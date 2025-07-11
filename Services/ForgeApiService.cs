@@ -56,7 +56,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     private static string GenerateCacheKey(string operation, params object[] parameters)
     {
         var keyParts = new List<string> { operation };
-        keyParts.AddRange(parameters.Select(p => p?.ToString() ?? "null"));
+        keyParts.AddRange(parameters.Select(p => p.ToString() ?? "null"));
         return string.Join("_", keyParts);
     }
 
