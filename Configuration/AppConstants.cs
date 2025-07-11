@@ -51,7 +51,7 @@ public static class AppConstants
         new()
         {
             FromName = "Adam's Boxes at Ref (BARF)",
-            FromAuthor = "",
+            FromAuthor = "Adam",
             ToName = "Boxes at ReF (BARF)",
             ToAuthor = "AcidMC",
         },
@@ -410,6 +410,13 @@ public static class AppConstants
         {
             FromName = "DeHazardifier",
             FromAuthor = "Tetris",
+            ToName = "DeHazardifier - Updated by Tetris",
+            ToAuthor = "TetrisGG",
+        },
+        new()
+        {
+            FromName = "TYR_DeHazardifier",
+            FromAuthor = "",
             ToName = "DeHazardifier - Updated by Tetris",
             ToAuthor = "TetrisGG",
         },
