@@ -1,0 +1,7 @@
+{
+    "RunOnSave": true,
+    "LogDebugMessages": false,
+    "CustomPath": null,
+    "UseCustomPath": null,
+    "DisableCSharpierServer": false
+}

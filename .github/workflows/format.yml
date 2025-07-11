@@ -1,0 +1,37 @@
+name: Format
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches-ignore:
+      - main
+
+jobs:
+  dotnet-format:
+    if: "!contains(github.event.head_commit.message, 'style: automatic fixes')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0
+
+      - name: Restore Tool Dependencies
+        run: dotnet tool install -g csharpier
+
+      - name: CSharpier Format
+        run: csharpier format .
+
+      - uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: "style: automatic fixes"
+          commit_user_name: Refringe
+          commit_user_email: me@refringe.com
+          commit_author: Refringe <me@refringe.com>
