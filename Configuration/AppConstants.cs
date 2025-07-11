@@ -18,6 +18,8 @@ public static class AppConstants
         ("server", "Fika"), // Not on Forge
         ("Skills Extended", "dirtbikercj"), // Not on Forge
         ("ProfileEditorHelper", "SkiTles55"), // In-app helper mod, not on Forge
+        ("RemoveTimeGateFromQuests", "Cj"), // Not on Forge
+        ("SERVPH's Tarky Menu", ""), // Not on Forge
     ];
     
     /// <summary>
@@ -57,7 +59,7 @@ public static class AppConstants
         new ModUpdateInfo { FromName = "RheddElBozo - SPT Battlepass", FromAuthor = "RheddElBozo", ToName = "SPT Battlepass", ToAuthor = "Pluto!" },
         new ModUpdateInfo { FromName = "MarkedRoomLoot", FromAuthor = "Valens", ToName = "Make Marked Room Loot Great Again", ToAuthor = "Valens" },
         new ModUpdateInfo { FromName = "SVM", FromAuthor = "GhostFenixx", ToName = "Server Value Modifier [SVM]", ToAuthor = "GhostFenixx" },
-        new ModUpdateInfo { FromName = "WTT-PackNStrap", FromAuthor = "", ToName = "WTT - Pack 'n' Strap", ToAuthor = "GrooveypenguinX" },
+        new ModUpdateInfo { FromName = "WTT-PackNStrap", FromAuthor = "", ToName = "WTT Pack N Strap", ToAuthor = "GrooveypenguinX" },
         new ModUpdateInfo { FromName = "Wisps-InfMeds", FromAuthor = "", ToName = "INFMEDS-Update BY WispsFlame", ToAuthor = "WispsFlame" },
         new ModUpdateInfo { FromName = "Rocka's Corner Store", FromAuthor = "RockaHorse", ToName = "WTT - Corner Store", ToAuthor = "rockahorse" },
         new ModUpdateInfo { FromName = "props-doorbreacher", FromAuthor = "Props", ToName = "Backdoor Bandit", ToAuthor = "MakerMacher" },
@@ -84,6 +86,14 @@ public static class AppConstants
         new ModUpdateInfo { FromName = "shiny_airdrop_guns", FromAuthor = "leaves", ToName = "Shiny Airdrop Guns!", ToAuthor = "DeadLeaves" },
         new ModUpdateInfo { FromName = "ReflexSightsRework", FromAuthor = "SamSwat", ToName = "Reflex Sights Rework - Updated", ToAuthor = "stckytwl" },
         new ModUpdateInfo { FromName = "no-pmcbot-response", FromAuthor = "schkuromi", ToName = "No PMC Bot Response", ToAuthor = "sch_kuromi" },
+        new ModUpdateInfo { FromName = "Expanded Task Text", FromAuthor = "Dirtbikercj", ToName = "Expanded Task Text (ETT)", ToAuthor = "FriedEngineer" },
+        new ModUpdateInfo { FromName = "Mass_ISOH", FromAuthor = "AmightyTank", ToName = "Massivesoft Guns", ToAuthor = "AmightyTank" },
+        new ModUpdateInfo { FromName = "Mass_MCW", FromAuthor = "AmightyTank", ToName = "Massivesoft Guns", ToAuthor = "AmightyTank" },
+        new ModUpdateInfo { FromName = "Mass_QBZ03", FromAuthor = "AmightyTank", ToName = "Massivesoft Guns", ToAuthor = "AmightyTank" },
+        new ModUpdateInfo { FromName = "Mass_QBZ97", FromAuthor = "AmightyTank", ToName = "Massivesoft Guns", ToAuthor = "AmightyTank" },
+        new ModUpdateInfo { FromName = "Mass_Tavor_95", FromAuthor = "AmightyTank", ToName = "Massivesoft Guns", ToAuthor = "AmightyTank" },
+
+        // new ModUpdateInfo { FromName = "xxxxxx", FromAuthor = "xxxxxx", ToName = "xxxxxx", ToAuthor = "xxxxxx" },
     ];
     
     /// <summary>
@@ -92,6 +102,7 @@ public static class AppConstants
     /// </summary>
     public static readonly List<ModUpdateInfo> ClientModUpdates =
     [
+        new ModUpdateInfo { FromName = "MOAR", FromAuthor = "MOAR", ToName = "MOAR + Bagels - Ultra lite spawn mod", ToAuthor = "DewardianDev" },
         new ModUpdateInfo { FromName = "Graphics", FromAuthor = "", ToName = "Amands's Graphics", ToAuthor = "Amands2Mello" },
         new ModUpdateInfo { FromName = "FOVFix", FromAuthor = "", ToName = "Fontaine's FOV Fix", ToAuthor = "Fontaine" },
         new ModUpdateInfo { FromName = "TraderScrolling", FromAuthor = "Kaeno", ToName = "Kaeno-TraderScrolling", ToAuthor = "CWX" },
@@ -113,5 +124,6 @@ public static class AppConstants
         new ModUpdateInfo { FromName = "Dynamic External Resolution", FromAuthor = "", ToName = "Dynamic External Resolution Patch (DERP) 3.11 port", ToAuthor = "Sh1ba" },
         new ModUpdateInfo { FromName = "UnderFire", FromAuthor = "rpmwpm", ToName = "UnderFire - An Adrenaline Effect", ToAuthor = "rpmwpm" },
         new ModUpdateInfo { FromName = "DeHazardifier", FromAuthor = "Tetris", ToName = "DeHazardifier - Updated by Tetris", ToAuthor = "TetrisGG" },
+        new ModUpdateInfo { FromName = "FOV", FromAuthor = "SamSWAT", ToName = "SamSWAT's IncreasedFOV", ToAuthor = "Devraccoon" },
     ];
 }
