@@ -22,7 +22,9 @@ public static partial class SecurityHelper
     public static string? GetSafePath(string? inputPath, string? basePath = null)
     {
         if (string.IsNullOrWhiteSpace(inputPath))
+        {
             return null;
+        }
 
         try
         {
@@ -31,7 +33,9 @@ public static partial class SecurityHelper
 
             // If a base path is provided, ensure the resolved path is within it
             if (string.IsNullOrWhiteSpace(basePath))
+            {
                 return fullPath;
+            }
 
             var baseFullPath = Path.GetFullPath(basePath);
 

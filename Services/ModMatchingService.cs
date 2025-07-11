@@ -41,7 +41,9 @@ public class ModMatchingService
     public static MatchResult? FindBestMatch(ModPackage localMod, List<ModSearchResult> searchResults)
     {
         if (searchResults.Count == 0)
+        {
             return null;
+        }
 
         var scoredResults = searchResults
             .Select(result => CalculateMatchConfidence(localMod, result))

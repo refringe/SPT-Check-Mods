@@ -73,13 +73,18 @@ public class ModService(IForgeApiService forgeApiService, ModMatchingService mat
     {
         var mods = new List<ModPackage>();
         if (!Directory.Exists(modsDirPath))
+        {
             return mods;
+        }
 
         foreach (var dir in Directory.GetDirectories(modsDirPath))
         {
             var packageJsonPath = Path.Combine(dir, "package.json");
             if (!File.Exists(packageJsonPath))
+            {
                 continue;
+            }
+
             try
             {
                 var jsonContent = File.ReadAllText(packageJsonPath);
@@ -88,7 +93,9 @@ public class ModService(IForgeApiService forgeApiService, ModMatchingService mat
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
                 );
                 if (package != null)
+                {
                     mods.Add(package);
+                }
             }
             catch (Exception ex)
             {
@@ -97,6 +104,7 @@ public class ModService(IForgeApiService forgeApiService, ModMatchingService mat
                 );
             }
         }
+
         return mods;
     }
 
@@ -145,6 +153,7 @@ public class ModService(IForgeApiService forgeApiService, ModMatchingService mat
         {
             AnsiConsole.MarkupLine($"- [red]Invalid Version:[/] {finalInvalidVersionCount}");
         }
+
         AnsiConsole.WriteLine();
 
         return orderedResults;
@@ -183,7 +192,7 @@ public class ModService(IForgeApiService forgeApiService, ModMatchingService mat
                     }
 
                     // Update progress
-                    var percentage = (current * 100) / totalCount;
+                    var percentage = current * 100 / totalCount;
                     AnsiConsole.MarkupLine(
                         $"[grey]Progress: {current}/{totalCount} ({percentage}%) - {result.ProcessedMod.Mod.Name.EscapeMarkup()} - {result.ProcessedMod.Status.ToDisplayString()}[/]"
                     );
@@ -313,7 +322,9 @@ public class ModService(IForgeApiService forgeApiService, ModMatchingService mat
         var update = AppConstants.ModUpdates.FirstOrDefault(u => u.FromName == mod.Name && u.FromAuthor == mod.Author);
 
         if (update == null)
+        {
             return mod;
+        }
 
         return new ModPackage
         {
@@ -375,7 +386,9 @@ public class ModService(IForgeApiService forgeApiService, ModMatchingService mat
             }
 
             if (!verificationResult.RequiresConfirmation)
+            {
                 return (ModStatus.NoMatch, null, null, verificationResult.ConfidenceScore);
+            }
 
             var pendingConfirmation = new PendingConfirmation(
                 modToCheck,
@@ -412,11 +425,15 @@ public class ModService(IForgeApiService forgeApiService, ModMatchingService mat
         {
             var searchResults = await forgeApiService.SearchModsAsync(mod.Name, sptVersion);
             if (searchResults.Count == 0)
+            {
                 return new ModVerificationResult(false, null);
+            }
 
             var bestMatch = ModMatchingService.FindBestMatch(mod, searchResults);
             if (bestMatch == null)
+            {
                 return new ModVerificationResult(false, null);
+            }
 
             return new ModVerificationResult(
                 bestMatch.IsHighConfidence,

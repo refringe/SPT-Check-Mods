@@ -19,7 +19,10 @@ public class ProcessedMod
     /// <summary>
     /// The processing status of the mod.
     /// </summary>
-    public ModStatus Status => Record.Status;
+    public ModStatus Status
+    {
+        get { return Record.Status; }
+    }
 
     /// <summary>
     /// The API search result that matched this mod, if any.
@@ -39,7 +42,9 @@ public class ProcessedMod
         ApiMatch = apiMatch;
 
         if (apiMatch == null || status != ModStatus.Verified)
+        {
             return;
+        }
 
         Record.UpdateFromApiMatch(apiMatch, 100);
         Record.IsConfirmed = true;

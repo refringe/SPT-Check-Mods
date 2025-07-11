@@ -38,7 +38,9 @@ public class ClientModService(IForgeApiService forgeApiService, BepInExScannerSe
         );
 
         if (updateInfo == null)
+        {
             return originalMod;
+        }
 
         return new ClientModPackage
         {
@@ -140,7 +142,7 @@ public class ClientModService(IForgeApiService forgeApiService, BepInExScannerSe
                     }
 
                     // Update progress
-                    var percentage = (current * 100) / totalCount;
+                    var percentage = current * 100 / totalCount;
                     AnsiConsole.MarkupLine(
                         $"[grey]Progress: {current}/{totalCount} ({percentage}%) - {result.ProcessedMod.Mod.Name.EscapeMarkup()} - {result.ProcessedMod.Status.ToDisplayString()}[/]"
                     );
@@ -374,11 +376,15 @@ public class ClientModService(IForgeApiService forgeApiService, BepInExScannerSe
         {
             var searchResults = await forgeApiService.SearchClientModsAsync(mod.Name, sptVersion);
             if (searchResults.Count == 0)
+            {
                 return new ModVerificationResult(false, null);
+            }
 
             var bestMatch = FindBestClientModMatch(mod, searchResults);
             if (bestMatch == null)
+            {
                 return new ModVerificationResult(false, null);
+            }
 
             return bestMatch.Score switch
             {
@@ -412,7 +418,9 @@ public class ClientModService(IForgeApiService forgeApiService, BepInExScannerSe
     private MatchResult? FindBestClientModMatch(ClientModPackage mod, List<ModSearchResult> searchResults)
     {
         if (searchResults.Count == 0)
+        {
             return null;
+        }
 
         var scoredResults = searchResults
             .Select(result =>

@@ -55,12 +55,14 @@ public class ClientModPackage
     /// dash separator, dot separator, GUID parsing, and filename parsing.
     /// </summary>
     /// <param name="fullName">The full plugin name from the BepInPlugin attribute.</param>
-    /// <param name="guid">The plugin GUID which may contain author information.</param>
+    /// <param name="guid">The plugin GUID.</param>
     /// <returns>A tuple containing the parsed author and mod name.</returns>
     private static (string Author, string Name) ParseAuthorAndName(string fullName, string guid)
     {
         if (string.IsNullOrWhiteSpace(fullName))
+        {
             return ("", "Unknown");
+        }
 
         // Try to parse Author-ModName format first (dash separator)
         var dashIndex = fullName.IndexOf('-');

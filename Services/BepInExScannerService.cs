@@ -48,7 +48,7 @@ public class BepInExScannerService
     /// <summary>
     /// Gets valid DLL files from the plugins directory, filtering by size.
     /// </summary>
-    /// <param name="pluginsPath">Path to the plugins directory.</param>
+    /// <param name="pluginsPath">Path to the plugins' directory.</param>
     /// <returns>List of valid DLL file paths.</returns>
     private static List<string> GetValidDllFiles(string pluginsPath)
     {
@@ -187,7 +187,9 @@ public class BepInExScannerService
         );
 
         if (bepInPluginAttribute == null || bepInPluginAttribute.ConstructorArguments.Count < 3)
+        {
             return null;
+        }
 
         // Extract constructor arguments: GUID, Name, Version
         var guid = bepInPluginAttribute.ConstructorArguments[0].Value?.ToString() ?? "";
@@ -195,7 +197,9 @@ public class BepInExScannerService
         var version = bepInPluginAttribute.ConstructorArguments[2].Value?.ToString() ?? "";
 
         if (string.IsNullOrWhiteSpace(guid) || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(version))
+        {
             return null;
+        }
 
         return new BepInPluginAttribute(guid, name, version);
     }

@@ -10,10 +10,11 @@ public static class ModStatusExtensions
     /// Converts a ModStatus enum value to a formatted display string with color markup.
     /// </summary>
     /// <param name="status">The ModStatus to format.</param>
-    /// <returns>A formatted string with Spectre.Console color markup.</returns>
+    /// <returns>A formatted string with Spectre Console color markup.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the status is not a valid ModStatus value.</exception>
-    public static string ToDisplayString(this ModStatus status) =>
-        status switch
+    public static string ToDisplayString(this ModStatus status)
+    {
+        return status switch
         {
             ModStatus.Verified => "[green]Verified[/]",
             ModStatus.NoMatch => "[red]No Match[/]",
@@ -22,4 +23,5 @@ public static class ModStatusExtensions
             ModStatus.NeedsConfirmation => "[yellow]Needs Confirmation[/]",
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
         };
+    }
 }

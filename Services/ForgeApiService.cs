@@ -15,8 +15,9 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     : IForgeApiService
 {
     private const string ForgeApiBaseUrl = "https://forge.sp-tarkov.com/api/v0/";
-    private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(10);
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(10);
+
+    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>
     /// A regular expression to convert camelCase strings to space-separated words.
@@ -33,11 +34,15 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     private static string ConvertCamelCaseToSpaces(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
+        {
             return input;
+        }
 
         // Handle special cases where the entire string is uppercase (like "MOAR")
         if (input.All(c => !char.IsLetter(c) || char.IsUpper(c)))
+        {
             return input;
+        }
 
         return ConvertCamelCaseRegex().Replace(input, " ").Trim();
     }
@@ -73,7 +78,9 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     public async Task<bool> ValidateApiKeyAsync(string apiKey)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
+        {
             return false;
+        }
 
         var cacheKey = GenerateCacheKey("validate_api_key", apiKey.GetHashCode());
         if (cache.TryGetValue(cacheKey, out bool cachedResult))
@@ -89,10 +96,10 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             var response = await httpClient.SendAsync(request);
             var jsonContent = await response.Content.ReadAsStringAsync();
-            var authResponse = JsonSerializer.Deserialize<AuthAbilitiesResponse>(jsonContent, JsonOptions);
+            var authResponse = JsonSerializer.Deserialize<AuthAbilitiesResponse>(jsonContent, _jsonOptions);
             var result = authResponse is { Success: true, Data: not null } && authResponse.Data.Contains("read");
 
-            cache.Set(cacheKey, result, CacheExpiration);
+            cache.Set(cacheKey, result, _cacheExpiration);
             return result;
         }
         catch
@@ -124,7 +131,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
             var result =
                 apiResponse is { Success: true, Data: not null } && apiResponse.Data.Any(v => v.Version == sptVersion);
 
-            cache.Set(cacheKey, result, CacheExpiration);
+            cache.Set(cacheKey, result, _cacheExpiration);
             return result;
         }
         catch
@@ -134,8 +141,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     }
 
     /// <summary>
-    /// Searches for server mods using the Forge API.
-    /// search results.
+    /// Searches for server mods using the Forge API search results.
     /// </summary>
     /// <param name="modName">The name of the mod to search for.</param>
     /// <param name="sptVersion">The SPT version to filter by.</param>
@@ -173,7 +179,9 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     public async Task<ModSearchResult?> GetModByIdAsync(int modId)
     {
         if (modId <= 0)
+        {
             return null;
+        }
 
         var cacheKey = GenerateCacheKey("get_mod", modId);
         if (cache.TryGetValue(cacheKey, out ModSearchResult? cachedResult))
@@ -186,7 +194,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
             var url = $"{ForgeApiBaseUrl}mods/{modId}?include=owner,versions";
             var result = await MakeApiCallAsync<ModSearchResult>(url, cacheKey, isDataWrapped: true);
 
-            cache.Set(cacheKey, result, CacheExpiration);
+            cache.Set(cacheKey, result, _cacheExpiration);
             return result;
         }
         catch
@@ -221,7 +229,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
             );
 
             var result = apiResponse is { Success: true, Data: not null } ? apiResponse.Data : [];
-            cache.Set(cacheKey, result, CacheExpiration);
+            cache.Set(cacheKey, result, _cacheExpiration);
             return result;
         }
         catch (Exception ex)
@@ -262,7 +270,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
             );
 
             var result = apiResponse is { Success: true, Data: not null } ? apiResponse.Data : [];
-            cache.Set(cacheKey, result, CacheExpiration);
+            cache.Set(cacheKey, result, _cacheExpiration);
             return result;
         }
         catch (Exception ex)
@@ -304,7 +312,9 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
             var jsonContent = await response.Content.ReadAsStringAsync();
 
             if (!isDataWrapped)
-                return JsonSerializer.Deserialize<T>(jsonContent, JsonOptions);
+            {
+                return JsonSerializer.Deserialize<T>(jsonContent, _jsonOptions);
+            }
 
             var jsonDoc = JsonDocument.Parse(jsonContent);
             if (
@@ -316,7 +326,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
                 return default;
             }
 
-            return JsonSerializer.Deserialize<T>(dataElement.GetRawText(), JsonOptions);
+            return JsonSerializer.Deserialize<T>(dataElement.GetRawText(), _jsonOptions);
         }
         catch (Exception ex)
         {

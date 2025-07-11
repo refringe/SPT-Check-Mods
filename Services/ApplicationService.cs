@@ -28,17 +28,23 @@ public class ApplicationService(
             // API key setup
             var apiKey = await SetupApiKeyAsync();
             if (apiKey == null)
+            {
                 return;
+            }
 
             // SPT path validation
             var sptPath = GetValidatedSptPath(args);
             if (sptPath == null)
+            {
                 return;
+            }
 
             // SPT version validation
             var sptVersion = await ValidateSptInstallationAsync(sptPath);
             if (sptVersion == null)
+            {
                 return;
+            }
 
             // Process mods
             var (serverMods, clientMods) = await ProcessAllModsAsync(sptPath, sptVersion);
@@ -71,7 +77,9 @@ public class ApplicationService(
     {
         var apiKey = await GetAndValidateApiKey();
         if (apiKey == null)
+        {
             return null;
+        }
 
         forgeApiService.SetApiKey(apiKey);
         return apiKey;
@@ -121,7 +129,9 @@ public class ApplicationService(
     {
         var sptVersion = await modService.GetAndValidateSptVersionAsync(sptPath);
         if (sptVersion == null)
+        {
             return null;
+        }
 
         AnsiConsole.MarkupLine($"[green]Successfully validated SPT Version:[/] [bold]{sptVersion}[/]");
         AnsiConsole.WriteLine();
@@ -202,7 +212,9 @@ public class ApplicationService(
     )
     {
         if (serverMods.Count == 0 && clientMods.Count == 0)
+        {
             return;
+        }
 
         ShowCombinedResults(serverMods, clientMods);
         await ShowVersionUpdateTable(serverMods, clientMods, sptVersion);
@@ -252,7 +264,9 @@ public class ApplicationService(
             );
 
             if (string.IsNullOrWhiteSpace(newKey))
+            {
                 continue;
+            }
 
             // Sanitize API key
             newKey = SecurityHelper.SanitizeInput(newKey);
