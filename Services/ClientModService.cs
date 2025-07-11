@@ -358,23 +358,22 @@ public class ClientModService(IForgeApiService forgeApiService, BepInExScannerSe
 
         var scoredResults = searchResults.Select(result =>
         {
-            var nameScore = ModMatchingService.CalculateMatchConfidence(
-                new ModPackage { Name = mod.Name, Author = mod.Author, Version = mod.Version, SptVersion = "" },
-                result);
-            
-            // For client mods, handle cases where author may be unknown
+            // For client mods, handle cases where the author is unknown
             if (string.IsNullOrWhiteSpace(mod.Author))
             {
-                // Only use name score when author is unknown
+                // Only use the name score
+                var nameOnlyScore = FuzzySharp.Fuzz.Ratio(mod.Name, result.Name);
                 return new MatchResult
                 {
                     ApiResult = result,
-                    Score = nameScore.Score,
-                    IsHighConfidence = nameScore.Score >= 75,
-                    IsMediumConfidence = nameScore.Score >= 1 && nameScore.Score < 75
+                    Score = nameOnlyScore,
+                    IsHighConfidence = nameOnlyScore >= 75,
+                    IsMediumConfidence = nameOnlyScore >= 1 && nameOnlyScore < 75
                 };
             }
             
+            // Use standard matching when the author is available
+            var nameScore = ModMatchingService.CalculateMatchConfidence(new ModPackage { Name = mod.Name, Author = mod.Author, Version = mod.Version, SptVersion = "" }, result);
             return nameScore;
         }).OrderByDescending(x => x.Score).ToList();
 
