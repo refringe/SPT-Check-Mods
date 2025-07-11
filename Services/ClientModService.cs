@@ -143,8 +143,13 @@ public class ClientModService(IForgeApiService forgeApiService, BepInExScannerSe
 
                     // Update progress
                     var percentage = current * 100 / totalCount;
+                    var modDisplayName = result.ProcessedMod.Mod.Name.EscapeMarkup();
+                    if (!string.IsNullOrWhiteSpace(result.ProcessedMod.Mod.Author))
+                    {
+                        modDisplayName += $" by {result.ProcessedMod.Mod.Author.EscapeMarkup()}";
+                    }
                     AnsiConsole.MarkupLine(
-                        $"[grey]Progress: {current}/{totalCount} ({percentage}%) - {result.ProcessedMod.Mod.Name.EscapeMarkup()} - {result.ProcessedMod.Status.ToDisplayString()}[/]"
+                        $"[grey]Progress: {current}/{totalCount} ({percentage}%) - {modDisplayName} - {result.ProcessedMod.Status.ToDisplayString()}[/]"
                     );
                 }
 
