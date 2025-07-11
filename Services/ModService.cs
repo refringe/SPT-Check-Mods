@@ -12,7 +12,6 @@ namespace CheckMods.Services;
 /// </summary>
 public class ModService(IForgeApiService forgeApiService) : IModService
 {
-
     /// <summary>
     /// Reads and validates the SPT version from the core.json configuration file.
     /// </summary>
