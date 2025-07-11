@@ -47,24 +47,24 @@ public class AssemblyResolver : MetadataAssemblyResolver
     private static IEnumerable<string> BuildMinimalAssemblySearchPaths(string dllPath)
     {
         var assemblyPaths = new List<string> { dllPath };
-        
+
         // Add .NET runtime assemblies, required for MetadataLoadContext core assembly
         var runtimeDir = RuntimeEnvironment.GetRuntimeDirectory();
         if (Directory.Exists(runtimeDir))
         {
             assemblyPaths.AddRange(Directory.GetFiles(runtimeDir, "*.dll"));
         }
-        
+
         // Add BepInEx core assemblies, required for BepInPlugin attribute resolution
         var pluginDir = Path.GetDirectoryName(dllPath) ?? "";
         var sptRoot = Path.GetDirectoryName(Path.GetDirectoryName(pluginDir)) ?? "";
         var bepInExCoreDir = Path.Combine(sptRoot, "BepInEx", "core");
-        
+
         if (Directory.Exists(bepInExCoreDir))
         {
             assemblyPaths.AddRange(Directory.GetFiles(bepInExCoreDir, "*.dll"));
         }
-        
+
         return assemblyPaths.Distinct();
     }
 }

@@ -10,7 +10,7 @@ public class ModMatchingService
 {
     private const int HighConfidenceThreshold = 75;
     private const int MediumConfidenceThreshold = 20;
-    
+
     /// <summary>
     /// Calculates match confidence between a local mod and API search result.
     /// </summary>
@@ -22,16 +22,16 @@ public class ModMatchingService
         var nameScore = Fuzz.Ratio(localMod.Name, apiResult.Name);
         var authorScore = Fuzz.Ratio(localMod.Author, apiResult.Owner?.Name ?? "");
         var overallScore = (nameScore * 2 + authorScore) / 3;
-        
+
         return new MatchResult
         {
             ApiResult = apiResult,
             Score = overallScore,
             IsHighConfidence = overallScore >= HighConfidenceThreshold,
-            IsMediumConfidence = overallScore is >= MediumConfidenceThreshold and < HighConfidenceThreshold
+            IsMediumConfidence = overallScore is >= MediumConfidenceThreshold and < HighConfidenceThreshold,
         };
     }
-    
+
     /// <summary>
     /// Finds the best matching mod from API search results.
     /// </summary>
@@ -40,13 +40,14 @@ public class ModMatchingService
     /// <returns>Best match result or null if no suitable match found.</returns>
     public static MatchResult? FindBestMatch(ModPackage localMod, List<ModSearchResult> searchResults)
     {
-        if (searchResults.Count == 0) return null;
-        
+        if (searchResults.Count == 0)
+            return null;
+
         var scoredResults = searchResults
             .Select(result => CalculateMatchConfidence(localMod, result))
             .OrderByDescending(x => x.Score)
             .ToList();
-            
+
         return scoredResults.FirstOrDefault();
     }
 }

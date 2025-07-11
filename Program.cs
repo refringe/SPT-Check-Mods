@@ -1,7 +1,7 @@
-using Spectre.Console;
 using CheckMods.Extensions;
 using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
+using Spectre.Console;
 
 namespace CheckMods;
 
@@ -22,7 +22,7 @@ public class Program
             var services = new ServiceCollection();
             services.AddCheckModsServices();
             await using var serviceProvider = services.BuildServiceProvider();
-            
+
             // Run the main application logic
             var applicationService = serviceProvider.GetRequiredService<IApplicationService>();
             await applicationService.RunAsync(args);

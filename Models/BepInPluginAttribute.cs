@@ -13,12 +13,12 @@ public class BepInPluginAttribute(string guid, string name, string version)
     /// The unique identifier for the plugin.
     /// </summary>
     public string Guid { get; set; } = guid;
-    
+
     /// <summary>
     /// The display name of the plugin.
     /// </summary>
     public string Name { get; set; } = name;
-    
+
     /// <summary>
     /// The version of the plugin.
     /// </summary>

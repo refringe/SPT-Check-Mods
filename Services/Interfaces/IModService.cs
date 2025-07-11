@@ -13,14 +13,14 @@ public interface IModService
     /// <param name="sptPath">Path to the SPT installation directory.</param>
     /// <returns>Validated SPT version or null if validation fails.</returns>
     Task<SemanticVersioning.Version?> GetAndValidateSptVersionAsync(string sptPath);
-    
+
     /// <summary>
     /// Scans the mods directory for server mods and reads their package.json files.
     /// </summary>
     /// <param name="modsDirPath">Path to the user/mods directory.</param>
     /// <returns>List of discovered mod packages.</returns>
     List<ModPackage> GetLocalMods(string modsDirPath);
-    
+
     /// <summary>
     /// Processes a list of local mods for compatibility with the specified SPT version.
     /// </summary>

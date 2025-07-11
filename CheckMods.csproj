@@ -1,34 +1,32 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <TargetFramework>net9.0</TargetFramework>
-        <LangVersion>latest</LangVersion>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <SelfContained>true</SelfContained>
-        <PublishSingleFile>true</PublishSingleFile>
-        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
-        <ApplicationIcon>check-mods.ico</ApplicationIcon>
-    </PropertyGroup>
-
-    <Target Name="RenamePublishedExe" AfterTargets="Publish">
-        <Exec Command="git rev-parse --short=6 HEAD" ConsoleToMsBuild="true">
-            <Output TaskParameter="ConsoleOutput" PropertyName="GitHash" />
-        </Exec>
-        <Exec Condition="'$(GitHash)' != ''"
-              Command="move &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash).exe&quot;" />
-    </Target>
-
-    <ItemGroup>
-      <PackageReference Include="FuzzySharp" Version="2.0.2" />
-      <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
-      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
-      <PackageReference Include="SemanticVersioning" Version="3.0.0" />
-      <PackageReference Include="Spectre.Console" Version="0.50.0" />
-      <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
-      <PackageReference Include="System.Threading.RateLimiting" Version="9.0.0" />
-    </ItemGroup>
-
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <ApplicationIcon>check-mods.ico</ApplicationIcon>
+  </PropertyGroup>
+  <Target Name="RenamePublishedExe" AfterTargets="Publish">
+    <Exec Command="git rev-parse --short=6 HEAD" ConsoleToMsBuild="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitHash" />
+    </Exec>
+    <Exec
+      Condition="'$(GitHash)' != ''"
+      Command="move &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash).exe&quot;"
+    />
+  </Target>
+  <ItemGroup>
+    <PackageReference Include="FuzzySharp" Version="2.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+    <PackageReference Include="SemanticVersioning" Version="3.0.0" />
+    <PackageReference Include="Spectre.Console" Version="0.50.0" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
+    <PackageReference Include="System.Threading.RateLimiting" Version="9.0.0" />
+  </ItemGroup>
 </Project>

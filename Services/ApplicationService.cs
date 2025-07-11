@@ -8,7 +8,11 @@ namespace CheckMods.Services;
 /// <summary>
 /// Main application service that orchestrates the SPT mod checking workflow.
 /// </summary>
-public class ApplicationService(IForgeApiService forgeApiService, IModService modService, IClientModService clientModService) : IApplicationService
+public class ApplicationService(
+    IForgeApiService forgeApiService,
+    IModService modService,
+    IClientModService clientModService
+) : IApplicationService
 {
     /// <summary>
     /// Main entry point for the application. Orchestrates API key validation, SPT path detection, mod scanning, and
@@ -23,15 +27,18 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
         {
             // API key setup
             var apiKey = await SetupApiKeyAsync();
-            if (apiKey == null) return;
+            if (apiKey == null)
+                return;
 
             // SPT path validation
             var sptPath = GetValidatedSptPath(args);
-            if (sptPath == null) return;
-            
+            if (sptPath == null)
+                return;
+
             // SPT version validation
             var sptVersion = await ValidateSptInstallationAsync(sptPath);
-            if (sptVersion == null) return;
+            if (sptVersion == null)
+                return;
 
             // Process mods
             var (serverMods, clientMods) = await ProcessAllModsAsync(sptPath, sptVersion);
@@ -63,8 +70,9 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     private async Task<string?> SetupApiKeyAsync()
     {
         var apiKey = await GetAndValidateApiKey();
-        if (apiKey == null) return null;
-        
+        if (apiKey == null)
+            return null;
+
         forgeApiService.SetApiKey(apiKey);
         return apiKey;
     }
@@ -77,7 +85,7 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     private static string? GetValidatedSptPath(string[] args)
     {
         string sptPath;
-        
+
         if (args.Length > 0)
         {
             var safePath = SecurityHelper.GetSafePath(args[0]);
@@ -86,20 +94,20 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
                 AnsiConsole.MarkupLine("[red]Error: Invalid path provided.[/]");
                 return null;
             }
-            
+
             if (!Directory.Exists(safePath))
             {
                 AnsiConsole.MarkupLine($"[red]Error: Directory does not exist: {safePath.EscapeMarkup()}[/]");
                 return null;
             }
-            
+
             sptPath = safePath;
         }
         else
         {
             sptPath = Directory.GetCurrentDirectory();
         }
-        
+
         AnsiConsole.MarkupLine($"[grey]Using Path:[/] {sptPath.EscapeMarkup()}");
         return sptPath;
     }
@@ -112,8 +120,9 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     private async Task<SemanticVersioning.Version?> ValidateSptInstallationAsync(string sptPath)
     {
         var sptVersion = await modService.GetAndValidateSptVersionAsync(sptPath);
-        if (sptVersion == null) return null;
-        
+        if (sptVersion == null)
+            return null;
+
         AnsiConsole.MarkupLine($"[green]Successfully validated SPT Version:[/] [bold]{sptVersion}[/]");
         AnsiConsole.WriteLine();
         return sptVersion;
@@ -126,14 +135,16 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     /// <param name="sptVersion">SPT version to check compatibility against.</param>
     /// <returns>Tuple of processed server and client mods.</returns>
     private async Task<(List<ProcessedMod> serverMods, List<ProcessedMod> clientMods)> ProcessAllModsAsync(
-        string sptPath, SemanticVersioning.Version sptVersion)
+        string sptPath,
+        SemanticVersioning.Version sptVersion
+    )
     {
         // Process server mods
         var serverMods = await ProcessServerModsAsync(sptPath, sptVersion);
-        
+
         // Process client mods
         var clientMods = await ProcessClientModsAsync(sptPath, sptVersion);
-        
+
         return (serverMods, clientMods);
     }
 
@@ -147,12 +158,12 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     {
         var modsDir = Path.Combine(sptPath, "user", "mods");
         var localMods = modService.GetLocalMods(modsDir);
-        
+
         if (localMods.Count > 0)
         {
             return await modService.ProcessModCompatibility(localMods, sptVersion);
         }
-        
+
         AnsiConsole.MarkupLine("[yellow]No server mods found.[/]");
         return [];
     }
@@ -167,13 +178,13 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     {
         var pluginsDir = Path.Combine(sptPath, "BepInEx", "plugins");
         var clientMods = clientModService.GetClientMods(pluginsDir);
-        
+
         if (clientMods.Count > 0)
         {
             AnsiConsole.WriteLine();
             return await clientModService.ProcessClientModCompatibility(clientMods, sptVersion);
         }
-        
+
         AnsiConsole.MarkupLine("[yellow]No client mods found.[/]");
         return [];
     }
@@ -184,11 +195,15 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     /// <param name="serverMods">Processed server mods.</param>
     /// <param name="clientMods">Processed client mods.</param>
     /// <param name="sptVersion">SPT version for compatibility checking.</param>
-    private async Task DisplayResultsAsync(List<ProcessedMod> serverMods, List<ProcessedMod> clientMods, 
-        SemanticVersioning.Version sptVersion)
+    private async Task DisplayResultsAsync(
+        List<ProcessedMod> serverMods,
+        List<ProcessedMod> clientMods,
+        SemanticVersioning.Version sptVersion
+    )
     {
-        if (serverMods.Count == 0 && clientMods.Count == 0) return;
-        
+        if (serverMods.Count == 0 && clientMods.Count == 0)
+            return;
+
         ShowCombinedResults(serverMods, clientMods);
         await ShowVersionUpdateTable(serverMods, clientMods, sptVersion);
     }
@@ -233,12 +248,12 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
         while (true)
         {
             var newKey = AnsiConsole.Prompt(
-                new TextPrompt<string>("Enter your [green]API key[/]:")
-                    .PromptStyle("green")
-                    .Secret());
+                new TextPrompt<string>("Enter your [green]API key[/]:").PromptStyle("green").Secret()
+            );
 
-            if (string.IsNullOrWhiteSpace(newKey)) continue;
-            
+            if (string.IsNullOrWhiteSpace(newKey))
+                continue;
+
             // Sanitize API key
             newKey = SecurityHelper.SanitizeInput(newKey);
 
@@ -252,10 +267,12 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
                 return newKey;
             }
 
-            AnsiConsole.MarkupLine("[red]Failed. The entered key is invalid or lacks 'read' permissions. Please try again.[/]");
+            AnsiConsole.MarkupLine(
+                "[red]Failed. The entered key is invalid or lacks 'read' permissions. Please try again.[/]"
+            );
         }
     }
-    
+
     /// <summary>
     /// Displays a summary of the mod matching results for both server and client mods. Shows counts for verified, no
     /// match, incompatible, and invalid version statuses.
@@ -265,28 +282,38 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     private static void ShowCombinedResults(List<ProcessedMod> serverMods, List<ProcessedMod> clientMods)
     {
         var allMods = serverMods.Concat(clientMods).ToList();
-        
+
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold blue]Overall Matching Summary:[/]");
-        
+
         var totalVerified = allMods.Count(m => m.Record.Status == ModStatus.Verified);
         var totalNoMatch = allMods.Count(m => m.Record.Status == ModStatus.NoMatch);
         var totalIncompatible = allMods.Count(m => m.Record.Status == ModStatus.Incompatible);
         var totalInvalidVersion = allMods.Count(m => m.Record.Status == ModStatus.InvalidVersion);
-        
-        AnsiConsole.MarkupLine($"[green]Verified:[/] {totalVerified} ([grey]Server: {serverMods.Count(m => m.Record.Status == ModStatus.Verified)}, Client: {clientMods.Count(m => m.Record.Status == ModStatus.Verified)}[/])");
-        AnsiConsole.MarkupLine($"[red]No Match:[/] {totalNoMatch} ([grey]Server: {serverMods.Count(m => m.Record.Status == ModStatus.NoMatch)}, Client: {clientMods.Count(m => m.Record.Status == ModStatus.NoMatch)}[/])");
-        AnsiConsole.MarkupLine($"[maroon]Incompatible:[/] {totalIncompatible} ([grey]Server: {serverMods.Count(m => m.Record.Status == ModStatus.Incompatible)}, Client: {clientMods.Count(m => m.Record.Status == ModStatus.Incompatible)}[/])");
-        
+
+        AnsiConsole.MarkupLine(
+            $"[green]Verified:[/] {totalVerified} ([grey]Server: {serverMods.Count(m => m.Record.Status == ModStatus.Verified)}, Client: {clientMods.Count(m => m.Record.Status == ModStatus.Verified)}[/])"
+        );
+        AnsiConsole.MarkupLine(
+            $"[red]No Match:[/] {totalNoMatch} ([grey]Server: {serverMods.Count(m => m.Record.Status == ModStatus.NoMatch)}, Client: {clientMods.Count(m => m.Record.Status == ModStatus.NoMatch)}[/])"
+        );
+        AnsiConsole.MarkupLine(
+            $"[maroon]Incompatible:[/] {totalIncompatible} ([grey]Server: {serverMods.Count(m => m.Record.Status == ModStatus.Incompatible)}, Client: {clientMods.Count(m => m.Record.Status == ModStatus.Incompatible)}[/])"
+        );
+
         if (totalInvalidVersion > 0)
         {
-            AnsiConsole.MarkupLine($"[red]Invalid Version:[/] {totalInvalidVersion} ([grey]Server: {serverMods.Count(m => m.Record.Status == ModStatus.InvalidVersion)}, Client: {clientMods.Count(m => m.Record.Status == ModStatus.InvalidVersion)}[/])");
+            AnsiConsole.MarkupLine(
+                $"[red]Invalid Version:[/] {totalInvalidVersion} ([grey]Server: {serverMods.Count(m => m.Record.Status == ModStatus.InvalidVersion)}, Client: {clientMods.Count(m => m.Record.Status == ModStatus.InvalidVersion)}[/])"
+            );
         }
-        
+
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[bold]Total Matched Mods:[/] {allMods.Count} ([grey]Server: {serverMods.Count}, Client: {clientMods.Count}[/])");
+        AnsiConsole.MarkupLine(
+            $"[bold]Total Matched Mods:[/] {allMods.Count} ([grey]Server: {serverMods.Count}, Client: {clientMods.Count}[/])"
+        );
     }
-    
+
     /// <summary>
     /// Displays a live-updating table showing version information for all verified mods. Checks each mod against the
     /// Forge API to determine if updates are available.
@@ -294,21 +321,26 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     /// <param name="serverMods">Processed server mods.</param>
     /// <param name="clientMods">Processed client mods.</param>
     /// <param name="sptVersion">SPT version for version compatibility checking.</param>
-    private async Task ShowVersionUpdateTable(List<ProcessedMod> serverMods, List<ProcessedMod> clientMods, SemanticVersioning.Version sptVersion)
+    private async Task ShowVersionUpdateTable(
+        List<ProcessedMod> serverMods,
+        List<ProcessedMod> clientMods,
+        SemanticVersioning.Version sptVersion
+    )
     {
         // Filter only verified mods
-        var verifiedMods = serverMods.Concat(clientMods)
+        var verifiedMods = serverMods
+            .Concat(clientMods)
             .Where(m => m.Record.Status == ModStatus.Verified && m.ApiMatch != null)
             .ToList();
-            
+
         if (verifiedMods.Count == 0)
         {
             return;
         }
-        
+
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold blue]Checking for updates...[/]");
-        
+
         // Create the live table
         var table = new Table()
             .Title("[yellow]Version Update Check[/]")
@@ -317,8 +349,9 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
             .AddColumn("[blue]Author[/]")
             .AddColumn("[blue]Current Version[/]")
             .AddColumn("[blue]Latest Version[/]");
-            
-        await AnsiConsole.Live(table)
+
+        await AnsiConsole
+            .Live(table)
             .AutoClear(false)
             .StartAsync(async ctx =>
             {
@@ -327,10 +360,10 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
                     var modName = mod.ApiMatch!.Name;
                     var author = mod.ApiMatch.Owner?.Name ?? "Unknown";
                     var currentVersion = mod.Mod.Version;
-                    
+
                     // Format display strings
                     var (displayName, displayAuthor) = FormatModDisplayStrings(modName, author);
-                    
+
                     // Add row with the current version
                     table.AddRow(
                         displayName.EscapeMarkup(),
@@ -339,22 +372,32 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
                         "[grey]Checking...[/]"
                     );
                     ctx.Refresh();
-                    
+
                     // Check for updates
-                    var latestVersionDisplay = await GetLatestVersionDisplayAsync(mod.ApiMatch.Id, currentVersion, sptVersion);
-                    
+                    var latestVersionDisplay = await GetLatestVersionDisplayAsync(
+                        mod.ApiMatch.Id,
+                        currentVersion,
+                        sptVersion
+                    );
+
                     // Update the last cell in the row
                     var rowCount = table.Rows.Count;
                     table.UpdateCell(rowCount - 1, 3, latestVersionDisplay);
                     ctx.Refresh();
                 }
             });
-        
-        AnsiConsole.MarkupLine("[grey]Version colors: [green]Up to date[/] | [red]Update available[/] | [yellow]Newer than latest[/][/]");
+
+        AnsiConsole.MarkupLine(
+            "[grey]Version colors: [green]Up to date[/] | [red]Update available[/] | [yellow]Newer than latest[/][/]"
+        );
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[fuchsia]This tool depends on mod authors to use and update valid version numbers. If you notice a version number in the Current Version column that is incorrect, please contact the author of the mod to have it updated.[/]");
+        AnsiConsole.MarkupLine(
+            "[fuchsia]This tool depends on mod authors to use and update valid version numbers. If you notice a version number in the Current Version column that is incorrect, please contact the author of the mod to have it updated.[/]"
+        );
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[fuchsia]Find an issue? Find [italic]Refringe[/] on Discord, or submit a bug report here:[/]");
+        AnsiConsole.MarkupLine(
+            "[fuchsia]Find an issue? Find [italic]Refringe[/] on Discord, or submit a bug report here:[/]"
+        );
         AnsiConsole.MarkupLine("[link]https://github.com/refringe/SPT-Check-Mods/issues/new[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[fuchsia]>:{}[/]");
@@ -370,15 +413,11 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     {
         const int maxNameLength = 40;
         const int maxAuthorLength = 20;
-        
-        var displayName = modName.Length > maxNameLength 
-            ? modName[..(maxNameLength - 3)] + "..." 
-            : modName;
-            
-        var displayAuthor = author.Length > maxAuthorLength
-            ? author[..(maxAuthorLength - 3)] + "..."
-            : author;
-            
+
+        var displayName = modName.Length > maxNameLength ? modName[..(maxNameLength - 3)] + "..." : modName;
+
+        var displayAuthor = author.Length > maxAuthorLength ? author[..(maxAuthorLength - 3)] + "..." : author;
+
         return (displayName, displayAuthor);
     }
 
@@ -389,11 +428,14 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
     /// <param name="currentVersion">Current installed version.</param>
     /// <param name="sptVersion">SPT version for compatibility checking.</param>
     /// <returns>Formatted version string with color markup.</returns>
-    private async Task<string> GetLatestVersionDisplayAsync(int modId, string currentVersion, 
-        SemanticVersioning.Version sptVersion)
+    private async Task<string> GetLatestVersionDisplayAsync(
+        int modId,
+        string currentVersion,
+        SemanticVersioning.Version sptVersion
+    )
     {
         var versions = await forgeApiService.GetModVersionsAsync(modId, sptVersion);
-        
+
         if (versions.Count == 0)
         {
             return "[grey]No versions found[/]";
@@ -415,7 +457,7 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
         {
             var current = new SemanticVersioning.Version(currentVersion);
             var latest = new SemanticVersioning.Version(latestVersion);
-            
+
             if (latest > current)
             {
                 return $"[red]{latestVersion.EscapeMarkup()}[/]";
@@ -432,8 +474,8 @@ public class ApplicationService(IForgeApiService forgeApiService, IModService mo
         catch
         {
             // Fallback to string comparison if version parsing fails
-            return latestVersion == currentVersion 
-                ? $"[green]{latestVersion.EscapeMarkup()}[/]" 
+            return latestVersion == currentVersion
+                ? $"[green]{latestVersion.EscapeMarkup()}[/]"
                 : $"[red]{latestVersion.EscapeMarkup()}[/]";
         }
     }

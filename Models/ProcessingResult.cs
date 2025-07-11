@@ -12,7 +12,7 @@ public class ProcessingResult(ProcessedMod processedMod, PendingConfirmation? pe
     /// The processed mod containing verification results and status information.
     /// </summary>
     public ProcessedMod ProcessedMod { get; set; } = processedMod;
-    
+
     /// <summary>
     /// The pending confirmation if the match requires user interaction due to low confidence.
     /// Null if no confirmation is required.

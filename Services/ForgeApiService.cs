@@ -11,18 +11,19 @@ namespace CheckMods.Services;
 /// Service for interacting with the Forge API, providing caching and rate limiting. Handles authentication, mod
 /// searching, version validation, and data retrieval.
 /// </summary>
-public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, IRateLimitService rateLimitService) : IForgeApiService
+public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, IRateLimitService rateLimitService)
+    : IForgeApiService
 {
     private const string ForgeApiBaseUrl = "https://forge.sp-tarkov.com/api/v0/";
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(10);
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-    
+
     /// <summary>
     /// A regular expression to convert camelCase strings to space-separated words.
     /// </summary>
     [GeneratedRegex(@"(?<!^)(?<![\p{Lu}])(?=[\p{Lu}])|(?<=[\p{Ll}])(?=[\p{Lu}])")]
     private static partial Regex ConvertCamelCaseRegex();
-    
+
     /// <summary>
     /// Converts camelCase strings to space-separated words for better API search results. Handles special cases like
     /// all-uppercase strings (MOAR, SPT, API).
@@ -33,11 +34,11 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     {
         if (string.IsNullOrWhiteSpace(input))
             return input;
-            
+
         // Handle special cases where the entire string is uppercase (like "MOAR")
         if (input.All(c => !char.IsLetter(c) || char.IsUpper(c)))
             return input;
-            
+
         return ConvertCamelCaseRegex().Replace(input, " ").Trim();
     }
 
@@ -71,25 +72,26 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     /// <returns>True if the API key is valid and has read permissions.</returns>
     public async Task<bool> ValidateApiKeyAsync(string apiKey)
     {
-        if (string.IsNullOrWhiteSpace(apiKey)) return false;
-        
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return false;
+
         var cacheKey = GenerateCacheKey("validate_api_key", apiKey.GetHashCode());
         if (cache.TryGetValue(cacheKey, out bool cachedResult))
         {
             return cachedResult;
         }
-        
+
         try
         {
             await rateLimitService.WaitForApiCallAsync();
-            
+
             var request = new HttpRequestMessage(HttpMethod.Get, ForgeApiBaseUrl + "auth/abilities");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             var response = await httpClient.SendAsync(request);
             var jsonContent = await response.Content.ReadAsStringAsync();
             var authResponse = JsonSerializer.Deserialize<AuthAbilitiesResponse>(jsonContent, JsonOptions);
             var result = authResponse is { Success: true, Data: not null } && authResponse.Data.Contains("read");
-            
+
             cache.Set(cacheKey, result, CacheExpiration);
             return result;
         }
@@ -108,20 +110,20 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     {
         var escapedVersion = Uri.EscapeDataString(sptVersion);
         var cacheKey = GenerateCacheKey("validate_spt_version", escapedVersion);
-        
+
         if (cache.TryGetValue(cacheKey, out bool cachedResult))
         {
             return cachedResult;
         }
-        
+
         try
         {
             var url = $"{ForgeApiBaseUrl}spt/versions?filter[spt_version]={escapedVersion}";
             var apiResponse = await MakeApiCallAsync<SptVersionApiResponse>(url, cacheKey);
-            
-            var result = apiResponse is { Success: true, Data: not null } && 
-                        apiResponse.Data.Any(v => v.Version == sptVersion);
-            
+
+            var result =
+                apiResponse is { Success: true, Data: not null } && apiResponse.Data.Any(v => v.Version == sptVersion);
+
             cache.Set(cacheKey, result, CacheExpiration);
             return result;
         }
@@ -142,24 +144,27 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     {
         var searchQuery = ConvertCamelCaseToSpaces(modName);
         var cacheKey = GenerateCacheKey("search_mods", searchQuery, sptVersion);
-        
+
         return await SearchModsInternalAsync(searchQuery, sptVersion, cacheKey, "mod");
     }
-    
+
     /// <summary>
     /// Searches for client mods using the Forge API.
     /// </summary>
     /// <param name="modName">The name of the client mod to search for.</param>
     /// <param name="sptVersion">The SPT version to filter by.</param>
     /// <returns>List of matching client mod search results.</returns>
-    public async Task<List<ModSearchResult>> SearchClientModsAsync(string modName, SemanticVersioning.Version sptVersion)
+    public async Task<List<ModSearchResult>> SearchClientModsAsync(
+        string modName,
+        SemanticVersioning.Version sptVersion
+    )
     {
         var searchQuery = ConvertCamelCaseToSpaces(modName);
         var cacheKey = GenerateCacheKey("search_client_mods", searchQuery, sptVersion);
-        
+
         return await SearchModsInternalAsync(searchQuery, sptVersion, cacheKey, "client mod");
     }
-    
+
     /// <summary>
     /// Retrieves a specific mod by its ID from the Forge API.
     /// </summary>
@@ -167,19 +172,20 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     /// <returns>The mod search result or null if not found.</returns>
     public async Task<ModSearchResult?> GetModByIdAsync(int modId)
     {
-        if (modId <= 0) return null;
-        
+        if (modId <= 0)
+            return null;
+
         var cacheKey = GenerateCacheKey("get_mod", modId);
         if (cache.TryGetValue(cacheKey, out ModSearchResult? cachedResult))
         {
             return cachedResult;
         }
-        
+
         try
         {
             var url = $"{ForgeApiBaseUrl}mods/{modId}?include=owner,versions";
             var result = await MakeApiCallAsync<ModSearchResult>(url, cacheKey, isDataWrapped: true);
-            
+
             cache.Set(cacheKey, result, CacheExpiration);
             return result;
         }
@@ -188,7 +194,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
             return null;
         }
     }
-    
+
     /// <summary>
     /// Retrieves all versions of a specific mod that are compatible with the given SPT version. Results are sorted by
     /// version and creation date (newest first).
@@ -203,12 +209,17 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
         {
             return cachedResult ?? [];
         }
-        
+
         try
         {
-            var url = $"{ForgeApiBaseUrl}mod/{modId}/versions?filter[spt_version]={sptVersion}&sort=-version,-created_at";
-            var apiResponse = await MakeApiCallAsync<ModVersionsApiResponse>(url, cacheKey, logContext: $"mod versions (ID: {modId})");
-            
+            var url =
+                $"{ForgeApiBaseUrl}mod/{modId}/versions?filter[spt_version]={sptVersion}&sort=-version,-created_at";
+            var apiResponse = await MakeApiCallAsync<ModVersionsApiResponse>(
+                url,
+                cacheKey,
+                logContext: $"mod versions (ID: {modId})"
+            );
+
             var result = apiResponse is { Success: true, Data: not null } ? apiResponse.Data : [];
             cache.Set(cacheKey, result, CacheExpiration);
             return result;
@@ -228,18 +239,28 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     /// <param name="cacheKey">The cache key for storing results.</param>
     /// <param name="modType">The type of mod being searched (for logging).</param>
     /// <returns>List of matching mod search results.</returns>
-    private async Task<List<ModSearchResult>> SearchModsInternalAsync(string searchQuery, SemanticVersioning.Version sptVersion, string cacheKey, string modType)
+    private async Task<List<ModSearchResult>> SearchModsInternalAsync(
+        string searchQuery,
+        SemanticVersioning.Version sptVersion,
+        string cacheKey,
+        string modType
+    )
     {
         if (cache.TryGetValue(cacheKey, out List<ModSearchResult>? cachedResult))
         {
             return cachedResult ?? [];
         }
-        
+
         try
         {
-            var url = $"{ForgeApiBaseUrl}mods?query={Uri.EscapeDataString(searchQuery)}&filter[spt_version]={sptVersion}&include=owner,versions";
-            var apiResponse = await MakeApiCallAsync<ModSearchApiResponse>(url, cacheKey, logContext: $"{modType} '{searchQuery}'");
-            
+            var url =
+                $"{ForgeApiBaseUrl}mods?query={Uri.EscapeDataString(searchQuery)}&filter[spt_version]={sptVersion}&include=owner,versions";
+            var apiResponse = await MakeApiCallAsync<ModSearchApiResponse>(
+                url,
+                cacheKey,
+                logContext: $"{modType} '{searchQuery}'"
+            );
+
             var result = apiResponse is { Success: true, Data: not null } ? apiResponse.Data : [];
             cache.Set(cacheKey, result, CacheExpiration);
             return result;
@@ -260,14 +281,19 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     /// <param name="isDataWrapped">Whether the response data is wrapped in a 'data' property.</param>
     /// <param name="logContext">Context information for logging errors.</param>
     /// <returns>The deserialized API response.</returns>
-    private async Task<T?> MakeApiCallAsync<T>(string url, string cacheKey, bool isDataWrapped = false, string? logContext = null)
+    private async Task<T?> MakeApiCallAsync<T>(
+        string url,
+        string cacheKey,
+        bool isDataWrapped = false,
+        string? logContext = null
+    )
     {
         try
         {
             await rateLimitService.WaitForApiCallAsync();
-            
+
             var response = await httpClient.GetAsync(url);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var context = logContext ?? "API request";
@@ -277,18 +303,20 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
 
             var jsonContent = await response.Content.ReadAsStringAsync();
 
-            if (!isDataWrapped) return JsonSerializer.Deserialize<T>(jsonContent, JsonOptions);
-            
+            if (!isDataWrapped)
+                return JsonSerializer.Deserialize<T>(jsonContent, JsonOptions);
+
             var jsonDoc = JsonDocument.Parse(jsonContent);
-            if (!jsonDoc.RootElement.TryGetProperty("success", out var successElement) ||
-                !successElement.GetBoolean() ||
-                !jsonDoc.RootElement.TryGetProperty("data", out var dataElement))
+            if (
+                !jsonDoc.RootElement.TryGetProperty("success", out var successElement)
+                || !successElement.GetBoolean()
+                || !jsonDoc.RootElement.TryGetProperty("data", out var dataElement)
+            )
             {
                 return default;
             }
-                
-            return JsonSerializer.Deserialize<T>(dataElement.GetRawText(), JsonOptions);
 
+            return JsonSerializer.Deserialize<T>(dataElement.GetRawText(), JsonOptions);
         }
         catch (Exception ex)
         {

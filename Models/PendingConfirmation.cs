@@ -14,28 +14,29 @@ public class PendingConfirmation(
     ModPackage originalMod,
     ModSearchResult apiMatch,
     int confidenceScore,
-    int resultIndex)
+    int resultIndex
+)
 {
     /// <summary>
     /// The local mod package information as processed by the application.
     /// </summary>
     public ModPackage LocalMod { get; set; } = localMod;
-    
+
     /// <summary>
     /// The original mod package information before any name transformations or updates.
     /// </summary>
     public ModPackage OriginalMod { get; set; } = originalMod;
-    
+
     /// <summary>
     /// The matched mod from the Forge API search results.
     /// </summary>
     public ModSearchResult ApiMatch { get; set; } = apiMatch;
-    
+
     /// <summary>
     /// The confidence score of the match based on fuzzy string matching (0-100).
     /// </summary>
     public int ConfidenceScore { get; set; } = confidenceScore;
-    
+
     /// <summary>
     /// The index of this result in the processing queue for display purposes.
     /// </summary>

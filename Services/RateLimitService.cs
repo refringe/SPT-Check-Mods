@@ -16,15 +16,17 @@ public class RateLimitService : IRateLimitService, IDisposable
     /// - Replenishment period: 1 second
     /// - Queue limit: 100 pending requests
     /// </summary>
-    private readonly RateLimiter _rateLimiter = new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
-    {
-        TokenLimit = 4,
-        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-        QueueLimit = 100,
-        ReplenishmentPeriod = TimeSpan.FromSeconds(1),
-        TokensPerPeriod = 2,
-        AutoReplenishment = true
-    });
+    private readonly RateLimiter _rateLimiter = new TokenBucketRateLimiter(
+        new TokenBucketRateLimiterOptions
+        {
+            TokenLimit = 4,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 100,
+            ReplenishmentPeriod = TimeSpan.FromSeconds(1),
+            TokensPerPeriod = 2,
+            AutoReplenishment = true,
+        }
+    );
 
     /// <summary>
     /// Waits for permission to make an API call according to the rate-limiting policy. This method will block until a

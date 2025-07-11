@@ -18,10 +18,10 @@ public static class ServiceCollectionExtensions
     {
         // Register caching
         services.AddMemoryCache();
-        
+
         // Register HttpClient
         services.AddHttpClient<IForgeApiService, ForgeApiService>();
-        
+
         // Register services
         services.AddSingleton<IRateLimitService, RateLimitService>();
         services.AddSingleton<ModMatchingService>();
@@ -30,7 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IModService, ModService>();
         services.AddScoped<IClientModService, ClientModService>();
         services.AddScoped<IApplicationService, ApplicationService>();
-        
+
         return services;
     }
 }

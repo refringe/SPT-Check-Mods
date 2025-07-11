@@ -11,17 +11,17 @@ public class ModPackage
     /// The name of the mod.
     /// </summary>
     public string Name { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// The author of the mod.
     /// </summary>
     public string Author { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// The version of the mod.
     /// </summary>
     public string Version { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// The SPT version constraint for this mod.
     /// </summary>

@@ -12,23 +12,24 @@ public class ModVerificationResult(
     bool isVerified,
     ModSearchResult? matchedMod,
     bool requiresConfirmation = false,
-    int confidenceScore = 0)
+    int confidenceScore = 0
+)
 {
     /// <summary>
     /// Whether the mod was successfully verified against the Forge API.
     /// </summary>
     public bool IsVerified { get; set; } = isVerified;
-    
+
     /// <summary>
     /// The matched mod from the Forge API search results if a match was found.
     /// </summary>
     public ModSearchResult? MatchedMod { get; set; } = matchedMod;
-    
+
     /// <summary>
     /// Whether the match requires user confirmation due to a low confidence score.
     /// </summary>
     public bool RequiresConfirmation { get; set; } = requiresConfirmation;
-    
+
     /// <summary>
     /// The confidence score of the match based on fuzzy string matching (0-100).
     /// Higher scores indicate better matches.

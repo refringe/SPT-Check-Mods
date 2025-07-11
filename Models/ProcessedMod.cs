@@ -10,17 +10,17 @@ public class ProcessedMod
     /// The original mod package.
     /// </summary>
     public ModPackage Mod { get; set; }
-    
+
     /// <summary>
     /// The processing record containing status and match details.
     /// </summary>
     public ModRecord Record { get; set; }
-    
+
     /// <summary>
     /// The processing status of the mod.
     /// </summary>
     public ModStatus Status => Record.Status;
-    
+
     /// <summary>
     /// The API search result that matched this mod, if any.
     /// </summary>
@@ -38,8 +38,9 @@ public class ProcessedMod
         Record = new ModRecord(mod, status);
         ApiMatch = apiMatch;
 
-        if (apiMatch == null || status != ModStatus.Verified) return;
-        
+        if (apiMatch == null || status != ModStatus.Verified)
+            return;
+
         Record.UpdateFromApiMatch(apiMatch, 100);
         Record.IsConfirmed = true;
     }
@@ -64,7 +65,7 @@ public class ProcessedMod
                 break;
         }
     }
-    
+
     /// <summary>
     /// Sets the confidence score for the API match.
     /// </summary>
@@ -73,7 +74,7 @@ public class ProcessedMod
     {
         Record.ConfidenceScore = score;
     }
-    
+
     /// <summary>
     /// Updates the processed mod with API match information.
     /// </summary>

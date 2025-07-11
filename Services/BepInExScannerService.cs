@@ -20,25 +20,27 @@ public class BepInExScannerService
     public List<ClientModPackage> ScanPluginsDirectory(string pluginsPath)
     {
         var clientMods = new List<ClientModPackage>();
-        
+
         if (!Directory.Exists(pluginsPath))
         {
-            AnsiConsole.MarkupLine($"[yellow]Warning: BepInEx plugins directory not found: {pluginsPath.EscapeMarkup()}[/]");
+            AnsiConsole.MarkupLine(
+                $"[yellow]Warning: BepInEx plugins directory not found: {pluginsPath.EscapeMarkup()}[/]"
+            );
             return clientMods;
         }
-        
+
         var dllFiles = GetValidDllFiles(pluginsPath);
         if (dllFiles.Count == 0)
         {
             AnsiConsole.MarkupLine("[grey]No DLL files found in plugins directory.[/]");
             return clientMods;
         }
-        
+
         AnsiConsole.MarkupLine($"[blue]Scanning {dllFiles.Count} DLL files for BepInEx plugins...[/]");
-        
+
         var results = ProcessDllsInParallel(dllFiles);
         clientMods.AddRange(FilterDuplicateMods(results));
-        
+
         AnsiConsole.MarkupLine($"[green]Found {clientMods.Count} client mods.[/]");
         return clientMods;
     }
@@ -50,7 +52,8 @@ public class BepInExScannerService
     /// <returns>List of valid DLL file paths.</returns>
     private static List<string> GetValidDllFiles(string pluginsPath)
     {
-        return Directory.GetFiles(pluginsPath, "*.dll", SearchOption.AllDirectories)
+        return Directory
+            .GetFiles(pluginsPath, "*.dll", SearchOption.AllDirectories)
             .Where(file => new FileInfo(file).Length <= MaxDllSizeBytes)
             .ToList();
     }
@@ -70,11 +73,13 @@ public class BepInExScannerService
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[yellow]Warning: Failed to scan {Path.GetFileName(dllPath)}: {ex.Message.EscapeMarkup()}[/]");
+                AnsiConsole.MarkupLine(
+                    $"[yellow]Warning: Failed to scan {Path.GetFileName(dllPath)}: {ex.Message.EscapeMarkup()}[/]"
+                );
                 return null;
             }
         });
-        
+
         var results = Task.WhenAll(tasks).Result;
         return results.Where(r => r != null).Cast<ClientModPackage>().ToList();
     }
@@ -87,17 +92,20 @@ public class BepInExScannerService
     private static List<ClientModPackage> FilterDuplicateMods(List<ClientModPackage> mods)
     {
         var uniqueMods = new List<ClientModPackage>();
-        
+
         foreach (var mod in mods)
         {
-            if (!uniqueMods.Any(existing => 
-                existing.Name.Equals(mod.Name, StringComparison.OrdinalIgnoreCase) &&
-                existing.Author.Equals(mod.Author, StringComparison.OrdinalIgnoreCase)))
+            if (
+                !uniqueMods.Any(existing =>
+                    existing.Name.Equals(mod.Name, StringComparison.OrdinalIgnoreCase)
+                    && existing.Author.Equals(mod.Author, StringComparison.OrdinalIgnoreCase)
+                )
+            )
             {
                 uniqueMods.Add(mod);
             }
         }
-        
+
         return uniqueMods;
     }
 
@@ -112,12 +120,14 @@ public class BepInExScannerService
         {
             using var loadContext = CreateMetadataLoadContext(dllPath);
             var assembly = loadContext.LoadFromAssemblyPath(dllPath);
-            
+
             return ScanAssemblyForBepInPlugin(assembly, dllPath);
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[yellow]Warning: Failed to extract BepInPlugin from {Path.GetFileName(dllPath)}: {ex.Message.EscapeMarkup()}[/]");
+            AnsiConsole.MarkupLine(
+                $"[yellow]Warning: Failed to extract BepInPlugin from {Path.GetFileName(dllPath)}: {ex.Message.EscapeMarkup()}[/]"
+            );
             return null;
         }
     }
@@ -156,7 +166,7 @@ public class BepInExScannerService
                 // Skip types that can't be inspected
             }
         }
-        
+
         return null;
     }
 
@@ -168,16 +178,17 @@ public class BepInExScannerService
     private static BepInPluginAttribute? ExtractBepInPluginAttribute(Type type)
     {
         var customAttributes = type.GetCustomAttributesData();
-        
+
         // Look for the BepInPlugin attribute by checking multiple possible names
-        var bepInPluginAttribute = customAttributes.FirstOrDefault(attr => 
-            attr.AttributeType.Name == "BepInPlugin" || 
-            attr.AttributeType.Name == "BepInPluginAttribute" ||
-            (attr.AttributeType.FullName?.Contains("BepInPlugin") ?? false));
+        var bepInPluginAttribute = customAttributes.FirstOrDefault(attr =>
+            attr.AttributeType.Name == "BepInPlugin"
+            || attr.AttributeType.Name == "BepInPluginAttribute"
+            || (attr.AttributeType.FullName?.Contains("BepInPlugin") ?? false)
+        );
 
         if (bepInPluginAttribute == null || bepInPluginAttribute.ConstructorArguments.Count < 3)
             return null;
-        
+
         // Extract constructor arguments: GUID, Name, Version
         var guid = bepInPluginAttribute.ConstructorArguments[0].Value?.ToString() ?? "";
         var name = bepInPluginAttribute.ConstructorArguments[1].Value?.ToString() ?? "";
@@ -185,7 +196,7 @@ public class BepInExScannerService
 
         if (string.IsNullOrWhiteSpace(guid) || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(version))
             return null;
-        
+
         return new BepInPluginAttribute(guid, name, version);
     }
 }
