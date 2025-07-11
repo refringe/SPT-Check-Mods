@@ -1,0 +1,35 @@
+version: 2
+updates:
+  # Nuget
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+      timezone: "America/Toronto"
+    open-pull-requests-limit: 5
+    target-branch: "develop"
+    commit-message:
+      prefix: "actions"
+    labels:
+      - "dependencies"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+      timezone: "America/Toronto"
+    target-branch: "develop"
+    groups:
+      actions-deps:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "actions"
+    labels:
+      - "dependencies"
