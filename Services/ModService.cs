@@ -10,9 +10,8 @@ namespace CheckMods.Services;
 /// Service responsible for server-side mod discovery, validation, and compatibility checking. Handles reading
 /// package.json files, SPT version validation, and coordinating with the Forge API.
 /// </summary>
-public class ModService(IForgeApiService forgeApiService, ModMatchingService matchingService) : IModService
+public class ModService(IForgeApiService forgeApiService) : IModService
 {
-    private readonly ModMatchingService _matchingService = matchingService;
 
     /// <summary>
     /// Reads and validates the SPT version from the core.json configuration file.

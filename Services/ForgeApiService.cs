@@ -126,7 +126,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
         try
         {
             var url = $"{ForgeApiBaseUrl}spt/versions?filter[spt_version]={escapedVersion}";
-            var apiResponse = await MakeApiCallAsync<SptVersionApiResponse>(url, cacheKey);
+            var apiResponse = await MakeApiCallAsync<SptVersionApiResponse>(url);
 
             var result =
                 apiResponse is { Success: true, Data: not null } && apiResponse.Data.Any(v => v.Version == sptVersion);
@@ -192,7 +192,7 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
         try
         {
             var url = $"{ForgeApiBaseUrl}mods/{modId}?include=owner,versions";
-            var result = await MakeApiCallAsync<ModSearchResult>(url, cacheKey, isDataWrapped: true);
+            var result = await MakeApiCallAsync<ModSearchResult>(url, true);
 
             cache.Set(cacheKey, result, _cacheExpiration);
             return result;
@@ -224,7 +224,6 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
                 $"{ForgeApiBaseUrl}mod/{modId}/versions?filter[spt_version]={sptVersion}&sort=-version,-created_at";
             var apiResponse = await MakeApiCallAsync<ModVersionsApiResponse>(
                 url,
-                cacheKey,
                 logContext: $"mod versions (ID: {modId})"
             );
 
@@ -265,7 +264,6 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
                 $"{ForgeApiBaseUrl}mods?query={Uri.EscapeDataString(searchQuery)}&filter[spt_version]={sptVersion}&include=owner,versions";
             var apiResponse = await MakeApiCallAsync<ModSearchApiResponse>(
                 url,
-                cacheKey,
                 logContext: $"{modType} '{searchQuery}'"
             );
 
@@ -281,20 +279,14 @@ public partial class ForgeApiService(HttpClient httpClient, IMemoryCache cache, 
     }
 
     /// <summary>
-    /// Generic method for making API calls with rate limiting, caching, and error handling.
+    /// Generic method for making API calls with rate limiting and error handling.
     /// </summary>
     /// <typeparam name="T">The type of response expected from the API.</typeparam>
     /// <param name="url">The API endpoint URL.</param>
-    /// <param name="cacheKey">The cache key for storing results.</param>
     /// <param name="isDataWrapped">Whether the response data is wrapped in a 'data' property.</param>
     /// <param name="logContext">Context information for logging errors.</param>
     /// <returns>The deserialized API response.</returns>
-    private async Task<T?> MakeApiCallAsync<T>(
-        string url,
-        string cacheKey,
-        bool isDataWrapped = false,
-        string? logContext = null
-    )
+    private async Task<T?> MakeApiCallAsync<T>(string url, bool isDataWrapped = false, string? logContext = null)
     {
         try
         {
