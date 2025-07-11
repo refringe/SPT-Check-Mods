@@ -4,26 +4,26 @@ using CheckMods.Services.Interfaces;
 namespace CheckMods.Services;
 
 /// <summary>
-/// Service that provides rate limiting for API calls using a token bucket algorithm. Configured to allow 2 requests per
-/// second with a burst capacity of 4 tokens.
+/// Service that provides rate limiting for API calls using a token bucket algorithm. Configured to allow 5 requests per
+/// second with a burst capacity of 10 tokens.
 /// </summary>
 public class RateLimitService : IRateLimitService, IDisposable
 {
     /// <summary>
     /// Token bucket rate limiter configured for API throttling.
-    /// - Token limit: 4 (burst capacity)
-    /// - Tokens per period: 2 (sustained rate)
+    /// - Token limit: 10 (burst capacity)
+    /// - Tokens per period: 5 (sustained rate)
     /// - Replenishment period: 1 second
     /// - Queue limit: 100 pending requests
     /// </summary>
     private readonly RateLimiter _rateLimiter = new TokenBucketRateLimiter(
         new TokenBucketRateLimiterOptions
         {
-            TokenLimit = 4,
+            TokenLimit = 10,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             QueueLimit = 100,
             ReplenishmentPeriod = TimeSpan.FromSeconds(1),
-            TokensPerPeriod = 2,
+            TokensPerPeriod = 5,
             AutoReplenishment = true,
         }
     );
