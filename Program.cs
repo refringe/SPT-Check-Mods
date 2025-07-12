@@ -1,3 +1,4 @@
+using System.Reflection;
 using CheckMods.Extensions;
 using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,8 +37,28 @@ public class Program
         {
             // Wait for user input before closing
             AnsiConsole.WriteLine();
+
+            // Display git hash
+            var gitHash = GetGitHash();
+            AnsiConsole.MarkupLine($"[grey]Build: {gitHash}[/]");
+
             AnsiConsole.MarkupLine("[grey]Press any key to exit...[/]");
             Console.ReadKey();
         }
+    }
+
+    /// <summary>
+    /// Gets the git hash from the assembly metadata.
+    /// </summary>
+    /// <returns>The git hash or "unknown" if not found.</returns>
+    private static string GetGitHash()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+
+        var gitHashAttribute = assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attr => attr.Key == "GitHash");
+
+        return gitHashAttribute?.Value ?? "unknown";
     }
 }
