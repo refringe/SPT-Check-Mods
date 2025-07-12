@@ -33,7 +33,7 @@ public static class AppConstants
         ("core", "spt"), // Core SPT
         ("custom", "spt"), // Core SPT
         ("debugging", "spt"), // Core SPT
-        ("exfilbots", ""), // Not on Forge
+        ("exfilbots", "phen"), // Not on Forge
         ("HideSpecialIcon", ""), // In-app helper mod, not on Forge
         ("Hitmarker", ""), // Not on Forge
         ("RemoveTimeGateFromQuests", "Cj"), // Not on Forge
@@ -226,7 +226,7 @@ public static class AppConstants
         new()
         {
             FromName = "PoseServComp",
-            FromAuthor = "",
+            FromAuthor = "Choccy",
             ToName = "More Mannequin Pose",
             ToAuthor = "Choccy Milk",
         },
@@ -338,7 +338,7 @@ public static class AppConstants
         new()
         {
             FromName = "Wisps-InfMeds",
-            FromAuthor = "",
+            FromAuthor = "WispsFlame",
             ToName = "INFMEDS-Update BY WispsFlame",
             ToAuthor = "WispsFlame",
         },
@@ -352,7 +352,7 @@ public static class AppConstants
         new()
         {
             FromName = "WTT-PackNStrap",
-            FromAuthor = "",
+            FromAuthor = "GrooveypenguinX, Tron, WTT Team",
             ToName = "WTT Pack N Strap",
             ToAuthor = "GrooveypenguinX",
         },
