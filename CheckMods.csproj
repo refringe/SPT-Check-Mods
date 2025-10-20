@@ -70,7 +70,7 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.7" />
     <PackageReference Include="SemanticVersioning" Version="3.0.0" />
     <PackageReference Include="Spectre.Console" Version="0.50.0" />
-    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.7" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.10" />
     <PackageReference Include="System.Threading.RateLimiting" Version="9.0.7" />
   </ItemGroup>
 </Project>
