@@ -51,18 +51,18 @@
       </AssemblyAttribute>
     </ItemGroup>
   </Target>
-  <!-- Rename the published executable to include the Git hash. -->
-  <Target Name="RenamePublishedExe" AfterTargets="Publish" DependsOnTargets="GetGitHash">
+  <!-- Rename the published executable to include the runtime identifier. -->
+  <Target Name="RenamePublishedExe" AfterTargets="Publish">
     <!-- Windows target (RID starts with 'win') -->
     <Exec
-      Condition="'$(GitHash)' != '' AND $(RuntimeIdentifier.StartsWith('win'))"
-      Command="mv &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash).exe&quot;"
+      Condition="'$(RuntimeIdentifier)' != '' AND $(RuntimeIdentifier.StartsWith('win'))"
+      Command="mv &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier).exe&quot;"
       IgnoreStandardErrorWarningFormat="true"
     />
     <!-- Non-Windows target (Linux, macOS, etc.) -->
     <Exec
-      Condition="'$(GitHash)' != '' AND !$(RuntimeIdentifier.StartsWith('win'))"
-      Command="mv &quot;$(PublishDir)$(AssemblyName)&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash)&quot;"
+      Condition="'$(RuntimeIdentifier)' != '' AND !$(RuntimeIdentifier.StartsWith('win'))"
+      Command="mv &quot;$(PublishDir)$(AssemblyName)&quot; &quot;$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier)&quot;"
       IgnoreStandardErrorWarningFormat="true"
     />
   </Target>
