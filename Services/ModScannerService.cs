@@ -127,10 +127,12 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
     /// <summary>
     /// Groups DLL files by their immediate parent directory.
     /// </summary>
-    private static Dictionary<string, List<string>> GroupDllsByDirectory(List<string> dllFiles, string pluginsDir) =>
-        dllFiles
+    private static Dictionary<string, List<string>> GroupDllsByDirectory(List<string> dllFiles, string pluginsDir)
+    {
+        return dllFiles
             .GroupBy(dllPath => GetModDirectory(dllPath, pluginsDir), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Gets the mod's root directory (immediate child of plugins, or plugins itself for loose DLLs).
@@ -510,8 +512,10 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         return results.Where(r => r is not null).Cast<Mod>().ToList();
     }
 
-    private static List<Mod> FilterDuplicateClientMods(List<Mod> mods) =>
-        mods.DistinctBy(m => (m.LocalName.ToLowerInvariant(), m.LocalAuthor.ToLowerInvariant())).ToList();
+    private static List<Mod> FilterDuplicateClientMods(List<Mod> mods)
+    {
+        return mods.DistinctBy(m => (m.LocalName.ToLowerInvariant(), m.LocalAuthor.ToLowerInvariant())).ToList();
+    }
 
     private Mod? ExtractClientModMetadata(string dllPath)
     {
