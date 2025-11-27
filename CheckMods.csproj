@@ -53,13 +53,17 @@
   </Target>
   <!-- Rename the published executable to include the Git hash. -->
   <Target Name="RenamePublishedExe" AfterTargets="Publish" DependsOnTargets="GetGitHash">
+    <!-- Windows target (RID starts with 'win') -->
     <Exec
-      Condition="'$(GitHash)' != '' AND '$(OS)' == 'Windows_NT'"
-      Command="move &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash).exe&quot;"
+      Condition="'$(GitHash)' != '' AND $(RuntimeIdentifier.StartsWith('win'))"
+      Command="mv &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash).exe&quot;"
+      IgnoreStandardErrorWarningFormat="true"
     />
+    <!-- Non-Windows target (Linux, macOS, etc.) -->
     <Exec
-      Condition="'$(GitHash)' != '' AND '$(OS)' != 'Windows_NT'"
+      Condition="'$(GitHash)' != '' AND !$(RuntimeIdentifier.StartsWith('win'))"
       Command="mv &quot;$(PublishDir)$(AssemblyName)&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash)&quot;"
+      IgnoreStandardErrorWarningFormat="true"
     />
   </Target>
   <ItemGroup>
