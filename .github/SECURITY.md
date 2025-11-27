@@ -21,7 +21,7 @@ If you discover a security vulnerability in SPT Check Mods, please report it res
 ## Security Considerations
 
 SPT Check Mods handles:
-- API keys stored in `%APPDATA%\SptModChecker\apikey.txt`
+- API keys stored in `%APPDATA%\SptCheckMods\apikey.txt`
 - File system access for mod scanning
 - Network requests to `forge.sp-tarkov.com` API
 

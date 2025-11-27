@@ -148,7 +148,7 @@ public sealed class ApplicationService(
     {
         var tagline = _bannerTaglines[Random.Shared.Next(_bannerTaglines.Length)];
 
-        AnsiConsole.Write(new FigletText("SPT Mod Checker").LeftJustified().Color(Color.Blue));
+        AnsiConsole.Write(new FigletText("Check Mods").LeftJustified().Color(Color.Blue));
         AnsiConsole.MarkupLine("[fuchsia]A tool to check for mod issues and updates.[/]");
         AnsiConsole.MarkupLine($"[grey]{tagline}[/]");
         AnsiConsole.MarkupLine("[link]https://forge.sp-tarkov.com[/]");
@@ -1282,14 +1282,14 @@ public sealed class ApplicationService(
 
     /// <summary>
     /// Retrieves and validates the Forge API key from storage or prompts the user for a new one.
-    /// Stores valid keys in %APPDATA%/SptModChecker/apikey.txt for future use.
+    /// Stores valid keys in %APPDATA%/SptCheckMods/apikey.txt for future use.
     /// </summary>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>Valid API key or null if the user cancels.</returns>
     private async Task<string?> GetAndValidateApiKey(CancellationToken cancellationToken = default)
     {
         var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var configFolder = SecurityHelper.GetSafePath(Path.Combine(appDataFolder, "SptModChecker"));
+        var configFolder = SecurityHelper.GetSafePath(Path.Combine(appDataFolder, "SptCheckMods"));
         if (configFolder is null)
         {
             AnsiConsole.MarkupLine("[red]Error: Could not determine a safe configuration folder path.[/]");
