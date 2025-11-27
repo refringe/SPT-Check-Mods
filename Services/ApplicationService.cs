@@ -189,6 +189,8 @@ public sealed class ApplicationService(
     /// <returns>Validated SPT path or null if validation failed.</returns>
     private static string? GetValidatedSptPath(string[] args)
     {
+        AnsiConsole.MarkupLine("[bold blue]Validating SPT installation...[/]");
+
         if (args.Length == 0)
         {
             var currentPath = Directory.GetCurrentDirectory();
@@ -955,7 +957,7 @@ public sealed class ApplicationService(
     /// <param name="result">The dependency analysis result.</param>
     private static void DisplayDependencyTree(DependencyAnalysisResult result)
     {
-        var tree = new Tree("[bold blue]Mod Dependencies[/]");
+        var tree = new Tree("[bold white]Mod Dependencies[/]");
 
         // Sort mods alphabetically and add each with their dependencies as children
         var sortedMods = result.RootMods.OrderBy(n => n.Mod.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
@@ -1139,15 +1141,19 @@ public sealed class ApplicationService(
         }
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[bold blue]Update Summary[/]");
+        AnsiConsole.MarkupLine("[bold blue]Checking for mod updates...[/]");
+        AnsiConsole.MarkupLine(
+            "[white]This tool depends on mod authors to use and update valid version numbers. If you notice a version number in the Current Version column that is incorrect, please contact the author of the mod to have it updated.[/]"
+        );
         AnsiConsole.WriteLine();
 
         var table = new Table()
+            .Title("[blue]Mod Version Summary[/]")
             .BorderColor(Color.Grey)
-            .AddColumn("[blue]Name[/]")
-            .AddColumn("[blue]Author[/]")
-            .AddColumn("[blue]Current Version[/]")
-            .AddColumn("[blue]Latest Version[/]");
+            .AddColumn("[white]Name[/]")
+            .AddColumn("[white]Author[/]")
+            .AddColumn("[white]Current Version[/]")
+            .AddColumn("[white]Latest Version[/]");
 
         foreach (var mod in verifiedMods)
         {
@@ -1203,18 +1209,18 @@ public sealed class ApplicationService(
         }
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(
-            "[white]This tool depends on mod authors to use and update valid version numbers. If you notice a version number in the Current Version column that is incorrect, please contact the author of the mod to have it updated.[/]"
-        );
-        AnsiConsole.WriteLine();
         WriteRule();
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(
-            "[fuchsia]Find an issue [italic]with this tool[/]? Find Refringe on Discord, or submit a bug report here:[/]"
-        );
-        AnsiConsole.MarkupLine("[link]https://github.com/refringe/SPT-Check-Mods/issues/new[/]");
+
+        AnsiConsole.Write(new FigletText("FIN").LeftJustified().Color(Color.Fuchsia));
+        AnsiConsole.MarkupLine("[fuchsia]Scroll up to read details about your mods![/]");
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[fuchsia]>:{}[/]");
+        AnsiConsole.MarkupLine("[grey]Pro tip:    Mod names are clickable.[/]");
+        AnsiConsole.MarkupLine("[grey]Expert tip: Read the mod page before installing or updating mods.[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine(
+            "[white]Find an issue [italic]with this tool[/]? Find Refringe on Discord, or [link=https://github.com/refringe/SPT-Check-Mods/issues/new]submit a bug report[/].[/]"
+        );
     }
 
     /// <summary>
@@ -1299,6 +1305,7 @@ public sealed class ApplicationService(
         }
 
         savedKey = SecurityHelper.SanitizeInput(savedKey);
+        AnsiConsole.MarkupLine("[bold blue]Validating Forge API key...[/]");
         AnsiConsole.MarkupLine("Found saved API key. Validating...");
 
         var validationResult = await forgeApiService.ValidateApiKeyAsync(savedKey, cancellationToken);
