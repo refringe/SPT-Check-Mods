@@ -27,7 +27,7 @@ public sealed class ServerModService(
         {
             logger.LogError("SPT core DLL not found: {CoreDllPath}", coreDllPath);
             AnsiConsole.MarkupLine(
-                "[red]Error: Could not find SPT installation. Run this file in the same directory as [italic]SPT.Server.exe[/], or provide the SPT path as an argument.[/]"
+                "[red]Error: Could not find SPT installation. Run this file in your root SPT directory, or provide the SPT path as an argument.[/]"
             );
             return null;
         }
