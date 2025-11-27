@@ -11,10 +11,14 @@ namespace CheckMods.Services;
 public sealed class ServerModService(
     IForgeApiService forgeApiService,
     IModScannerService scannerService,
-    ILogger<ServerModService> logger) : IServerModService
+    ILogger<ServerModService> logger
+) : IServerModService
 {
     /// <inheritdoc />
-    public async Task<SemanticVersioning.Version?> GetAndValidateSptVersionAsync(string sptPath, CancellationToken cancellationToken = default)
+    public async Task<SemanticVersioning.Version?> GetAndValidateSptVersionAsync(
+        string sptPath,
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Validating SPT installation at: {SptPath}", sptPath);
 
@@ -47,15 +51,15 @@ public sealed class ServerModService(
 
         var isValid = validationResult.Match(
             valid => valid,
-            _ => false,  // InvalidSptVersion
-            _ => false   // ApiError - treat as invalid for safety
+            _ => false, // InvalidSptVersion
+            _ => false // ApiError - treat as invalid for safety
         );
 
         if (!isValid)
         {
             // Provide more specific error messages based on the result type
             validationResult.Switch(
-                _ => { },  // Success - handled above
+                _ => { }, // Success - handled above
                 _ => AnsiConsole.MarkupLine("[red]Failed. SPT version not recognized by Forge API.[/]"),
                 apiError => AnsiConsole.MarkupLine($"[red]Failed. API error: {apiError.Message.EscapeMarkup()}[/]")
             );
@@ -68,7 +72,10 @@ public sealed class ServerModService(
     }
 
     /// <inheritdoc />
-    public async Task<List<SptVersionResult>> CheckForSptUpdatesAsync(SemanticVersioning.Version currentVersion, CancellationToken cancellationToken = default)
+    public async Task<List<SptVersionResult>> CheckForSptUpdatesAsync(
+        SemanticVersioning.Version currentVersion,
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Checking for SPT updates. Current version: {CurrentVersion}", currentVersion);
 

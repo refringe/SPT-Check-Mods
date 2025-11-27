@@ -10,12 +10,15 @@ namespace CheckMods.Services;
 /// Service responsible for matching local mods with their Forge API counterparts.
 /// Uses GUID lookup as the primary method with multiple fallback strategies.
 /// </summary>
-public sealed class ModMatchingService(
-    IForgeApiService forgeApiService,
-    ILogger<ModMatchingService> logger) : IModMatchingService
+public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger<ModMatchingService> logger)
+    : IModMatchingService
 {
     /// <inheritdoc />
-    public async Task<Mod> MatchModAsync(Mod mod, SemanticVersioning.Version sptVersion, CancellationToken cancellationToken = default)
+    public async Task<Mod> MatchModAsync(
+        Mod mod,
+        SemanticVersioning.Version sptVersion,
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Matching mod: {ModName} (GUID: {Guid})", mod.LocalName, mod.Guid);
 
@@ -27,10 +30,7 @@ public sealed class ModMatchingService(
             if (guidResult.TryPickT0(out var guidMatch, out _))
             {
                 logger.LogDebug("Mod matched by GUID: {ModName} -> {ApiName}", mod.LocalName, guidMatch.Name);
-                mod.UpdateFromApiMatch(
-                    guidMatch,
-                    MatchingConstants.ExactGuidConfidence,
-                    MatchMethod.ExactGuid);
+                mod.UpdateFromApiMatch(guidMatch, MatchingConstants.ExactGuidConfidence, MatchMethod.ExactGuid);
                 return mod;
             }
         }
@@ -47,7 +47,8 @@ public sealed class ModMatchingService(
                 mod.UpdateFromApiMatch(
                     altGuidMatch,
                     MatchingConstants.ExactGuidConfidence - MatchingConstants.AlternateGuidConfidenceReduction,
-                    MatchMethod.ExactGuid);
+                    MatchMethod.ExactGuid
+                );
                 return mod;
             }
         }
@@ -66,7 +67,7 @@ public sealed class ModMatchingService(
             // Extract the list from the result (empty list if error)
             var searchResults = searchResult.Match(
                 results => results,
-                _ => []  // ApiError - return empty list
+                _ => [] // ApiError - return empty list
             );
 
             if (searchResults.Count == 0)
@@ -81,10 +82,7 @@ public sealed class ModMatchingService(
                 continue;
             }
 
-            mod.UpdateFromApiMatch(
-                bestMatch.Value.Result,
-                bestMatch.Value.Confidence,
-                bestMatch.Value.Method);
+            mod.UpdateFromApiMatch(bestMatch.Value.Result, bestMatch.Value.Confidence, bestMatch.Value.Method);
             return mod;
         }
 
@@ -126,8 +124,10 @@ public sealed class ModMatchingService(
         }
 
         // 4. Author + name combination (if author is known and not generic)
-        if (!string.IsNullOrWhiteSpace(mod.LocalAuthor) &&
-            !string.Equals(mod.LocalAuthor, "Unknown", StringComparison.OrdinalIgnoreCase))
+        if (
+            !string.IsNullOrWhiteSpace(mod.LocalAuthor)
+            && !string.Equals(mod.LocalAuthor, "Unknown", StringComparison.OrdinalIgnoreCase)
+        )
         {
             AddIfNew(terms, seen, $"{mod.LocalAuthor} {mod.LocalName}");
         }
@@ -147,7 +147,8 @@ public sealed class ModMatchingService(
 
         string[] suffixes = ["Server", "Client"];
         var matchingSuffix = suffixes.FirstOrDefault(s =>
-            name.EndsWith(s, StringComparison.OrdinalIgnoreCase) && name.Length > s.Length);
+            name.EndsWith(s, StringComparison.OrdinalIgnoreCase) && name.Length > s.Length
+        );
 
         return matchingSuffix is not null ? name[..^matchingSuffix.Length] : name;
     }
@@ -168,7 +169,8 @@ public sealed class ModMatchingService(
         IEnumerable<Mod> mods,
         SemanticVersioning.Version sptVersion,
         Action<Mod, int, int>? progressCallback = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var modList = mods.ToList();
         var totalCount = modList.Count;
@@ -193,7 +195,8 @@ public sealed class ModMatchingService(
     /// </summary>
     private static (ModSearchResult Result, int Confidence, MatchMethod Method)? FindBestMatch(
         Mod mod,
-        List<ModSearchResult> searchResults)
+        List<ModSearchResult> searchResults
+    )
     {
         // 1. Try exact normalized name match
         foreach (var result in searchResults)
@@ -241,14 +244,18 @@ public sealed class ModMatchingService(
         }
 
         // 4. Try matching by author + name combination
-        if (!string.IsNullOrWhiteSpace(mod.LocalAuthor) &&
-            !string.Equals(mod.LocalAuthor, "Unknown", StringComparison.OrdinalIgnoreCase))
+        if (
+            !string.IsNullOrWhiteSpace(mod.LocalAuthor)
+            && !string.Equals(mod.LocalAuthor, "Unknown", StringComparison.OrdinalIgnoreCase)
+        )
         {
             foreach (var result in searchResults)
             {
-                if (result.Owner is not null &&
-                    string.Equals(mod.LocalAuthor, result.Owner.Name, StringComparison.OrdinalIgnoreCase) &&
-                    ModNameNormalizer.IsExactMatch(mod.LocalName, result.Name, removeComponentSuffixes: true))
+                if (
+                    result.Owner is not null
+                    && string.Equals(mod.LocalAuthor, result.Owner.Name, StringComparison.OrdinalIgnoreCase)
+                    && ModNameNormalizer.IsExactMatch(mod.LocalName, result.Name, removeComponentSuffixes: true)
+                )
                 {
                     return (result, MatchingConstants.ExactNameConfidence, MatchMethod.ExactName);
                 }
@@ -263,13 +270,9 @@ public sealed class ModMatchingService(
                 NameScore = ModNameNormalizer.GetFuzzyMatchScore(mod.LocalName, r.Name),
                 SlugScore = !string.IsNullOrWhiteSpace(r.Slug)
                     ? ModNameNormalizer.GetFuzzyMatchScore(mod.LocalName, r.Slug)
-                    : 0
+                    : 0,
             })
-            .Select(x => new
-            {
-                x.Result,
-                Score = Math.Max(x.NameScore, x.SlugScore)
-            })
+            .Select(x => new { x.Result, Score = Math.Max(x.NameScore, x.SlugScore) })
             .Where(x => x.Score >= MatchingConstants.MinimumFuzzyMatchScore)
             .OrderByDescending(x => x.Score)
             .FirstOrDefault();

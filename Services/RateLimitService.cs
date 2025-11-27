@@ -10,9 +10,7 @@ namespace CheckMods.Services;
 /// Service that provides rate limiting for API calls. Throttles requests to a sustainable rate and applies
 /// exponential backoff with jitter if rate limiting (429) is encountered. Backoff state is shared across all requests.
 /// </summary>
-public class RateLimitService(
-    IOptions<RateLimitOptions> options,
-    ILogger<RateLimitService> logger) : IRateLimitService
+public class RateLimitService(IOptions<RateLimitOptions> options, ILogger<RateLimitService> logger) : IRateLimitService
 {
     private readonly RateLimitOptions _options = options.Value;
     private readonly SemaphoreSlim _backoffSemaphore = new(1, 1);
@@ -32,7 +30,8 @@ public class RateLimitService(
     /// <exception cref="HttpRequestException">Thrown when max retries are exceeded.</exception>
     public async Task<HttpResponseMessage> ExecuteWithRetryAsync(
         Func<Task<HttpResponseMessage>> requestFunc,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var retryCount = 0;
 
@@ -60,7 +59,11 @@ public class RateLimitService(
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 retryCount++;
-                logger.LogWarning("Rate limited (429). Retry {RetryCount}/{MaxRetries}", retryCount, _options.MaxRetries);
+                logger.LogWarning(
+                    "Rate limited (429). Retry {RetryCount}/{MaxRetries}",
+                    retryCount,
+                    _options.MaxRetries
+                );
 
                 if (retryCount > _options.MaxRetries)
                 {
@@ -155,7 +158,11 @@ public class RateLimitService(
             if (newBackoffUntil > _backoffUntil)
             {
                 _backoffUntil = newBackoffUntil;
-                logger.LogDebug("Backoff applied: {DelayMs}ms (failures: {FailureCount})", delay.TotalMilliseconds, _consecutiveFailures);
+                logger.LogDebug(
+                    "Backoff applied: {DelayMs}ms (failures: {FailureCount})",
+                    delay.TotalMilliseconds,
+                    _consecutiveFailures
+                );
             }
         }
         finally

@@ -28,5 +28,5 @@ public enum MatchMethod
     /// <summary>
     /// Manually confirmed by the user.
     /// </summary>
-    Manual = 4
+    Manual = 4,
 }

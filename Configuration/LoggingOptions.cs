@@ -37,7 +37,14 @@ public class LoggingOptions
     /// </summary>
     public static string LogDirectory
     {
-        get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SptModChecker", "logs"); }
+        get
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "SptModChecker",
+                "logs"
+            );
+        }
     }
 
     /// <summary>

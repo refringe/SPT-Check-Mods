@@ -38,5 +38,5 @@ public enum UpdateStatus
     /// <summary>
     /// The mod has no compatible version for the current SPT version.
     /// </summary>
-    Incompatible = 6
+    Incompatible = 6,
 }

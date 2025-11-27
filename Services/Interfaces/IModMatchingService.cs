@@ -15,7 +15,11 @@ public interface IModMatchingService
     /// <param name="sptVersion">The SPT version for compatibility filtering.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>The same mod instance, updated with API match data if found.</returns>
-    Task<Mod> MatchModAsync(Mod mod, SemanticVersioning.Version sptVersion, CancellationToken cancellationToken = default);
+    Task<Mod> MatchModAsync(
+        Mod mod,
+        SemanticVersioning.Version sptVersion,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Matches multiple mods with the Forge API in parallel.
@@ -30,5 +34,6 @@ public interface IModMatchingService
         IEnumerable<Mod> mods,
         SemanticVersioning.Version sptVersion,
         Action<Mod, int, int>? progressCallback = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }

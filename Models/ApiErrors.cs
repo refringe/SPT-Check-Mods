@@ -39,7 +39,4 @@ public readonly record struct InvalidSptVersion;
 /// <param name="Message">A description of the error.</param>
 /// <param name="StatusCode">The HTTP status code, if applicable.</param>
 /// <param name="Exception">The underlying exception, if any.</param>
-public readonly record struct ApiError(
-    string Message,
-    int? StatusCode = null,
-    Exception? Exception = null);
+public readonly record struct ApiError(string Message, int? StatusCode = null, Exception? Exception = null);

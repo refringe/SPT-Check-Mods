@@ -30,7 +30,10 @@ public interface IModScannerService
     /// <param name="sptPath">Path to the SPT installation directory.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>Tuple of server mods and client mods.</returns>
-    Task<(List<Mod> ServerMods, List<Mod> ClientMods)> ScanAllModsAsync(string sptPath, CancellationToken cancellationToken = default);
+    Task<(List<Mod> ServerMods, List<Mod> ClientMods)> ScanAllModsAsync(
+        string sptPath,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Extracts the SPT version from the installation.

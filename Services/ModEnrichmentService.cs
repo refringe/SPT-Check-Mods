@@ -7,27 +7,23 @@ namespace CheckMods.Services;
 /// <summary>
 /// Service responsible for enriching matched mods with additional API data such as version information.
 /// </summary>
-public sealed class ModEnrichmentService(
-    IForgeApiService forgeApiService,
-    ILogger<ModEnrichmentService> logger) : IModEnrichmentService
+public sealed class ModEnrichmentService(IForgeApiService forgeApiService, ILogger<ModEnrichmentService> logger)
+    : IModEnrichmentService
 {
     /// <inheritdoc />
     public async Task EnrichAllWithVersionDataAsync(
         IEnumerable<Mod> mods,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Enriching mods with version data");
 
         // Filter to only matched mods and deduplicate by API mod ID
-        var matchedMods = mods
-            .Where(m => m.IsMatched && m.ApiModId.HasValue)
-            .ToList();
+        var matchedMods = mods.Where(m => m.IsMatched && m.ApiModId.HasValue).ToList();
 
         // Group by API mod ID to deduplicate (paired server/client mods share the same API ID)
-        var uniqueModsById = matchedMods
-            .GroupBy(m => m.ApiModId!.Value)
-            .ToDictionary(g => g.Key, g => g.ToList());
+        var uniqueModsById = matchedMods.GroupBy(m => m.ApiModId!.Value).ToDictionary(g => g.Key, g => g.ToList());
 
         if (uniqueModsById.Count == 0)
         {

@@ -511,9 +511,7 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
     }
 
     private static List<Mod> FilterDuplicateClientMods(List<Mod> mods) =>
-        mods
-            .DistinctBy(m => (m.LocalName.ToLowerInvariant(), m.LocalAuthor.ToLowerInvariant()))
-            .ToList();
+        mods.DistinctBy(m => (m.LocalName.ToLowerInvariant(), m.LocalAuthor.ToLowerInvariant())).ToList();
 
     private Mod? ExtractClientModMetadata(string dllPath)
     {

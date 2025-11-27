@@ -18,5 +18,6 @@ public interface IModEnrichmentService
     Task EnrichAllWithVersionDataAsync(
         IEnumerable<Mod> mods,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }

@@ -34,7 +34,8 @@ public static partial class ModNameNormalizer
         // Remove special characters using Aggregate
         var result = _charsToRemove.Aggregate(
             name.ToLowerInvariant(),
-            (current, c) => current.Replace(c.ToString(), string.Empty));
+            (current, c) => current.Replace(c.ToString(), string.Empty)
+        );
 
         // Optionally remove server/client suffixes
         if (removeComponentSuffixes)
@@ -120,8 +121,7 @@ public static partial class ModNameNormalizer
         var normalized1 = Normalize(name1, removeComponentSuffixes);
         var normalized2 = Normalize(name2, removeComponentSuffixes);
 
-        return !string.IsNullOrEmpty(normalized1) &&
-               string.Equals(normalized1, normalized2, StringComparison.Ordinal);
+        return !string.IsNullOrEmpty(normalized1) && string.Equals(normalized1, normalized2, StringComparison.Ordinal);
     }
 
     [GeneratedRegex(@"(?<!^)([A-Z])")]

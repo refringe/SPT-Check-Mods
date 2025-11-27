@@ -14,8 +14,11 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
     /// <inheritdoc />
     public ModReconciliationResult ReconcileMods(List<Mod> serverMods, List<Mod> clientMods)
     {
-        logger.LogDebug("Reconciling {ServerCount} server mods with {ClientCount} client mods",
-            serverMods.Count, clientMods.Count);
+        logger.LogDebug(
+            "Reconciling {ServerCount} server mods with {ClientCount} client mods",
+            serverMods.Count,
+            clientMods.Count
+        );
 
         List<ModPair> reconciledPairs = [];
         var matchedServerIndices = new HashSet<int>();
@@ -43,17 +46,17 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
                 var (selectedMod, notes) = SelectBestMod(serverMod, clientMod);
 
                 // Update the selected mod with the paired component path
-                selectedMod.PairedComponentPath = selectedMod == serverMod
-                    ? clientMod.FilePath
-                    : serverMod.FilePath;
+                selectedMod.PairedComponentPath = selectedMod == serverMod ? clientMod.FilePath : serverMod.FilePath;
 
-                reconciledPairs.Add(new ModPair
-                {
-                    ServerMod = serverMod,
-                    ClientMod = clientMod,
-                    SelectedMod = selectedMod,
-                    Notes = notes
-                });
+                reconciledPairs.Add(
+                    new ModPair
+                    {
+                        ServerMod = serverMod,
+                        ClientMod = clientMod,
+                        SelectedMod = selectedMod,
+                        Notes = notes,
+                    }
+                );
 
                 matchedServerIndices.Add(serverIdx);
                 matchedClientIndices.Add(clientIdx);
@@ -62,13 +65,9 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
         }
 
         // Collect unmatched mods
-        var unmatchedServerMods = serverMods
-            .Where((_, idx) => !matchedServerIndices.Contains(idx))
-            .ToList();
+        var unmatchedServerMods = serverMods.Where((_, idx) => !matchedServerIndices.Contains(idx)).ToList();
 
-        var unmatchedClientMods = clientMods
-            .Where((_, idx) => !matchedClientIndices.Contains(idx))
-            .ToList();
+        var unmatchedClientMods = clientMods.Where((_, idx) => !matchedClientIndices.Contains(idx)).ToList();
 
         // Build final mod list: reconciled pairs (selected mod) + unmatched mods
         var allMods = reconciledPairs
@@ -77,15 +76,19 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
             .Concat(unmatchedClientMods)
             .ToList();
 
-        logger.LogDebug("Reconciliation complete. Pairs: {PairCount}, Unmatched server: {UnmatchedServer}, Unmatched client: {UnmatchedClient}",
-            reconciledPairs.Count, unmatchedServerMods.Count, unmatchedClientMods.Count);
+        logger.LogDebug(
+            "Reconciliation complete. Pairs: {PairCount}, Unmatched server: {UnmatchedServer}, Unmatched client: {UnmatchedClient}",
+            reconciledPairs.Count,
+            unmatchedServerMods.Count,
+            unmatchedClientMods.Count
+        );
 
         return new ModReconciliationResult
         {
             Mods = allMods,
             ReconciledPairs = reconciledPairs,
             UnmatchedServerMods = unmatchedServerMods,
-            UnmatchedClientMods = unmatchedClientMods
+            UnmatchedClientMods = unmatchedClientMods,
         };
     }
 
@@ -95,9 +98,11 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
     private static bool ModsMatch(Mod serverMod, Mod clientMod)
     {
         // Direct GUID match (case-insensitive)
-        if (!string.IsNullOrWhiteSpace(serverMod.Guid) &&
-            !string.IsNullOrWhiteSpace(clientMod.Guid) &&
-            string.Equals(serverMod.Guid, clientMod.Guid, StringComparison.OrdinalIgnoreCase))
+        if (
+            !string.IsNullOrWhiteSpace(serverMod.Guid)
+            && !string.IsNullOrWhiteSpace(clientMod.Guid)
+            && string.Equals(serverMod.Guid, clientMod.Guid, StringComparison.OrdinalIgnoreCase)
+        )
         {
             return true;
         }
@@ -121,8 +126,10 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
             }
 
             // Compare GUID name to local name
-            if (ModNameNormalizer.IsExactMatch(serverGuidName, clientMod.LocalName, removeComponentSuffixes: true) ||
-                ModNameNormalizer.IsExactMatch(serverMod.LocalName, clientGuidName, removeComponentSuffixes: true))
+            if (
+                ModNameNormalizer.IsExactMatch(serverGuidName, clientMod.LocalName, removeComponentSuffixes: true)
+                || ModNameNormalizer.IsExactMatch(serverMod.LocalName, clientGuidName, removeComponentSuffixes: true)
+            )
             {
                 return true;
             }

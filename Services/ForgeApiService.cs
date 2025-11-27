@@ -18,8 +18,8 @@ public partial class ForgeApiService(
     HttpClient httpClient,
     IRateLimitService rateLimitService,
     IOptions<ForgeApiOptions> options,
-    ILogger<ForgeApiService> logger)
-    : IForgeApiService
+    ILogger<ForgeApiService> logger
+) : IForgeApiService
 {
     private readonly ForgeApiOptions _options = options.Value;
 
@@ -74,7 +74,10 @@ public partial class ForgeApiService(
     /// - InvalidApiKey: The API key is invalid or lacks permissions
     /// - ApiError: An error occurred during validation
     /// </returns>
-    public async Task<OneOf<bool, InvalidApiKey, ApiError>> ValidateApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
+    public async Task<OneOf<bool, InvalidApiKey, ApiError>> ValidateApiKeyAsync(
+        string apiKey,
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Validating API key");
 
@@ -89,16 +92,21 @@ public partial class ForgeApiService(
             var url = _options.BaseUrl + "auth/abilities";
             logger.LogDebug("API Request: GET {Url}", url);
 
-            var response = await rateLimitService.ExecuteWithRetryAsync(async () =>
-            {
-                var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-                return await httpClient.SendAsync(request, cancellationToken);
-            }, cancellationToken);
+            var response = await rateLimitService.ExecuteWithRetryAsync(
+                async () =>
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                    return await httpClient.SendAsync(request, cancellationToken);
+                },
+                cancellationToken
+            );
 
             // Definitive auth failures - key is bad
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
-                response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            if (
+                response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                || response.StatusCode == System.Net.HttpStatusCode.Forbidden
+            )
             {
                 logger.LogWarning("API key validation failed: {StatusCode}", response.StatusCode);
                 return new InvalidApiKey(ShouldDeleteKey: true);
@@ -113,7 +121,8 @@ public partial class ForgeApiService(
 
             var jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
             var authResponse = JsonSerializer.Deserialize<AuthAbilitiesResponse>(jsonContent, _jsonOptions);
-            var hasReadPermission = authResponse is { Success: true, Data: not null } && authResponse.Data.Contains("read");
+            var hasReadPermission =
+                authResponse is { Success: true, Data: not null } && authResponse.Data.Contains("read");
 
             if (!hasReadPermission)
             {
@@ -143,7 +152,10 @@ public partial class ForgeApiService(
     /// - InvalidSptVersion: The SPT version does not exist
     /// - ApiError: An error occurred during validation
     /// </returns>
-    public async Task<OneOf<bool, InvalidSptVersion, ApiError>> ValidateSptVersionAsync(string sptVersion, CancellationToken cancellationToken = default)
+    public async Task<OneOf<bool, InvalidSptVersion, ApiError>> ValidateSptVersionAsync(
+        string sptVersion,
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Validating SPT version: {SptVersion}", sptVersion);
 
@@ -153,7 +165,10 @@ public partial class ForgeApiService(
             var url = $"{_options.BaseUrl}spt/versions?filter[spt_version]={escapedVersion}";
             logger.LogDebug("API Request: GET {Url}", url);
 
-            var response = await rateLimitService.ExecuteWithRetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+            var response = await rateLimitService.ExecuteWithRetryAsync(
+                () => httpClient.GetAsync(url, cancellationToken),
+                cancellationToken
+            );
 
             if (!response.IsSuccessStatusCode)
             {
@@ -164,8 +179,8 @@ public partial class ForgeApiService(
             var jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
             var apiResponse = JsonSerializer.Deserialize<SptVersionApiResponse>(jsonContent, _jsonOptions);
 
-            var isValid = apiResponse is { Success: true, Data: not null } &&
-                          apiResponse.Data.Any(v => v.Version == sptVersion);
+            var isValid =
+                apiResponse is { Success: true, Data: not null } && apiResponse.Data.Any(v => v.Version == sptVersion);
 
             if (!isValid)
             {
@@ -193,7 +208,9 @@ public partial class ForgeApiService(
     /// </summary>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>List of all available SPT versions or an error.</returns>
-    public async Task<OneOf<List<SptVersionResult>, ApiError>> GetAllSptVersionsAsync(CancellationToken cancellationToken = default)
+    public async Task<OneOf<List<SptVersionResult>, ApiError>> GetAllSptVersionsAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Fetching all SPT versions from Forge API");
 
@@ -202,7 +219,10 @@ public partial class ForgeApiService(
             var url = $"{_options.BaseUrl}spt/versions?sort=-version&per_page=15";
             logger.LogDebug("API Request: GET {Url}", url);
 
-            var response = await rateLimitService.ExecuteWithRetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+            var response = await rateLimitService.ExecuteWithRetryAsync(
+                () => httpClient.GetAsync(url, cancellationToken),
+                cancellationToken
+            );
 
             if (!response.IsSuccessStatusCode)
             {
@@ -237,7 +257,8 @@ public partial class ForgeApiService(
     public async Task<OneOf<List<ModSearchResult>, ApiError>> SearchModsAsync(
         string modName,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Searching for server mod: {ModName}", modName);
 
@@ -255,7 +276,8 @@ public partial class ForgeApiService(
     public async Task<OneOf<List<ModSearchResult>, ApiError>> SearchClientModsAsync(
         string modName,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Searching for client mod: {ModName}", modName);
 
@@ -269,7 +291,10 @@ public partial class ForgeApiService(
     /// <param name="modId">The ID of the mod to retrieve.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>The mod search result or an error type.</returns>
-    public async Task<OneOf<ModSearchResult, NotFound, InvalidInput, ApiError>> GetModByIdAsync(int modId, CancellationToken cancellationToken = default)
+    public async Task<OneOf<ModSearchResult, NotFound, InvalidInput, ApiError>> GetModByIdAsync(
+        int modId,
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Getting mod by ID: {ModId}", modId);
 
@@ -284,7 +309,10 @@ public partial class ForgeApiService(
             var url = $"{_options.BaseUrl}mod/{modId}?include=versions,source_code_links";
             logger.LogDebug("API Request: GET {Url}", url);
 
-            var response = await rateLimitService.ExecuteWithRetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+            var response = await rateLimitService.ExecuteWithRetryAsync(
+                () => httpClient.GetAsync(url, cancellationToken),
+                cancellationToken
+            );
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
@@ -299,9 +327,11 @@ public partial class ForgeApiService(
             var jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
             var jsonDoc = JsonDocument.Parse(jsonContent);
 
-            if (!jsonDoc.RootElement.TryGetProperty("success", out var successElement) ||
-                !successElement.GetBoolean() ||
-                !jsonDoc.RootElement.TryGetProperty("data", out var dataElement))
+            if (
+                !jsonDoc.RootElement.TryGetProperty("success", out var successElement)
+                || !successElement.GetBoolean()
+                || !jsonDoc.RootElement.TryGetProperty("data", out var dataElement)
+            )
             {
                 return new NotFound();
             }
@@ -334,7 +364,8 @@ public partial class ForgeApiService(
     public async Task<OneOf<ModSearchResult, NotFound, NoCompatibleVersion, ApiError>> GetModByGuidAsync(
         string modGuid,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Getting mod by GUID: {ModGuid}", modGuid);
 
@@ -346,10 +377,14 @@ public partial class ForgeApiService(
 
         try
         {
-            var url = $"{_options.BaseUrl}mods?filter[guid]={Uri.EscapeDataString(modGuid)}&include=versions,source_code_links";
+            var url =
+                $"{_options.BaseUrl}mods?filter[guid]={Uri.EscapeDataString(modGuid)}&include=versions,source_code_links";
             logger.LogDebug("API Request: GET {Url}", url);
 
-            var response = await rateLimitService.ExecuteWithRetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+            var response = await rateLimitService.ExecuteWithRetryAsync(
+                () => httpClient.GetAsync(url, cancellationToken),
+                cancellationToken
+            );
 
             if (!response.IsSuccessStatusCode)
             {
@@ -417,7 +452,8 @@ public partial class ForgeApiService(
     private async Task<OneOf<List<ModSearchResult>, ApiError>> SearchModsInternalAsync(
         string searchQuery,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         try
         {
@@ -425,7 +461,10 @@ public partial class ForgeApiService(
                 $"{_options.BaseUrl}mods?query={Uri.EscapeDataString(searchQuery)}&filter[spt_version]={sptVersion}&include=versions,source_code_links";
             logger.LogDebug("API Request: GET {Url}", url);
 
-            var response = await rateLimitService.ExecuteWithRetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+            var response = await rateLimitService.ExecuteWithRetryAsync(
+                () => httpClient.GetAsync(url, cancellationToken),
+                cancellationToken
+            );
 
             if (!response.IsSuccessStatusCode)
             {
@@ -457,7 +496,8 @@ public partial class ForgeApiService(
     public async Task<OneOf<ModUpdatesData, NotFound, ApiError>> GetModUpdatesAsync(
         IEnumerable<(int ModId, string CurrentVersion)> modUpdates,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var modList = modUpdates.ToList();
         if (modList.Count == 0)
@@ -468,13 +508,18 @@ public partial class ForgeApiService(
         try
         {
             // Build mods query parameter as comma-separated "id:version" pairs
-            var modsParam = string.Join(",", modList.Select(m =>
-                $"{m.ModId}:{Uri.EscapeDataString(m.CurrentVersion)}"));
+            var modsParam = string.Join(
+                ",",
+                modList.Select(m => $"{m.ModId}:{Uri.EscapeDataString(m.CurrentVersion)}")
+            );
 
             var url = $"{_options.BaseUrl}mods/updates?mods={modsParam}&spt_version={sptVersion}";
             logger.LogDebug("API Request: GET {Url}", url);
 
-            var response = await rateLimitService.ExecuteWithRetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+            var response = await rateLimitService.ExecuteWithRetryAsync(
+                () => httpClient.GetAsync(url, cancellationToken),
+                cancellationToken
+            );
 
             if (!response.IsSuccessStatusCode)
             {
@@ -509,7 +554,8 @@ public partial class ForgeApiService(
     /// <returns>Flattened dependency tree with recursive structure or an error.</returns>
     public async Task<OneOf<List<ModDependency>, NotFound, ApiError>> GetModDependenciesAsync(
         IEnumerable<(string Identifier, string Version)> modVersions,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var modList = modVersions.ToList();
         if (modList.Count == 0)
@@ -520,13 +566,18 @@ public partial class ForgeApiService(
         try
         {
             // Build mods query parameter as comma-separated "identifier:version" pairs
-            var modsParam = string.Join(",", modList.Select(m =>
-                $"{Uri.EscapeDataString(m.Identifier)}:{Uri.EscapeDataString(m.Version)}"));
+            var modsParam = string.Join(
+                ",",
+                modList.Select(m => $"{Uri.EscapeDataString(m.Identifier)}:{Uri.EscapeDataString(m.Version)}")
+            );
 
             var url = $"{_options.BaseUrl}mods/dependencies?mods={modsParam}";
             logger.LogDebug("API Request: GET {Url}", url);
 
-            var response = await rateLimitService.ExecuteWithRetryAsync(() => httpClient.GetAsync(url, cancellationToken), cancellationToken);
+            var response = await rateLimitService.ExecuteWithRetryAsync(
+                () => httpClient.GetAsync(url, cancellationToken),
+                cancellationToken
+            );
 
             if (!response.IsSuccessStatusCode)
             {

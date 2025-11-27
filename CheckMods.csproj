@@ -16,7 +16,12 @@
   </PropertyGroup>
   <Target Name="GetGitHash" BeforeTargets="GetAssemblyAttributes;Publish">
     <!-- Capture the current Git commit hash and set it as a property. -->
-    <Exec Command="git rev-parse --short=6 HEAD" ConsoleToMsBuild="true" IgnoreExitCode="true" EchoOff="true">
+    <Exec
+      Command="git rev-parse --short=6 HEAD"
+      ConsoleToMsBuild="true"
+      IgnoreExitCode="true"
+      EchoOff="true"
+    >
       <Output TaskParameter="ConsoleOutput" PropertyName="GitHash" />
     </Exec>
     <PropertyGroup>
@@ -39,15 +44,24 @@
         <_Parameter2>$(GitHash)</_Parameter2>
       </AssemblyAttribute>
       <!-- Manually set the product version to include the git hash. -->
-      <AssemblyAttribute Include="System.Reflection.AssemblyInformationalVersionAttribute" Condition="'$(BuildVersion)' != ''">
+      <AssemblyAttribute
+        Include="System.Reflection.AssemblyInformationalVersionAttribute"
+        Condition="'$(BuildVersion)' != ''"
+      >
         <_Parameter1>$(BuildVersion).$(GitHash)</_Parameter1>
       </AssemblyAttribute>
     </ItemGroup>
   </Target>
   <!-- Rename the published executable to include the Git hash. -->
   <Target Name="RenamePublishedExe" AfterTargets="Publish" DependsOnTargets="GetGitHash">
-    <Exec Condition="'$(GitHash)' != '' AND '$(OS)' == 'Windows_NT'" Command="move &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash).exe&quot;" />
-    <Exec Condition="'$(GitHash)' != '' AND '$(OS)' != 'Windows_NT'" Command="mv &quot;$(PublishDir)$(AssemblyName)&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash)&quot;" />
+    <Exec
+      Condition="'$(GitHash)' != '' AND '$(OS)' == 'Windows_NT'"
+      Command="move &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash).exe&quot;"
+    />
+    <Exec
+      Condition="'$(GitHash)' != '' AND '$(OS)' != 'Windows_NT'"
+      Command="mv &quot;$(PublishDir)$(AssemblyName)&quot; &quot;$(PublishDir)$(AssemblyName)-$(GitHash)&quot;"
+    />
   </Target>
   <ItemGroup>
     <PackageReference Include="FuzzySharp" Version="2.0.2" />

@@ -16,5 +16,6 @@ public interface IRateLimitService
     /// <exception cref="HttpRequestException">Thrown when max retries are exceeded.</exception>
     Task<HttpResponseMessage> ExecuteWithRetryAsync(
         Func<Task<HttpResponseMessage>> requestFunc,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }

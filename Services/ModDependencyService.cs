@@ -7,9 +7,8 @@ namespace CheckMods.Services;
 /// <summary>
 /// Service responsible for analyzing mod dependencies and building a dependency tree.
 /// </summary>
-public sealed class ModDependencyService(
-    IForgeApiService forgeApiService,
-    ILogger<ModDependencyService> logger) : IModDependencyService
+public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogger<ModDependencyService> logger)
+    : IModDependencyService
 {
     /// <summary>
     /// Analyzes dependencies for a collection of mods.
@@ -23,7 +22,8 @@ public sealed class ModDependencyService(
         IEnumerable<Mod> mods,
         HashSet<string> installedModGuids,
         Action<int, int>? progressCallback = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         logger.LogDebug("Analyzing mod dependencies");
 
@@ -81,13 +81,15 @@ public sealed class ModDependencyService(
             }
 
             var depsResult = await forgeApiService.GetModDependenciesAsync(
-                [(modId.ToString(), mod.LocalVersion)], cancellationToken);
+                [(modId.ToString(), mod.LocalVersion)],
+                cancellationToken
+            );
 
             // Extract dependencies or use empty list on error/not found
             var deps = depsResult.Match(
                 dependencies => dependencies,
-                _ => [],  // NotFound
-                _ => []   // ApiError
+                _ => [], // NotFound
+                _ => [] // ApiError
             );
 
             modDependencyCache[modId] = deps;
@@ -108,25 +110,32 @@ public sealed class ModDependencyService(
             // Build the dependency subtree for this mod
             var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { mod.Guid };
             var children = modDeps
-                .Select(dep => BuildDependencySubtree(dep, modByGuid, modById, installedModGuids, missingDeps, conflicts, visited))
+                .Select(dep =>
+                    BuildDependencySubtree(dep, modByGuid, modById, installedModGuids, missingDeps, conflicts, visited)
+                )
                 .Where(node => node is not null)
                 .Cast<DependencyNode>()
                 .ToList();
 
-            result.RootMods.Add(new DependencyNode
-            {
-                Mod = mod,
-                DependencyInfo = null,
-                IsInstalled = true,
-                Children = children
-            });
+            result.RootMods.Add(
+                new DependencyNode
+                {
+                    Mod = mod,
+                    DependencyInfo = null,
+                    IsInstalled = true,
+                    Children = children,
+                }
+            );
         }
 
         result.Conflicts.AddRange(conflicts);
         result.MissingDependencies.AddRange(missingDeps.Values);
 
-        logger.LogDebug("Dependency analysis complete. Conflicts: {ConflictCount}, Missing: {MissingCount}",
-            conflicts.Count, missingDeps.Count);
+        logger.LogDebug(
+            "Dependency analysis complete. Conflicts: {ConflictCount}, Missing: {MissingCount}",
+            conflicts.Count,
+            missingDeps.Count
+        );
 
         return result;
     }
@@ -141,7 +150,8 @@ public sealed class ModDependencyService(
         HashSet<string> installedGuids,
         Dictionary<string, MissingDependency> missingDeps,
         List<DependencyConflict> conflicts,
-        HashSet<string> visited)
+        HashSet<string> visited
+    )
     {
         // Prevent circular recursion
         if (!visited.Add(dependency.Guid))
@@ -150,15 +160,20 @@ public sealed class ModDependencyService(
         }
 
         // Check for conflicts
-        if (dependency.Conflict && !conflicts.Any(c => c.ModGuid.Equals(dependency.Guid, StringComparison.OrdinalIgnoreCase)))
+        if (
+            dependency.Conflict
+            && !conflicts.Any(c => c.ModGuid.Equals(dependency.Guid, StringComparison.OrdinalIgnoreCase))
+        )
         {
-            conflicts.Add(new DependencyConflict
-            {
-                ModName = dependency.Name,
-                ModGuid = dependency.Guid,
-                Description = "Version constraint conflict detected",
-                DependencyInfo = dependency
-            });
+            conflicts.Add(
+                new DependencyConflict
+                {
+                    ModName = dependency.Name,
+                    ModGuid = dependency.Guid,
+                    Description = "Version constraint conflict detected",
+                    DependencyInfo = dependency,
+                }
+            );
         }
 
         // Try to find the installed mod for this dependency
@@ -179,10 +194,14 @@ public sealed class ModDependencyService(
         {
             // Always construct the Forge download URL for consistency
             string? downloadLink = null;
-            if (dependency.Id > 0 && !string.IsNullOrWhiteSpace(dependency.Slug) &&
-                !string.IsNullOrWhiteSpace(dependency.LatestCompatibleVersion?.Version))
+            if (
+                dependency.Id > 0
+                && !string.IsNullOrWhiteSpace(dependency.Slug)
+                && !string.IsNullOrWhiteSpace(dependency.LatestCompatibleVersion?.Version)
+            )
             {
-                downloadLink = $"https://forge.sp-tarkov.com/mod/download/{dependency.Id}/{dependency.Slug}/{dependency.LatestCompatibleVersion.Version}";
+                downloadLink =
+                    $"https://forge.sp-tarkov.com/mod/download/{dependency.Id}/{dependency.Slug}/{dependency.LatestCompatibleVersion.Version}";
             }
 
             missingDeps[dependency.Guid] = new MissingDependency
@@ -192,7 +211,7 @@ public sealed class ModDependencyService(
                 ModId = dependency.Id,
                 Slug = dependency.Slug,
                 RecommendedVersion = dependency.LatestCompatibleVersion?.Version ?? "unknown",
-                DownloadLink = downloadLink
+                DownloadLink = downloadLink,
             };
         }
 
@@ -202,8 +221,10 @@ public sealed class ModDependencyService(
             return CreateDependencyNode(dependency, installedMod, isInstalled, []);
         }
 
-        var children = dependency.Dependencies
-            .Select(nestedDep => BuildDependencySubtree(nestedDep, modByGuid, modById, installedGuids, missingDeps, conflicts, visited))
+        var children = dependency
+            .Dependencies.Select(nestedDep =>
+                BuildDependencySubtree(nestedDep, modByGuid, modById, installedGuids, missingDeps, conflicts, visited)
+            )
             .Where(node => node is not null)
             .Cast<DependencyNode>()
             .ToList();
@@ -218,24 +239,27 @@ public sealed class ModDependencyService(
         ModDependency dependency,
         Mod? installedMod,
         bool isInstalled,
-        List<DependencyNode> children)
+        List<DependencyNode> children
+    )
     {
-        var mod = installedMod ?? new Mod
-        {
-            Guid = dependency.Guid,
-            FilePath = string.Empty,
-            IsServerMod = true,
-            LocalName = dependency.Name,
-            LocalAuthor = string.Empty,
-            LocalVersion = dependency.LatestCompatibleVersion?.Version ?? "unknown"
-        };
+        var mod =
+            installedMod
+            ?? new Mod
+            {
+                Guid = dependency.Guid,
+                FilePath = string.Empty,
+                IsServerMod = true,
+                LocalName = dependency.Name,
+                LocalAuthor = string.Empty,
+                LocalVersion = dependency.LatestCompatibleVersion?.Version ?? "unknown",
+            };
 
         return new DependencyNode
         {
             Mod = mod,
             DependencyInfo = dependency,
             IsInstalled = isInstalled,
-            Children = children
+            Children = children,
         };
     }
 }

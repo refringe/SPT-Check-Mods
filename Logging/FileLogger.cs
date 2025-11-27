@@ -176,12 +176,15 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
             }
 
             // Shift existing logs (process in reverse order)
-            var logsToShift = Enumerable.Range(1, _options.RetainedFileCount - 1)
+            var logsToShift = Enumerable
+                .Range(1, _options.RetainedFileCount - 1)
                 .Reverse()
-                .Select(i => (
-                    Current: Path.Combine(directory, $"{fileNameWithoutExt}.{i}{extension}"),
-                    New: Path.Combine(directory, $"{fileNameWithoutExt}.{i + 1}{extension}")
-                ))
+                .Select(i =>
+                    (
+                        Current: Path.Combine(directory, $"{fileNameWithoutExt}.{i}{extension}"),
+                        New: Path.Combine(directory, $"{fileNameWithoutExt}.{i + 1}{extension}")
+                    )
+                )
                 .Where(paths => File.Exists(paths.Current));
 
             foreach (var (current, newPath) in logsToShift)

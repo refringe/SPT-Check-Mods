@@ -19,7 +19,8 @@ public interface IModDependencyService
         IEnumerable<Mod> mods,
         HashSet<string> installedModGuids,
         Action<int, int>? progressCallback = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }
 
 /// <summary>

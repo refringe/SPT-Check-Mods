@@ -26,7 +26,10 @@ public interface IForgeApiService
     /// - InvalidApiKey: The API key is invalid or lacks permissions (includes ShouldDeleteKey flag)
     /// - ApiError: An error occurred during validation (transient errors)
     /// </returns>
-    Task<OneOf<bool, InvalidApiKey, ApiError>> ValidateApiKeyAsync(string apiKey, CancellationToken cancellationToken = default);
+    Task<OneOf<bool, InvalidApiKey, ApiError>> ValidateApiKeyAsync(
+        string apiKey,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Validates that an SPT version exists in the Forge API.
@@ -39,7 +42,10 @@ public interface IForgeApiService
     /// - InvalidSptVersion: The SPT version does not exist in the API
     /// - ApiError: An error occurred during validation
     /// </returns>
-    Task<OneOf<bool, InvalidSptVersion, ApiError>> ValidateSptVersionAsync(string sptVersion, CancellationToken cancellationToken = default);
+    Task<OneOf<bool, InvalidSptVersion, ApiError>> ValidateSptVersionAsync(
+        string sptVersion,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Retrieves all available SPT versions from the Forge API.
@@ -63,7 +69,11 @@ public interface IForgeApiService
     /// - List&lt;ModSearchResult&gt;: List of matching mods (may be empty if no matches)
     /// - ApiError: An error occurred during the search
     /// </returns>
-    Task<OneOf<List<ModSearchResult>, ApiError>> SearchModsAsync(string modName, SemanticVersioning.Version sptVersion, CancellationToken cancellationToken = default);
+    Task<OneOf<List<ModSearchResult>, ApiError>> SearchModsAsync(
+        string modName,
+        SemanticVersioning.Version sptVersion,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Searches for client mods using the Forge API.
@@ -79,7 +89,8 @@ public interface IForgeApiService
     Task<OneOf<List<ModSearchResult>, ApiError>> SearchClientModsAsync(
         string modName,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Retrieves a specific mod by its ID from the Forge API.
@@ -93,7 +104,10 @@ public interface IForgeApiService
     /// - InvalidInput: The mod ID was invalid (e.g., less than or equal to 0)
     /// - ApiError: An error occurred during the API call
     /// </returns>
-    Task<OneOf<ModSearchResult, NotFound, InvalidInput, ApiError>> GetModByIdAsync(int modId, CancellationToken cancellationToken = default);
+    Task<OneOf<ModSearchResult, NotFound, InvalidInput, ApiError>> GetModByIdAsync(
+        int modId,
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Retrieves a mod by its GUID from the Forge API.
@@ -111,7 +125,8 @@ public interface IForgeApiService
     Task<OneOf<ModSearchResult, NotFound, NoCompatibleVersion, ApiError>> GetModByGuidAsync(
         string modGuid,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Retrieves batch update information for multiple mods in a single API call.
@@ -128,7 +143,8 @@ public interface IForgeApiService
     Task<OneOf<ModUpdatesData, NotFound, ApiError>> GetModUpdatesAsync(
         IEnumerable<(int ModId, string CurrentVersion)> modUpdates,
         SemanticVersioning.Version sptVersion,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Retrieves dependency information for multiple mods in a single API call.
@@ -143,5 +159,6 @@ public interface IForgeApiService
     /// </returns>
     Task<OneOf<List<ModDependency>, NotFound, ApiError>> GetModDependenciesAsync(
         IEnumerable<(string Identifier, string Version)> modVersions,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }
