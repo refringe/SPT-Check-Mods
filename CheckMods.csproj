@@ -5,9 +5,8 @@
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <SelfContained>true</SelfContained>
+    <SelfContained>false</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <ApplicationIcon>check-mods.ico</ApplicationIcon>
     <Copyright>2025 Refringe &lt;me@refringe.com&gt;</Copyright>
     <Product>https://github.com/refringe/SPT-Check-Mods</Product>
