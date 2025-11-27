@@ -8,30 +8,39 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '9.0.x'
+    
+    - name: Extract version from tag
+      id: version
+      run: |
+        # Extract version from tag (e.g., v1.2.3 -> 1.2.3.0)
+        VERSION=${GITHUB_REF#refs/tags/}
+        VERSION_CLEAN=${VERSION#v}
+        VERSION_WITH_BUILD="${VERSION_CLEAN}.0"
+        echo "version=${VERSION_WITH_BUILD}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION_WITH_BUILD}"
     
     - name: Restore dependencies
       run: dotnet restore
     
     - name: Build and Publish Windows x64
       run: |
-        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish/win-x64
+        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/win-x64
     
     - name: Build and Publish Linux x64
       run: |
-        dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o ./publish/linux-x64
+        dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/linux-x64
     
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          ./publish/win-x64/CheckMods.exe
-          ./publish/linux-x64/CheckMods
+          ./publish/win-x64/CheckMods-*.exe
+          ./publish/linux-x64/CheckMods-*
         generate_release_notes: true

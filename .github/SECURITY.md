@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in CheckMods, please report it responsibly by following these steps:
+If you discover a security vulnerability in SPT Check Mods, please report it responsibly by following these steps:
 
 1. **Do NOT** create a public GitHub issue for security vulnerabilities
 2. Send an email to the project maintainer me@refringe.com with details about the vulnerability
@@ -20,10 +20,10 @@ If you discover a security vulnerability in CheckMods, please report it responsi
 
 ## Security Considerations
 
-CheckMods handles:
+SPT Check Mods handles:
 - API keys stored in `%APPDATA%\SptModChecker\apikey.txt`
 - File system access for mod scanning
-- Network requests to forge.sp-tarkov.com API
+- Network requests to `forge.sp-tarkov.com` API
 
 ## Disclosure Policy
 

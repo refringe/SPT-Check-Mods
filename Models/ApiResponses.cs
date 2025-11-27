@@ -5,221 +5,229 @@ namespace CheckMods.Models;
 /// <summary>
 /// Response from the Forge API authentication abilities endpoint.
 /// </summary>
-public class AuthAbilitiesResponse
-{
-    /// <summary>
-    /// Whether the API call was successful.
-    /// </summary>
-    [JsonPropertyName("success")]
-    public bool Success { get; set; }
-    
-    /// <summary>
-    /// List of abilities/permissions for the authenticated user.
-    /// </summary>
-    [JsonPropertyName("data")]
-    public List<string>? Data { get; set; }
-}
+public record AuthAbilitiesResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("data")] List<string>? Data
+);
 
 /// <summary>
 /// Response from the Forge API mod search endpoint.
 /// </summary>
-public class ModSearchApiResponse
-{
-    /// <summary>
-    /// Whether the API call was successful.
-    /// </summary>
-    [JsonPropertyName("success")]
-    public bool Success { get; set; }
-    
-    /// <summary>
-    /// List of mod search results.
-    /// </summary>
-    [JsonPropertyName("data")]
-    public List<ModSearchResult>? Data { get; set; }
-}
+public record ModSearchApiResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("data")] List<ModSearchResult>? Data
+);
 
 /// <summary>
 /// Represents a mod search result from the Forge API.
 /// </summary>
-public class ModSearchResult
+public record ModSearchResult(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("hub_id")] int? HubId,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("slug")] string Slug,
+    [property: JsonPropertyName("teaser")] string? Teaser,
+    [property: JsonPropertyName("thumbnail")] string? Thumbnail,
+    [property: JsonPropertyName("downloads")] int Downloads,
+    [property: JsonPropertyName("source_code_links")] List<SourceCodeLink>? SourceCodeLinks,
+    [property: JsonPropertyName("detail_url")] string? DetailUrl,
+    [property: JsonPropertyName("owner")] ModAuthor? Owner,
+    [property: JsonPropertyName("versions")] List<ModVersion>? Versions
+)
 {
     /// <summary>
-    /// The unique identifier of the mod.
+    /// Gets the primary source code URL (first link if available).
     /// </summary>
-    [JsonPropertyName("id")]
-    public int Id { get; set; }
-    
-    /// <summary>
-    /// The hub identifier of the mod.
-    /// </summary>
-    [JsonPropertyName("hub_id")]
-    public int HubId { get; set; }
-    
-    /// <summary>
-    /// The name of the mod.
-    /// </summary>
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// The URL slug of the mod.
-    /// </summary>
-    [JsonPropertyName("slug")]
-    public string Slug { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// A short description or teaser for the mod.
-    /// </summary>
-    [JsonPropertyName("teaser")]
-    public string? Teaser { get; set; }
-    
-    /// <summary>
-    /// URL to the mod's thumbnail image.
-    /// </summary>
-    [JsonPropertyName("thumbnail")]
-    public string? Thumbnail { get; set; }
-    
-    /// <summary>
-    /// The number of downloads for this mod.
-    /// </summary>
-    [JsonPropertyName("downloads")]
-    public int Downloads { get; set; }
-    
-    /// <summary>
-    /// URL to the mod's source code repository.
-    /// </summary>
-    [JsonPropertyName("source_code_url")]
-    public string? SourceCodeUrl { get; set; }
-    
-    /// <summary>
-    /// URL to the mod's detail page.
-    /// </summary>
-    [JsonPropertyName("detail_url")]
-    public string? DetailUrl { get; set; }
-    
-    /// <summary>
-    /// The author/owner of the mod.
-    /// </summary>
-    [JsonPropertyName("owner")]
-    public ModAuthor? Owner { get; set; }
-    
-    /// <summary>
-    /// List of available versions for this mod.
-    /// </summary>
-    [JsonPropertyName("versions")]
-    public List<ModVersion>? Versions { get; set; }
+    public string? SourceCodeUrl
+    {
+        get { return SourceCodeLinks?.FirstOrDefault()?.Url; }
+    }
 }
 
 /// <summary>
 /// Represents the author/owner of a mod.
 /// </summary>
-public class ModAuthor
-{
-    /// <summary>
-    /// The unique identifier of the author.
-    /// </summary>
-    [JsonPropertyName("id")]
-    public int Id { get; set; }
-    
-    /// <summary>
-    /// The display name of the author.
-    /// </summary>
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// URL to the author's profile photo.
-    /// </summary>
-    [JsonPropertyName("profile_photo_url")]
-    public string? ProfilePhotoUrl { get; set; }
-}
+public record ModAuthor(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("profile_photo_url")] string? ProfilePhotoUrl
+);
+
+/// <summary>
+/// Represents a link to a source code repository.
+/// </summary>
+public record SourceCodeLink(
+    [property: JsonPropertyName("url")] string Url,
+    [property: JsonPropertyName("label")] string? Label
+);
 
 /// <summary>
 /// Represents a specific version of a mod.
 /// </summary>
-public class ModVersion
-{
-    /// <summary>
-    /// The unique identifier of this version.
-    /// </summary>
-    [JsonPropertyName("id")]
-    public int Id { get; set; }
-    
-    /// <summary>
-    /// The hub identifier this version belongs to.
-    /// </summary>
-    [JsonPropertyName("hub_id")]
-    public int? HubId { get; set; }
-    
-    /// <summary>
-    /// The version string (e.g., "1.0.0").
-    /// </summary>
-    [JsonPropertyName("version")]
-    public string Version { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Description of changes or features in this version.
-    /// </summary>
-    [JsonPropertyName("description")]
-    public string? Description { get; set; }
-    
-    /// <summary>
-    /// Direct download link for this version.
-    /// </summary>
-    [JsonPropertyName("link")]
-    public string? Link { get; set; }
-    
-    /// <summary>
-    /// SPT version compatibility constraint (e.g., ">=3.9.0").
-    /// </summary>
-    [JsonPropertyName("spt_version_constraint")]
-    public string SptVersionConstraint { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Link to VirusTotal scan results for this version.
-    /// </summary>
-    [JsonPropertyName("virus_total_link")]
-    public string? VirusTotalLink { get; set; }
-    
-    /// <summary>
-    /// Number of downloads for this specific version.
-    /// </summary>
-    [JsonPropertyName("downloads")]
-    public int Downloads { get; set; }
-    
-    /// <summary>
-    /// ISO 8601 timestamp when this version was published.
-    /// </summary>
-    [JsonPropertyName("published_at")]
-    public string? PublishedAt { get; set; }
-    
-    /// <summary>
-    /// ISO 8601 timestamp when this version was created.
-    /// </summary>
-    [JsonPropertyName("created_at")]
-    public string? CreatedAt { get; set; }
-    
-    /// <summary>
-    /// ISO 8601 timestamp when this version was last updated.
-    /// </summary>
-    [JsonPropertyName("updated_at")]
-    public string? UpdatedAt { get; set; }
-}
+public record ModVersion(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("hub_id")] int? HubId,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("description")] string? Description,
+    [property: JsonPropertyName("link")] string? Link,
+    [property: JsonPropertyName("spt_version_constraint")] string SptVersionConstraint,
+    [property: JsonPropertyName("virus_total_link")] string? VirusTotalLink,
+    [property: JsonPropertyName("downloads")] int Downloads,
+    [property: JsonPropertyName("published_at")] string? PublishedAt,
+    [property: JsonPropertyName("created_at")] string? CreatedAt,
+    [property: JsonPropertyName("updated_at")] string? UpdatedAt
+);
 
 /// <summary>
 /// Response from the Forge API mod versions' endpoint.
 /// </summary>
-public class ModVersionsApiResponse
+public record ModVersionsApiResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("data")] List<ModVersion>? Data
+);
+
+#region Batch Updates Endpoint Models
+
+/// <summary>
+/// Response from the Forge API batch mod updates endpoint.
+/// </summary>
+public record ModUpdatesApiResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("data")] ModUpdatesData? Data
+);
+
+/// <summary>
+/// Categorized mod update information from the batch updates endpoint.
+/// </summary>
+public record ModUpdatesData(
+    [property: JsonPropertyName("updates")] List<SafeToUpdateMod>? SafeToUpdate,
+    [property: JsonPropertyName("blocked_updates")] List<BlockedUpdateMod>? Blocked,
+    [property: JsonPropertyName("up_to_date")] List<UpToDateMod>? UpToDate,
+    [property: JsonPropertyName("incompatible_with_spt")] List<IncompatibleMod>? Incompatible
+);
+
+/// <summary>
+/// Version information containing version string and metadata.
+/// </summary>
+public record ModVersionInfo2(
+    [property: JsonPropertyName("id")] int? Id,
+    [property: JsonPropertyName("mod_id")] int ModId,
+    [property: JsonPropertyName("guid")] string? Guid,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("slug")] string? Slug,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("link")] string? Link,
+    [property: JsonPropertyName("spt_versions")] List<string>? SptVersions
+);
+
+/// <summary>
+/// A mod that has an update available and is safe to update.
+/// </summary>
+public record SafeToUpdateMod(
+    [property: JsonPropertyName("current_version")] ModVersionInfo2? CurrentVersion,
+    [property: JsonPropertyName("recommended_version")] ModVersionInfo2? RecommendedVersion,
+    [property: JsonPropertyName("update_reason")] string? UpdateReason
+)
 {
     /// <summary>
-    /// Whether the API call was successful.
+    /// Helper property to get the mod ID from current version.
     /// </summary>
-    [JsonPropertyName("success")]
-    public bool Success { get; set; }
-    
-    /// <summary>
-    /// List of mod versions returned by the API.
-    /// </summary>
-    [JsonPropertyName("data")]
-    public List<ModVersion>? Data { get; set; }
+    public int ModId
+    {
+        get { return CurrentVersion?.ModId ?? 0; }
+    }
 }
+
+/// <summary>
+/// A mod that has an update available but is blocked by dependency constraints.
+/// </summary>
+public record BlockedUpdateMod(
+    [property: JsonPropertyName("current_version")] ModVersionInfo2? CurrentVersion,
+    [property: JsonPropertyName("latest_version")] ModVersionInfo2? LatestVersion,
+    [property: JsonPropertyName("block_reason")] string? BlockReason,
+    [property: JsonPropertyName("blocking_mods")] List<BlockingModInfo>? BlockingMods
+)
+{
+    /// <summary>
+    /// Helper property to get the mod ID from current version.
+    /// </summary>
+    public int ModId
+    {
+        get { return CurrentVersion?.ModId ?? 0; }
+    }
+}
+
+/// <summary>
+/// Information about a mod that is blocking an update due to dependency constraints.
+/// </summary>
+public record BlockingModInfo(
+    [property: JsonPropertyName("mod_id")] int ModId,
+    [property: JsonPropertyName("mod_guid")] string? ModGuid,
+    [property: JsonPropertyName("mod_name")] string Name,
+    [property: JsonPropertyName("current_version")] string? CurrentVersion,
+    [property: JsonPropertyName("constraint")] string Constraint,
+    [property: JsonPropertyName("incompatible_with")] string? IncompatibleWith
+);
+
+/// <summary>
+/// A mod that is already up to date.
+/// </summary>
+public record UpToDateMod(
+    [property: JsonPropertyName("id")] int? Id,
+    [property: JsonPropertyName("mod_id")] int ModId,
+    [property: JsonPropertyName("guid")] string? Guid,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("spt_versions")] List<string>? SptVersions
+);
+
+/// <summary>
+/// A mod that has no compatible version for the current SPT version.
+/// </summary>
+public record IncompatibleMod(
+    [property: JsonPropertyName("id")] int? Id,
+    [property: JsonPropertyName("mod_id")] int ModId,
+    [property: JsonPropertyName("guid")] string? Guid,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("reason")] string Reason,
+    [property: JsonPropertyName("latest_compatible_version")] ModVersionInfo2? LatestCompatibleVersion
+);
+
+#endregion
+
+#region Dependencies Endpoint Models
+
+/// <summary>
+/// Response from the Forge API mod dependencies endpoint.
+/// </summary>
+public record ModDependenciesApiResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("data")] List<ModDependency>? Data
+);
+
+/// <summary>
+/// Represents a dependency from the Forge API dependencies endpoint.
+/// </summary>
+public record ModDependency(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("guid")] string Guid,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("slug")] string Slug,
+    [property: JsonPropertyName("latest_compatible_version")] DependencyVersionInfo? LatestCompatibleVersion,
+    [property: JsonPropertyName("conflict")] bool Conflict,
+    [property: JsonPropertyName("dependencies")] List<ModDependency>? Dependencies
+);
+
+/// <summary>
+/// Version information for a dependency.
+/// </summary>
+public record DependencyVersionInfo(
+    [property: JsonPropertyName("id")] int Id,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("link")] string? Link,
+    [property: JsonPropertyName("content_length")] long? ContentLength,
+    [property: JsonPropertyName("fika_compatibility")] string? FikaCompatibility
+);
+
+#endregion

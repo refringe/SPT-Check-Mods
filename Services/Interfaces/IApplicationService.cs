@@ -9,5 +9,6 @@ public interface IApplicationService
     /// Main entry point for the application workflow.
     /// </summary>
     /// <param name="args">Command line arguments.</param>
-    Task RunAsync(string[] args);
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    Task RunAsync(string[] args, CancellationToken cancellationToken = default);
 }

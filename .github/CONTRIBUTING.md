@@ -1,6 +1,6 @@
-# Contributing to CheckMods
+# Contributing to SPT Check Mods
 
-Thank you for your interest in contributing to CheckMods! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to SPT Check Mods! This document provides guidelines for contributing to the project.
 
 ## Code of Conduct
 
@@ -9,14 +9,14 @@ This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDU
 ## Getting Started
 
 ### Prerequisites
-- .NET 9.0 SDK
+- .NET 10 SDK
 - Git
 - A valid SPT installation for testing
 
 ### Development Setup
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/your-username/CheckMods.git`
-3. Navigate to the project: `cd CheckMods`
+2. Clone your fork: `git clone https://github.com/your-username/SPT-Check-Mods.git`
+3. Navigate to the project: `cd SPT-Check-Mods`
 4. Restore dependencies: `dotnet restore`
 5. Build the project: `dotnet build`
 
@@ -24,14 +24,15 @@ This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDU
 
 ### Code Style
 - Follow standard C# conventions
+- Use the latest C# 14 features (primary constructors, collection expressions, pattern matching, etc.)
 - Use meaningful variable and method names
 - Add XML documentation for public methods
 - Keep methods focused and concise
 
 ### Architecture Patterns
 - Use dependency injection for services
-- Follow the existing service-oriented architecture
-- Register services as singletons in `Program.cs`
+- Follow the existing pipeline-based service architecture
+- Register services via `ServiceCollectionExtensions.AddCheckModsServices()`
 - Use async/await for I/O operations
 
 ### Testing

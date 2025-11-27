@@ -11,7 +11,7 @@ public static partial class SecurityHelper
     /// </summary>
     [System.Text.RegularExpressions.GeneratedRegex(@"[\x00-\x1F\x7F]")]
     private static partial System.Text.RegularExpressions.Regex ControlCharactersRegex();
-    
+
     /// <summary>
     /// Validates and returns a safe absolute path, preventing directory traversal attacks. Resolves relative path
     /// segments and ensures the result stays within the base path if provided.
@@ -22,18 +22,23 @@ public static partial class SecurityHelper
     public static string? GetSafePath(string? inputPath, string? basePath = null)
     {
         if (string.IsNullOrWhiteSpace(inputPath))
+        {
             return null;
+        }
 
         try
         {
             // Get the full path, resolving any relative segments
             var fullPath = Path.GetFullPath(inputPath);
-            
+
             // If a base path is provided, ensure the resolved path is within it
-            if (string.IsNullOrWhiteSpace(basePath)) return fullPath;
-            
+            if (string.IsNullOrWhiteSpace(basePath))
+            {
+                return fullPath;
+            }
+
             var baseFullPath = Path.GetFullPath(basePath);
-            
+
             // Return null if a path traversal attempt is detected
             return !fullPath.StartsWith(baseFullPath, StringComparison.OrdinalIgnoreCase) ? null : fullPath;
         }
@@ -50,7 +55,7 @@ public static partial class SecurityHelper
             return null; // Path contains a colon in the middle of the string
         }
     }
-    
+
     /// <summary>
     /// Sanitizes input string by removing control characters that could be used for injection attacks. Removes
     /// characters in the range 0x00-0x1F and 0x7F, which include null bytes, line feeds, and DEL.

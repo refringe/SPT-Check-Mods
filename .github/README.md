@@ -1,22 +1,21 @@
-# CheckMods
+# SPT Check Mods
 
-A .NET 9.0 console application that validates Single Player Tarkov mod compatibility using the Forge API.
+A .NET 10 console application that validates Single Player Tarkov (SPT) mod compatibility using the Forge API.
 
 <img width="1013" height="314" alt="image" src="https://github.com/user-attachments/assets/00878387-024c-4961-b66f-b977f4e550c0" />
 
 ## Features
 
-- **Server Mod Validation**: Scans `user/mods` directory for server-side mods
-- **Client Mod Detection**: Scans and analyzes `BepInEx/plugins` directory for client-side mods
-- **Fuzzy Matching**: Intelligent mod name matching for accurate identification
-- **Version Compatibility**: Checks mod version requirements against SPT version
-- **Rate Limited API**: Respects forge.sp-tarkov.com API limits with built-in rate limiting
+- **Forge API Integration**: Verifies mods against the official SPT Forge database
+- **Version Compatibility**: Checks installed mod versions against SPT version requirements
+- **Update Detection**: Identifies mods with available updates and provides download links
+- **Dependency Analysis**: Builds dependency trees, identifies missing dependencies, and detects conflicts
+- **SPT Update Checking**: Notifies you when a new SPT version is available
 
 ## Requirements
 
-- .NET 9.0 Runtime
 - Valid SPT installation
-- [Forge API key](https://forge.sp-tarkov.com/user/api-tokens)
+- [Forge API key](https://forge.sp-tarkov.com/user/api-tokens) with read permissions
 
 ## Installation
 
@@ -25,8 +24,8 @@ Download the latest release from the [Releases](https://github.com/refringe/SPT-
 
 ### Option 2: Build from Source
 ```bash
-git clone https://github.com/refringe/CheckMods.git
-cd CheckMods
+git clone https://github.com/refringe/SPT-Check-Mods.git
+cd SPT-Check-Mods
 dotnet build
 ```
 
@@ -34,31 +33,41 @@ dotnet build
 
 ### Basic Usage
 ```bash
-# Run with current directory as SPT path
+# Run from your SPT installation directory
 dotnet run
 
-# Run with specific SPT path
+# Or specify the SPT path as an argument
 dotnet run /path/to/spt
 ```
 
+### First Run
+On first run, you'll be prompted to enter your Forge API key. The key is securely stored for future use.
+
 ## Architecture
 
-CheckMods follows a service-oriented architecture with dependency injection:
+SPT Mod Checker uses a pipeline-based service architecture with dependency injection:
 
-- **ApplicationService**: Main orchestrator
-- **ModService**: Server mod validation and scanning
-- **ClientModService**: BepInEx client mod detection
-- **ForgeApiService**: API communication with caching
-- **RateLimitService**: API rate limiting
+- **ApplicationService**: Main orchestrator that coordinates the entire workflow
+- **ServerModService**: Validates SPT installation and extracts SPT version from `SPTarkov.Server.Core.dll`
+- **ModScannerService**: Scans both server (`SPT/user/mods`) and client (`BepInEx/plugins`) mods
+- **ModReconciliationService**: Matches server/client components of the same mod
+- **ModMatchingService**: Matches local mods with the Forge API using GUID and fuzzy name matching
+- **ModEnrichmentService**: Enriches matched mods with version data from the API
+- **ModDependencyService**: Analyzes dependency trees and identifies missing/conflicting dependencies
+- **ForgeApiService**: HTTP client for the Forge API
+- **RateLimitService**: Prevents API throttling
 
 ## Configuration
 
 ### API Key Storage
 The Forge API key is stored in: `%APPDATA%\SptModChecker\apikey.txt`
 
+### Log Files
+Application logs are stored in: `%APPDATA%\SptModChecker\logs\checkmod.log`
+
 ### Supported Mod Formats
-- **Server Mods**: Standard SPT mod structure in `user/mods`
-- **Client Mods**: BepInEx plugins in `BepInEx/plugins`
+- **Server Mods**: SPT mods with `AbstractModMetadata` in `SPT/user/mods`
+- **Client Mods**: BepInEx plugins with `BepInPlugin` attribute in `BepInEx/plugins`
 
 ## Contributing
 
