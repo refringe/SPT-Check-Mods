@@ -42,11 +42,11 @@ jobs:
     
     - name: Build and Publish Windows x64
       run: |
-        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/win-x64
-    
+        dotnet publish -c Release -r win-x64 -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/win-x64
+
     - name: Build and Publish Linux x64
       run: |
-        dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/linux-x64
+        dotnet publish -c Release -r linux-x64 -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/linux-x64
     
     - name: Create Release
       uses: softprops/action-gh-release@v2
