@@ -41,7 +41,7 @@ public class LoggingOptions
         {
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SptModChecker",
+                "SptCheckMods",
                 "logs"
             );
         }

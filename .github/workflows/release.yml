@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -14,15 +17,23 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '9.0.x'
+        dotnet-version: '10.0.x'
     
     - name: Extract version from tag
       id: version
       run: |
-        # Extract version from tag (e.g., v1.2.3 -> 1.2.3.0)
+        # Extract version from tag (e.g., v1.2.3 -> 1.2.3.0, v1.0.0-beta.1 -> 1.0.0.0)
         VERSION=${GITHUB_REF#refs/tags/}
         VERSION_CLEAN=${VERSION#v}
-        VERSION_WITH_BUILD="${VERSION_CLEAN}.0"
+        # Extract only the numeric version (before any hyphen) for assembly version
+        VERSION_NUMERIC=${VERSION_CLEAN%%-*}
+        VERSION_WITH_BUILD="${VERSION_NUMERIC}.0"
+        # Check if this is a prerelease (contains hyphen)
+        if [[ "$VERSION_CLEAN" == *-* ]]; then
+          echo "prerelease=true" >> $GITHUB_OUTPUT
+        else
+          echo "prerelease=false" >> $GITHUB_OUTPUT
+        fi
         echo "version=${VERSION_WITH_BUILD}" >> $GITHUB_OUTPUT
         echo "Version: ${VERSION_WITH_BUILD}"
     
@@ -44,3 +55,4 @@ jobs:
           ./publish/win-x64/CheckMods-*.exe
           ./publish/linux-x64/CheckMods-*
         generate_release_notes: true
+        prerelease: ${{ steps.version.outputs.prerelease == 'true' }}

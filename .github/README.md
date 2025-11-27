@@ -45,7 +45,7 @@ On first run, you'll be prompted to enter your Forge API key. The key is securel
 
 ## Architecture
 
-SPT Mod Checker uses a pipeline-based service architecture with dependency injection:
+SPT Check Mods uses a pipeline-based service architecture with dependency injection:
 
 - **ApplicationService**: Main orchestrator that coordinates the entire workflow
 - **ServerModService**: Validates SPT installation and extracts SPT version from `SPTarkov.Server.Core.dll`
@@ -60,10 +60,10 @@ SPT Mod Checker uses a pipeline-based service architecture with dependency injec
 ## Configuration
 
 ### API Key Storage
-The Forge API key is stored in: `%APPDATA%\SptModChecker\apikey.txt`
+The Forge API key is stored in: `%APPDATA%\SptCheckMods\apikey.txt`
 
 ### Log Files
-Application logs are stored in: `%APPDATA%\SptModChecker\logs\checkmod.log`
+Application logs are stored in: `%APPDATA%\SptCheckMods\logs\checkmod.log`
 
 ### Supported Mod Formats
 - **Server Mods**: SPT mods with `AbstractModMetadata` in `SPT/user/mods`
