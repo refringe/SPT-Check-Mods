@@ -1289,9 +1289,20 @@ public sealed class ApplicationService(
     private async Task<string?> GetAndValidateApiKey(CancellationToken cancellationToken = default)
     {
         var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var configFolder = Path.Combine(appDataFolder, "SptModChecker");
+        var configFolder = SecurityHelper.GetSafePath(Path.Combine(appDataFolder, "SptModChecker"));
+        if (configFolder is null)
+        {
+            AnsiConsole.MarkupLine("[red]Error: Could not determine a safe configuration folder path.[/]");
+            return null;
+        }
+
         Directory.CreateDirectory(configFolder);
-        var configFilePath = Path.Combine(configFolder, "apikey.txt");
+        var configFilePath = SecurityHelper.GetSafePath(Path.Combine(configFolder, "apikey.txt"), configFolder);
+        if (configFilePath is null)
+        {
+            AnsiConsole.MarkupLine("[red]Error: Could not determine a safe configuration file path.[/]");
+            return null;
+        }
 
         if (!File.Exists(configFilePath))
         {
