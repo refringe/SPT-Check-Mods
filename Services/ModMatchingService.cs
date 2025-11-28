@@ -3,6 +3,7 @@ using CheckMods.Models;
 using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
@@ -10,6 +11,7 @@ namespace CheckMods.Services;
 /// Service responsible for matching local mods with their Forge API counterparts.
 /// Uses GUID lookup as the primary method with multiple fallback strategies.
 /// </summary>
+[Injectable(InjectionType.Transient)]
 public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger<ModMatchingService> logger)
     : IModMatchingService
 {

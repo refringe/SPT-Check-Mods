@@ -1,12 +1,14 @@
 using CheckMods.Models;
 using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.Logging;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
 /// <summary>
 /// Service responsible for analyzing mod dependencies and building a dependency tree.
 /// </summary>
+[Injectable(InjectionType.Transient)]
 public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogger<ModDependencyService> logger)
     : IModDependencyService
 {

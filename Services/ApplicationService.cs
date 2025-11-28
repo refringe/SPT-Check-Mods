@@ -4,12 +4,14 @@ using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
 /// <summary>
 /// Main application service that orchestrates the SPT mod checking workflow.
 /// </summary>
+[Injectable(InjectionType.Transient)]
 public sealed class ApplicationService(
     IForgeApiService forgeApiService,
     IServerModService serverModService,

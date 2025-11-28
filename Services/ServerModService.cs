@@ -2,12 +2,14 @@ using CheckMods.Models;
 using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
 /// <summary>
 /// Service responsible for SPT installation validation.
 /// </summary>
+[Injectable(InjectionType.Transient)]
 public sealed class ServerModService(
     IForgeApiService forgeApiService,
     IModScannerService scannerService,

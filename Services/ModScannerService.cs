@@ -6,6 +6,7 @@ using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
@@ -13,6 +14,7 @@ namespace CheckMods.Services;
 /// Unified service for scanning both server and client mods from disk.
 /// Returns Mod objects directly with validation warnings populated.
 /// </summary>
+[Injectable(InjectionType.Transient)]
 public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogger<ModScannerService> logger)
     : IModScannerService
 {

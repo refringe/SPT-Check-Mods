@@ -14,9 +14,14 @@ namespace CheckMods.Services;
 /// Service for interacting with the Forge API with rate limiting. Handles authentication, mod searching, version
 /// validation, and data retrieval.
 /// </summary>
+/// <remarks>
+/// This service is NOT decorated with [Injectable] because it requires special registration via AddHttpClient
+/// for proper HttpClient lifecycle management. It is registered manually in ServiceCollectionExtensions.
+/// </remarks>
 public partial class ForgeApiService(
     HttpClient httpClient,
     IRateLimitService rateLimitService,
+    IApiKeyProvider apiKeyProvider,
     IOptions<ForgeApiOptions> options,
     ILogger<ForgeApiService> logger
 ) : IForgeApiService
@@ -55,12 +60,43 @@ public partial class ForgeApiService(
 
     /// <summary>
     /// Sets the API key for authentication with the Forge API.
+    /// The key is stored in the singleton ApiKeyProvider so it persists across service instances.
     /// </summary>
     /// <param name="apiKey">The Bearer token for API authentication.</param>
     public void SetApiKey(string apiKey)
     {
         logger.LogDebug("Setting API key for Forge API authentication");
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        apiKeyProvider.SetApiKey(apiKey);
+    }
+
+    /// <summary>
+    /// Creates an HttpRequestMessage with the API key authorization header if available.
+    /// </summary>
+    /// <param name="method">The HTTP method.</param>
+    /// <param name="url">The request URL.</param>
+    /// <returns>An HttpRequestMessage with authorization header set if API key is available.</returns>
+    private HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string url)
+    {
+        var request = new HttpRequestMessage(method, url);
+        var apiKey = apiKeyProvider.ApiKey;
+        if (!string.IsNullOrEmpty(apiKey))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        }
+
+        return request;
+    }
+
+    /// <summary>
+    /// Sends a GET request with authorization header.
+    /// </summary>
+    /// <param name="url">The request URL.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The HTTP response.</returns>
+    private Task<HttpResponseMessage> GetWithAuthAsync(string url, CancellationToken cancellationToken)
+    {
+        var request = CreateAuthorizedRequest(HttpMethod.Get, url);
+        return httpClient.SendAsync(request, cancellationToken);
     }
 
     /// <summary>
@@ -166,7 +202,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => httpClient.GetAsync(url, cancellationToken),
+                () => GetWithAuthAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -220,7 +256,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => httpClient.GetAsync(url, cancellationToken),
+                () => GetWithAuthAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -310,7 +346,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => httpClient.GetAsync(url, cancellationToken),
+                () => GetWithAuthAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -382,7 +418,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => httpClient.GetAsync(url, cancellationToken),
+                () => GetWithAuthAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -462,7 +498,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => httpClient.GetAsync(url, cancellationToken),
+                () => GetWithAuthAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -517,7 +553,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => httpClient.GetAsync(url, cancellationToken),
+                () => GetWithAuthAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -575,7 +611,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => httpClient.GetAsync(url, cancellationToken),
+                () => GetWithAuthAsync(url, cancellationToken),
                 cancellationToken
             );
 
