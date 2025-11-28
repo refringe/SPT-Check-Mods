@@ -53,6 +53,7 @@ jobs:
       with:
         files: |
           ./publish/win-x64/CheckMods-*.exe
+          ./publish/win-x64/CheckMods-*.zip
           ./publish/linux-x64/CheckMods-*
         generate_release_notes: true
         prerelease: ${{ steps.version.outputs.prerelease == 'true' }}

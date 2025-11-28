@@ -46,9 +46,28 @@
   <!-- Rename the published executable to include the runtime identifier. -->
   <Target Name="RenamePublishedExe" AfterTargets="Publish">
     <!-- Windows target (RID starts with 'win') -->
-    <Exec Condition="'$(RuntimeIdentifier)' != '' AND $(RuntimeIdentifier.StartsWith('win'))" Command="mv &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier).exe&quot;" IgnoreStandardErrorWarningFormat="true" />
+    <Move Condition="'$(RuntimeIdentifier)' != '' AND $(RuntimeIdentifier.StartsWith('win'))" SourceFiles="$(PublishDir)$(AssemblyName).exe" DestinationFiles="$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier).exe" />
     <!-- Non-Windows target (Linux, macOS, etc.) -->
-    <Exec Condition="'$(RuntimeIdentifier)' != '' AND !$(RuntimeIdentifier.StartsWith('win'))" Command="mv &quot;$(PublishDir)$(AssemblyName)&quot; &quot;$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier)&quot;" IgnoreStandardErrorWarningFormat="true" />
+    <Move Condition="'$(RuntimeIdentifier)' != '' AND !$(RuntimeIdentifier.StartsWith('win'))" SourceFiles="$(PublishDir)$(AssemblyName)" DestinationFiles="$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier)" />
+  </Target>
+  <!-- Compress the Windows executable into a zip file with optimal compression. -->
+  <UsingTask TaskName="ZipFileWithCompression" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <SourceFile ParameterType="System.String" Required="true" />
+      <DestinationArchive ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.IO.Compression" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        if (File.Exists(DestinationArchive)) File.Delete(DestinationArchive);
+        using var archive = ZipFile.Open(DestinationArchive, ZipArchiveMode.Create);
+        archive.CreateEntryFromFile(SourceFile, Path.GetFileName(SourceFile), CompressionLevel.Optimal);
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="ZipWindowsExe" AfterTargets="RenamePublishedExe" Condition="'$(RuntimeIdentifier)' != '' AND $(RuntimeIdentifier.StartsWith('win'))">
+    <ZipFileWithCompression SourceFile="$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier).exe" DestinationArchive="$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier).zip" />
   </Target>
   <ItemGroup>
     <PackageReference Include="FuzzySharp" Version="2.0.2" />
