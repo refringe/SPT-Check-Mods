@@ -81,10 +81,10 @@
       <Using Namespace="System.IO.Compression" />
       <Code Type="Fragment" Language="cs">
         <![CDATA[
-        if (File.Exists(DestinationArchive)) File.Delete(DestinationArchive);
-        using var archive = ZipFile.Open(DestinationArchive, ZipArchiveMode.Create);
-        archive.CreateEntryFromFile(SourceFile, Path.GetFileName(SourceFile), CompressionLevel.Optimal);
-      ]]>
+          if (File.Exists(DestinationArchive)) File.Delete(DestinationArchive);
+          using var archive = ZipFile.Open(DestinationArchive, ZipArchiveMode.Create);
+          archive.CreateEntryFromFile(SourceFile, Path.GetFileName(SourceFile), CompressionLevel.Optimal);
+        ]]>
       </Code>
     </Task>
   </UsingTask>
