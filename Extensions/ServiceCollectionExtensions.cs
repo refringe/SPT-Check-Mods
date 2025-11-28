@@ -35,25 +35,24 @@ public static class ServiceCollectionExtensions
             builder.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
         });
 
-        // Register HttpClient with ForgeApiService (transient by default)
-        services.AddHttpClient<ForgeApiService>();
-        services.AddSingleton<IForgeApiService, ForgeApiService>();
+        // Register HttpClient with ForgeApiService (transient)
+        services.AddHttpClient<IForgeApiService, ForgeApiService>();
 
         // Register infrastructure services
         services.AddSingleton<IRateLimitService, RateLimitService>();
 
         // Register mod processing services
-        services.AddScoped<IModScannerService, ModScannerService>();
-        services.AddScoped<IModReconciliationService, ModReconciliationService>();
+        services.AddTransient<IModScannerService, ModScannerService>();
+        services.AddTransient<IModReconciliationService, ModReconciliationService>();
 
         // Register API services
-        services.AddScoped<IModMatchingService, ModMatchingService>();
-        services.AddScoped<IModEnrichmentService, ModEnrichmentService>();
-        services.AddScoped<IModDependencyService, ModDependencyService>();
+        services.AddTransient<IModMatchingService, ModMatchingService>();
+        services.AddTransient<IModEnrichmentService, ModEnrichmentService>();
+        services.AddTransient<IModDependencyService, ModDependencyService>();
 
         // Register application services
-        services.AddScoped<IServerModService, ServerModService>();
-        services.AddScoped<IApplicationService, ApplicationService>();
+        services.AddTransient<IServerModService, ServerModService>();
+        services.AddTransient<IApplicationService, ApplicationService>();
 
         return services;
     }
