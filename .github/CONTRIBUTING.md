@@ -9,7 +9,7 @@ This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDU
 ## Getting Started
 
 ### Prerequisites
-- .NET 10 SDK
+- .NET 9 SDK
 - Git
 - A valid SPT installation for testing
 
@@ -24,7 +24,7 @@ This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDU
 
 ### Code Style
 - Follow standard C# conventions
-- Use the latest C# 14 features (primary constructors, collection expressions, pattern matching, etc.)
+- Use modern C# 13 features (primary constructors, collection expressions, pattern matching, etc.)
 - Use meaningful variable and method names
 - Add XML documentation for public methods
 - Keep methods focused and concise
