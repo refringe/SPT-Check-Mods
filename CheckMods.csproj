@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <LangVersion>latest</LangVersion>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>13</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <SelfContained>false</SelfContained>
@@ -54,31 +54,63 @@
   <!-- Rename the published executable to include the runtime identifier. -->
   <Target Name="RenamePublishedExe" AfterTargets="Publish">
     <!-- Windows target (RID starts with 'win') -->
-    <Exec
+    <Move
       Condition="'$(RuntimeIdentifier)' != '' AND $(RuntimeIdentifier.StartsWith('win'))"
-      Command="mv &quot;$(PublishDir)$(AssemblyName).exe&quot; &quot;$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier).exe&quot;"
-      IgnoreStandardErrorWarningFormat="true"
+      SourceFiles="$(PublishDir)$(AssemblyName).exe"
+      DestinationFiles="$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier).exe"
     />
     <!-- Non-Windows target (Linux, macOS, etc.) -->
-    <Exec
+    <Move
       Condition="'$(RuntimeIdentifier)' != '' AND !$(RuntimeIdentifier.StartsWith('win'))"
-      Command="mv &quot;$(PublishDir)$(AssemblyName)&quot; &quot;$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier)&quot;"
-      IgnoreStandardErrorWarningFormat="true"
+      SourceFiles="$(PublishDir)$(AssemblyName)"
+      DestinationFiles="$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier)"
+    />
+  </Target>
+  <!-- Compress the Windows executable into a zip file with optimal compression. -->
+  <UsingTask
+    TaskName="ZipFileWithCompression"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll"
+  >
+    <ParameterGroup>
+      <SourceFile ParameterType="System.String" Required="true" />
+      <DestinationArchive ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.IO.Compression" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+          if (File.Exists(DestinationArchive)) File.Delete(DestinationArchive);
+          using var archive = ZipFile.Open(DestinationArchive, ZipArchiveMode.Create);
+          archive.CreateEntryFromFile(SourceFile, Path.GetFileName(SourceFile), CompressionLevel.Optimal);
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+  <Target
+    Name="ZipWindowsExe"
+    AfterTargets="RenamePublishedExe"
+    Condition="'$(RuntimeIdentifier)' != '' AND $(RuntimeIdentifier.StartsWith('win'))"
+  >
+    <ZipFileWithCompression
+      SourceFile="$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier).exe"
+      DestinationArchive="$(PublishDir)$(AssemblyName)-$(RuntimeIdentifier).zip"
     />
   </Target>
   <ItemGroup>
     <PackageReference Include="FuzzySharp" Version="2.0.2" />
-    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
-    <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.5" />
     <PackageReference Include="OneOf" Version="3.0.271" />
     <PackageReference Include="SemanticVersioning" Version="3.0.0" />
     <PackageReference Include="Spectre.Console" Version="0.50.0" />
-    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="10.0.0" />
-    <PackageReference Include="System.Threading.RateLimiting" Version="10.0.0" />
+    <PackageReference Include="SPTarkov.DI" Version="4.0.6" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.5" />
+    <PackageReference Include="System.Threading.RateLimiting" Version="9.0.5" />
   </ItemGroup>
 </Project>

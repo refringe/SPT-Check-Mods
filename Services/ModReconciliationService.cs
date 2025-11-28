@@ -2,6 +2,7 @@ using CheckMods.Models;
 using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
@@ -9,6 +10,7 @@ namespace CheckMods.Services;
 /// Service responsible for reconciling server and client mod components.
 /// Matches components of the same mod and selects the best version when duplicates exist.
 /// </summary>
+[Injectable(InjectionType.Transient)]
 public sealed class ModReconciliationService(ILogger<ModReconciliationService> logger) : IModReconciliationService
 {
     /// <inheritdoc />

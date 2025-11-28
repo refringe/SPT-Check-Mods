@@ -4,12 +4,14 @@ using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
 /// <summary>
 /// Main application service that orchestrates the SPT mod checking workflow.
 /// </summary>
+[Injectable(InjectionType.Transient)]
 public sealed class ApplicationService(
     IForgeApiService forgeApiService,
     IServerModService serverModService,
@@ -22,8 +24,7 @@ public sealed class ApplicationService(
 ) : IApplicationService
 {
     /// <summary>
-    /// Main entry point for the application. Orchestrates API key validation, SPT path detection, mod scanning, and
-    /// result presentation.
+    /// Main entry point for the application. Runs the mod checking workflow.
     /// </summary>
     /// <param name="args">Command line arguments. The first argument can be the SPT installation path.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
@@ -95,7 +96,7 @@ public sealed class ApplicationService(
 
             // Display results
             logger.LogDebug("Displaying results");
-            DisplayResults(mods);
+            ShowVersionUpdateTable(mods);
 
             logger.LogInformation("Mod check workflow completed successfully");
         }
@@ -1112,15 +1113,6 @@ public sealed class ApplicationService(
         }
 
         AnsiConsole.WriteLine();
-    }
-
-    /// <summary>
-    /// Displays all results including summary and version update table.
-    /// </summary>
-    /// <param name="mods">Processed mods.</param>
-    private static void DisplayResults(List<Mod> mods)
-    {
-        ShowVersionUpdateTable(mods);
     }
 
     /// <summary>

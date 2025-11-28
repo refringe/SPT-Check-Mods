@@ -6,6 +6,7 @@ using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
@@ -13,6 +14,7 @@ namespace CheckMods.Services;
 /// Unified service for scanning both server and client mods from disk.
 /// Returns Mod objects directly with validation warnings populated.
 /// </summary>
+[Injectable(InjectionType.Transient)]
 public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogger<ModScannerService> logger)
     : IModScannerService
 {
@@ -404,7 +406,7 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
 
     private static object? LoadSptMetadataFromAssembly(Assembly assembly)
     {
-        var types = assembly.Modules.SelectMany(m => m.GetTypes());
+        var types = GetLoadableTypes(assembly);
         var metadataType = types.FirstOrDefault(t => t.BaseType?.Name == "AbstractModMetadata" && !t.IsAbstract);
 
         if (metadataType is null)
@@ -413,6 +415,22 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         }
 
         return Activator.CreateInstance(metadataType);
+    }
+
+    /// <summary>
+    /// Gets all types from an assembly that can be loaded, gracefully handling types with missing dependencies.
+    /// </summary>
+    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            // Return only the types that loaded successfully (non-null entries)
+            return ex.Types.Where(t => t is not null)!;
+        }
     }
 
     private static string GetAssemblyVersion(Assembly assembly)

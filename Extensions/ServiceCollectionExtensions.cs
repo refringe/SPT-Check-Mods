@@ -1,9 +1,11 @@
+using System.Reflection;
 using CheckMods.Configuration;
 using CheckMods.Logging;
 using CheckMods.Services;
 using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using SPTarkov.DI;
 
 namespace CheckMods.Extensions;
 
@@ -35,25 +37,14 @@ public static class ServiceCollectionExtensions
             builder.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
         });
 
-        // Register HttpClient with ForgeApiService (transient by default)
-        services.AddHttpClient<ForgeApiService>();
-        services.AddSingleton<IForgeApiService, ForgeApiService>();
+        // Use SPTarkov.DI to auto-register all services with [Injectable] attribute
+        var diHandler = new DependencyInjectionHandler(services);
+        diHandler.AddInjectableTypesFromAssembly(Assembly.GetExecutingAssembly());
+        diHandler.InjectAll();
 
-        // Register infrastructure services
-        services.AddSingleton<IRateLimitService, RateLimitService>();
-
-        // Register mod processing services
-        services.AddScoped<IModScannerService, ModScannerService>();
-        services.AddScoped<IModReconciliationService, ModReconciliationService>();
-
-        // Register API services
-        services.AddScoped<IModMatchingService, ModMatchingService>();
-        services.AddScoped<IModEnrichmentService, ModEnrichmentService>();
-        services.AddScoped<IModDependencyService, ModDependencyService>();
-
-        // Register application services
-        services.AddScoped<IServerModService, ServerModService>();
-        services.AddScoped<IApplicationService, ApplicationService>();
+        // Register ForgeApiService as HttpClient after SPTarkov.DI registration
+        // AddHttpClient provides proper HttpClient lifecycle management
+        services.AddHttpClient<IForgeApiService, ForgeApiService>();
 
         return services;
     }

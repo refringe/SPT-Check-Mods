@@ -3,6 +3,7 @@ using CheckMods.Configuration;
 using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
@@ -10,6 +11,7 @@ namespace CheckMods.Services;
 /// Service that provides rate limiting for API calls. Throttles requests to a sustainable rate and applies
 /// exponential backoff with jitter if rate limiting (429) is encountered. Backoff state is shared across all requests.
 /// </summary>
+[Injectable(InjectionType.Singleton)]
 public class RateLimitService(IOptions<RateLimitOptions> options, ILogger<RateLimitService> logger) : IRateLimitService
 {
     private readonly RateLimitOptions _options = options.Value;

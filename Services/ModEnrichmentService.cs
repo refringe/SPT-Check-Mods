@@ -1,12 +1,14 @@
 using CheckMods.Models;
 using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.Logging;
+using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
 
 /// <summary>
 /// Service responsible for enriching matched mods with additional API data such as version information.
 /// </summary>
+[Injectable(InjectionType.Transient)]
 public sealed class ModEnrichmentService(IForgeApiService forgeApiService, ILogger<ModEnrichmentService> logger)
     : IModEnrichmentService
 {
