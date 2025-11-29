@@ -87,6 +87,13 @@ public class Program
     private static void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
     {
         e.Cancel = true; // Prevent immediate termination
+
+        // Only process cancellation once to prevent repeated messages
+        if (_wasCancelled)
+        {
+            return;
+        }
+
         _wasCancelled = true;
         _cts?.Cancel();
         AnsiConsole.MarkupLine("[yellow]Cancellation requested. Shutting down gracefully...[/]");
