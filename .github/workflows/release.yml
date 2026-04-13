@@ -49,7 +49,7 @@ jobs:
         dotnet publish -c Release -r linux-x64 -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/linux-x64
     
     - name: Create Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: |
           ./publish/win-x64/CheckMods-*.exe
