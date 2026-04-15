@@ -121,3 +121,7 @@ Generated\ Files/
 *.user
 *.userosscache
 *.sln.docstates
+*.bin
+*.v2
+*.vsidx
+DocumentLayout.json
