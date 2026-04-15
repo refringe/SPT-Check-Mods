@@ -1369,9 +1369,13 @@ public sealed class ApplicationService(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var newKey = AnsiConsole.Prompt(
-                new TextPrompt<string>("Enter your [green]API key[/]:").PromptStyle("green").Secret()
+            var promptTask = Task.Run(
+                () => AnsiConsole.Prompt(
+                    new TextPrompt<string>("Enter your [green]API key[/]:").PromptStyle("green").Secret()
+                ),
+                cancellationToken
             );
+            var newKey = await promptTask.WaitAsync(cancellationToken);
 
             if (string.IsNullOrWhiteSpace(newKey))
             {
