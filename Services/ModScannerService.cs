@@ -174,7 +174,7 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
             try
             {
                 using var loadContext = CreateMetadataLoadContext(dllPath);
-                var assembly = loadContext.LoadFromAssemblyPath(dllPath);
+                var assembly = loadContext.LoadFromByteArray(File.ReadAllBytes(dllPath));
                 var plugin = ScanAssemblyForBepInPluginAttribute(assembly);
 
                 if (plugin is null)
@@ -361,7 +361,8 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
 
         try
         {
-            var assembly = loadContext.LoadFromAssemblyPath(dllPath);
+            using var stream = new MemoryStream(File.ReadAllBytes(dllPath));
+            var assembly = loadContext.LoadFromStream(stream);
             var metadata = LoadSptMetadataFromAssembly(assembly);
 
             if (metadata is null)
@@ -480,7 +481,8 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
             var sptPath = Path.Combine(sptDirectory, "SPT", $"{assemblyName.Name}.dll");
             if (File.Exists(sptPath))
             {
-                return LoadFromAssemblyPath(sptPath);
+                using var stream = new MemoryStream(File.ReadAllBytes(sptPath));
+                return LoadFromStream(stream);
             }
 
             return null;
@@ -540,7 +542,7 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         try
         {
             using var loadContext = CreateMetadataLoadContext(dllPath);
-            var assembly = loadContext.LoadFromAssemblyPath(dllPath);
+            var assembly = loadContext.LoadFromByteArray(File.ReadAllBytes(dllPath));
 
             return ScanAssemblyForBepInPlugin(assembly, dllPath);
         }
