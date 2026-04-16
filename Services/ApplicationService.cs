@@ -1227,7 +1227,9 @@ public sealed class ApplicationService(
                 {
                     foreach (var blocker in mod.BlockingMods)
                     {
-                        AnsiConsole.MarkupLine($"    [grey]Blocked by:[/] {blocker.Name.EscapeMarkup()} [grey]({blocker.Constraint.EscapeMarkup()})[/]");
+                        AnsiConsole.MarkupLine(
+                            $"    [grey]Blocked by:[/] {blocker.Name.EscapeMarkup()} [grey]({blocker.Constraint.EscapeMarkup()})[/]"
+                        );
                     }
                 }
             }
@@ -1417,9 +1419,10 @@ public sealed class ApplicationService(
             cancellationToken.ThrowIfCancellationRequested();
 
             var promptTask = Task.Run(
-                () => AnsiConsole.Prompt(
-                    new TextPrompt<string>("Enter your [green]API key[/]:").PromptStyle("green").Secret()
-                ),
+                () =>
+                    AnsiConsole.Prompt(
+                        new TextPrompt<string>("Enter your [green]API key[/]:").PromptStyle("green").Secret()
+                    ),
                 cancellationToken
             );
             var newKey = await promptTask.WaitAsync(cancellationToken);
