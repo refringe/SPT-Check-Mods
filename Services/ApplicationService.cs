@@ -1425,7 +1425,7 @@ public sealed class ApplicationService(
                     ),
                 cancellationToken
             );
-            var newKey = await promptTask.WaitAsync(cancellationToken);
+            var newKey = (await promptTask.WaitAsync(cancellationToken)).Trim();
 
             if (string.IsNullOrWhiteSpace(newKey))
             {
