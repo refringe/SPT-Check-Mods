@@ -1169,7 +1169,7 @@ public sealed class ApplicationService(
         AnsiConsole.Write(table);
 
         AnsiConsole.MarkupLine(
-            "[grey]Version colors: [green]Up to date[/] | [red]Update available[/] | [yellow]Newer than latest[/][/]"
+            "[grey]Version colors: [green]Up to date[/] | [red]Update available[/] | [darkorange]Update blocked[/] | [blue]Newer than latest[/][/]"
         );
 
         // Display mods with available updates
@@ -1197,6 +1197,39 @@ public sealed class ApplicationService(
                 }
 
                 AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{mod.DownloadLink}[/]");
+            }
+        }
+
+        // Display mods with blocked updates
+        var modsWithBlockedUpdates = verifiedMods.Where(m => m.UpdateStatus == UpdateStatus.UpdateBlocked).ToList();
+        if (modsWithBlockedUpdates.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[darkorange]Updates blocked:[/]");
+
+            foreach (var mod in modsWithBlockedUpdates)
+            {
+                var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
+                    ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
+                    : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
+
+                AnsiConsole.MarkupLine($"  {nameDisplay}");
+                AnsiConsole.MarkupLine(
+                    $"    [grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [darkorange]{mod.LatestVersion!.EscapeMarkup()}[/]"
+                );
+
+                if (!string.IsNullOrWhiteSpace(mod.BlockReason))
+                {
+                    AnsiConsole.MarkupLine($"    [grey]Reason:[/] {FormatBlockReason(mod.BlockReason).EscapeMarkup()}");
+                }
+
+                if (mod.BlockingMods is { Count: > 0 })
+                {
+                    foreach (var blocker in mod.BlockingMods)
+                    {
+                        AnsiConsole.MarkupLine($"    [grey]Blocked by:[/] {blocker.Name.EscapeMarkup()} [grey]({blocker.Constraint.EscapeMarkup()})[/]");
+                    }
+                }
             }
         }
 
@@ -1229,9 +1262,23 @@ public sealed class ApplicationService(
         {
             UpdateStatus.UpToDate => $"[green]{mod.LatestVersion.EscapeMarkup()}[/]",
             UpdateStatus.UpdateAvailable => $"[red]{mod.LatestVersion.EscapeMarkup()}[/]",
-            UpdateStatus.NewerInstalled => $"[yellow]{mod.LatestVersion.EscapeMarkup()}[/]",
+            UpdateStatus.UpdateBlocked => $"[darkorange]{mod.LatestVersion.EscapeMarkup()}[/]",
+            UpdateStatus.NewerInstalled => $"[blue]{mod.LatestVersion.EscapeMarkup()}[/]",
             UpdateStatus.NoVersionsFound => "[grey]No versions found[/]",
             _ => mod.LatestVersion.EscapeMarkup(),
+        };
+    }
+
+    /// <summary>
+    /// Formats a raw block reason string from the API into a human-readable description.
+    /// </summary>
+    private static string FormatBlockReason(string reason)
+    {
+        return reason switch
+        {
+            "dependency_constraint_violation" => "A dependency has a version constraint that prevents this update",
+            "chain_dependency_conflict" => "A dependency chain conflict prevents this update",
+            _ => reason.Replace('_', ' '),
         };
     }
 

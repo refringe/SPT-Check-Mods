@@ -142,6 +142,11 @@ public sealed class Mod
     public IReadOnlyList<BlockingModInfo>? BlockingMods { get; private set; }
 
     /// <summary>
+    /// Reason the update is blocked by dependency constraints.
+    /// </summary>
+    public string? BlockReason { get; private set; }
+
+    /// <summary>
     /// Reason the mod is incompatible with the current SPT version.
     /// </summary>
     public string? IncompatibilityReason { get; private set; }
@@ -282,6 +287,7 @@ public sealed class Mod
     {
         LatestVersion = blocked.LatestVersion?.Version;
         BlockingMods = blocked.BlockingMods;
+        BlockReason = blocked.BlockReason;
         UpdateStatus = UpdateStatus.UpdateBlocked;
     }
 
@@ -345,6 +351,7 @@ public sealed class Mod
         UpdateStatus = UpdateStatus.Unknown;
         DownloadLink = null;
         BlockingMods = null;
+        BlockReason = null;
         IncompatibilityReason = null;
     }
 
