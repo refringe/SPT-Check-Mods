@@ -73,6 +73,12 @@ public class Program
             // Wait for user input (if not manually canceled)
             if (!_wasCancelled)
             {
+                // Drain any keystrokes buffered during the run so ReadKey actually waits.
+                while (Console.KeyAvailable)
+                {
+                    Console.ReadKey(intercept: true);
+                }
+
                 AnsiConsole.MarkupLine("[grey]Press any key to exit...[/]");
                 Console.ReadKey();
             }
