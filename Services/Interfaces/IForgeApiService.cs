@@ -4,33 +4,11 @@ using OneOf;
 namespace CheckMods.Services.Interfaces;
 
 /// <summary>
-/// Interface for interacting with the Forge API, providing caching and rate limiting. Handles authentication, mod
-/// searching, version validation, and data retrieval.
+/// Interface for interacting with the Forge API, providing rate limiting. Handles mod searching, version validation,
+/// and data retrieval. The Forge API is open and read-only, so no authentication is required.
 /// </summary>
 public interface IForgeApiService
 {
-    /// <summary>
-    /// Sets the API key for authentication with the Forge API.
-    /// </summary>
-    /// <param name="apiKey">The Bearer token for API authentication.</param>
-    void SetApiKey(string apiKey);
-
-    /// <summary>
-    /// Validates an API key by checking if it has the required 'read' permissions.
-    /// </summary>
-    /// <param name="apiKey">The API key to validate.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>
-    /// One of:
-    /// - bool (true): The API key is valid and has read permissions
-    /// - InvalidApiKey: The API key is invalid or lacks permissions (includes ShouldDeleteKey flag)
-    /// - ApiError: An error occurred during validation (transient errors)
-    /// </returns>
-    Task<OneOf<bool, InvalidApiKey, ApiError>> ValidateApiKeyAsync(
-        string apiKey,
-        CancellationToken cancellationToken = default
-    );
-
     /// <summary>
     /// Validates that an SPT version exists in the Forge API.
     /// </summary>

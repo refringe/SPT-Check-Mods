@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using CheckMods.Configuration;
@@ -11,8 +10,8 @@ using OneOf;
 namespace CheckMods.Services;
 
 /// <summary>
-/// Service for interacting with the Forge API with rate limiting. Handles authentication, mod searching, version
-/// validation, and data retrieval.
+/// Service for interacting with the Forge API with rate limiting. Handles mod searching, version validation, and data
+/// retrieval. The Forge API is open and read-only, so no authentication is required.
 /// </summary>
 /// <remarks>
 /// This service is NOT decorated with [Injectable] because it requires special registration via AddHttpClient
@@ -21,7 +20,6 @@ namespace CheckMods.Services;
 public partial class ForgeApiService(
     HttpClient httpClient,
     IRateLimitService rateLimitService,
-    IApiKeyProvider apiKeyProvider,
     IOptions<ForgeApiOptions> options,
     ILogger<ForgeApiService> logger
 ) : IForgeApiService
@@ -59,125 +57,6 @@ public partial class ForgeApiService(
     }
 
     /// <summary>
-    /// Sets the API key for authentication with the Forge API.
-    /// The key is stored in the singleton ApiKeyProvider so it persists across service instances.
-    /// </summary>
-    /// <param name="apiKey">The Bearer token for API authentication.</param>
-    public void SetApiKey(string apiKey)
-    {
-        logger.LogDebug("Setting API key for Forge API authentication");
-        apiKeyProvider.SetApiKey(apiKey);
-    }
-
-    /// <summary>
-    /// Creates an HttpRequestMessage with the API key authorization header if available.
-    /// </summary>
-    /// <param name="method">The HTTP method.</param>
-    /// <param name="url">The request URL.</param>
-    /// <returns>An HttpRequestMessage with authorization header set if API key is available.</returns>
-    private HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string url)
-    {
-        var request = new HttpRequestMessage(method, url);
-        var apiKey = apiKeyProvider.ApiKey;
-        if (!string.IsNullOrEmpty(apiKey))
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        }
-
-        return request;
-    }
-
-    /// <summary>
-    /// Sends a GET request with authorization header.
-    /// </summary>
-    /// <param name="url">The request URL.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>The HTTP response.</returns>
-    private Task<HttpResponseMessage> GetWithAuthAsync(string url, CancellationToken cancellationToken)
-    {
-        var request = CreateAuthorizedRequest(HttpMethod.Get, url);
-        return httpClient.SendAsync(request, cancellationToken);
-    }
-
-    /// <summary>
-    /// Validates an API key by checking if it has the required 'read' permissions.
-    /// </summary>
-    /// <param name="apiKey">The API key to validate.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>
-    /// One of:
-    /// - bool (true): The API key is valid and has read permissions
-    /// - InvalidApiKey: The API key is invalid or lacks permissions
-    /// - ApiError: An error occurred during validation
-    /// </returns>
-    public async Task<OneOf<bool, InvalidApiKey, ApiError>> ValidateApiKeyAsync(
-        string apiKey,
-        CancellationToken cancellationToken = default
-    )
-    {
-        logger.LogDebug("Validating API key");
-
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            logger.LogWarning("API key validation failed: key is empty or whitespace");
-            return new InvalidApiKey(ShouldDeleteKey: true);
-        }
-
-        try
-        {
-            var url = _options.BaseUrl + "auth/abilities";
-            logger.LogDebug("API Request: GET {Url}", url);
-
-            var response = await rateLimitService.ExecuteWithRetryAsync(
-                async () =>
-                {
-                    var request = new HttpRequestMessage(HttpMethod.Get, url);
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-                    return await httpClient.SendAsync(request, cancellationToken);
-                },
-                cancellationToken
-            );
-
-            // Definitive auth failures - key is bad
-            if (
-                response.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                || response.StatusCode == System.Net.HttpStatusCode.Forbidden
-            )
-            {
-                logger.LogWarning("API key validation failed: {StatusCode}", response.StatusCode);
-                return new InvalidApiKey(ShouldDeleteKey: true);
-            }
-
-            // Server errors - don't delete the key, might be transient
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.LogError("API key validation failed with server error: {StatusCode}", response.StatusCode);
-                return new ApiError($"API returned status {response.StatusCode}", (int)response.StatusCode);
-            }
-
-            var jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            var authResponse = JsonSerializer.Deserialize<AuthAbilitiesResponse>(jsonContent, _jsonOptions);
-            var hasReadPermission =
-                authResponse is { Success: true, Data: not null } && authResponse.Data.Contains("read");
-
-            if (!hasReadPermission)
-            {
-                logger.LogWarning("API key validation failed: key lacks read permission");
-                return new InvalidApiKey(ShouldDeleteKey: true);
-            }
-
-            logger.LogDebug("API key validated successfully with read permission");
-            return true;
-        }
-        catch (HttpRequestException ex)
-        {
-            logger.LogError(ex, "Network error during API key validation");
-            // Network error - don't delete the key
-            return new ApiError("Network error occurred", Exception: ex);
-        }
-    }
-
-    /// <summary>
     /// Validates that an SPT version exists in the Forge API.
     /// </summary>
     /// <param name="sptVersion">The SPT version to validate.</param>
@@ -202,7 +81,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => GetWithAuthAsync(url, cancellationToken),
+                () => httpClient.GetAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -256,7 +135,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => GetWithAuthAsync(url, cancellationToken),
+                () => httpClient.GetAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -346,7 +225,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => GetWithAuthAsync(url, cancellationToken),
+                () => httpClient.GetAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -418,7 +297,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => GetWithAuthAsync(url, cancellationToken),
+                () => httpClient.GetAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -498,7 +377,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => GetWithAuthAsync(url, cancellationToken),
+                () => httpClient.GetAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -553,7 +432,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => GetWithAuthAsync(url, cancellationToken),
+                () => httpClient.GetAsync(url, cancellationToken),
                 cancellationToken
             );
 
@@ -611,7 +490,7 @@ public partial class ForgeApiService(
             logger.LogDebug("API Request: GET {Url}", url);
 
             var response = await rateLimitService.ExecuteWithRetryAsync(
-                () => GetWithAuthAsync(url, cancellationToken),
+                () => httpClient.GetAsync(url, cancellationToken),
                 cancellationToken
             );
 

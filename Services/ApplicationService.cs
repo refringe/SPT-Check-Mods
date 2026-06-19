@@ -35,14 +35,8 @@ public sealed class ApplicationService(
 
         try
         {
-            // API key setup
-            logger.LogDebug("Setting up API key");
-            var apiKey = await SetupApiKeyAsync(cancellationToken);
-            if (apiKey is null)
-            {
-                logger.LogWarning("API key setup failed, exiting");
-                return;
-            }
+            // Remove any legacy API key file from previous versions; the Forge API is now open and keyless.
+            RemoveLegacyApiKeyFile();
 
             // SPT path validation
             logger.LogDebug("Validating SPT path");
@@ -184,23 +178,6 @@ public sealed class ApplicationService(
     private static void WriteRule()
     {
         AnsiConsole.Write(new Rule().RuleStyle("grey"));
-    }
-
-    /// <summary>
-    /// Sets up the API key by either loading from storage or prompting the user.
-    /// </summary>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>Valid API key or null if setup failed.</returns>
-    private async Task<string?> SetupApiKeyAsync(CancellationToken cancellationToken = default)
-    {
-        var apiKey = await GetAndValidateApiKey(cancellationToken);
-        if (apiKey is null)
-        {
-            return null;
-        }
-
-        forgeApiService.SetApiKey(apiKey);
-        return apiKey;
     }
 
     /// <summary>
@@ -1466,143 +1443,26 @@ public sealed class ApplicationService(
     }
 
     /// <summary>
-    /// Retrieves and validates the Forge API key from storage or prompts the user for a new one.
-    /// Stores valid keys in %APPDATA%/SptCheckMods/apikey.txt for future use.
+    /// Removes the legacy API key file written by previous versions. The Forge API is now open and read-only,
+    /// so no API key is stored. Best-effort: any failure is logged and ignored.
     /// </summary>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>Valid API key or null if the user cancels.</returns>
-    private async Task<string?> GetAndValidateApiKey(CancellationToken cancellationToken = default)
+    private void RemoveLegacyApiKeyFile()
     {
-        var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var configFolder = SecurityHelper.GetSafePath(Path.Combine(appDataFolder, "SptCheckMods"));
-        if (configFolder is null)
+        try
         {
-            AnsiConsole.MarkupLine("[red]Error: Could not determine a safe configuration folder path.[/]");
-            return null;
-        }
-
-        Directory.CreateDirectory(configFolder);
-        var configFilePath = SecurityHelper.GetSafePath(Path.Combine(configFolder, "apikey.txt"), configFolder);
-        if (configFilePath is null)
-        {
-            AnsiConsole.MarkupLine("[red]Error: Could not determine a safe configuration file path.[/]");
-            return null;
-        }
-
-        if (!File.Exists(configFilePath))
-        {
-            return await PromptForNewApiKeyAsync(configFilePath, cancellationToken);
-        }
-
-        var savedKey = (await File.ReadAllTextAsync(configFilePath, cancellationToken)).Trim();
-        if (string.IsNullOrWhiteSpace(savedKey))
-        {
-            return await PromptForNewApiKeyAsync(configFilePath, cancellationToken);
-        }
-
-        savedKey = SecurityHelper.SanitizeInput(savedKey);
-        AnsiConsole.MarkupLine("[bold blue]Validating Forge API key...[/]");
-        AnsiConsole.MarkupLine("Found saved API key. Validating...");
-
-        var validationResult = await forgeApiService.ValidateApiKeyAsync(savedKey, cancellationToken);
-
-        var outcome = validationResult.Match(
-            _ =>
+            var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var configFilePath = Path.Combine(appDataFolder, "SptCheckMods", "apikey.txt");
+            if (!File.Exists(configFilePath))
             {
-                AnsiConsole.MarkupLine("[green]Saved API key is valid.[/]");
-                AnsiConsole.WriteLine();
-                WriteRule();
-                AnsiConsole.WriteLine();
-                return (string?)savedKey;
-            },
-            invalidKey =>
-            {
-                if (invalidKey.ShouldDeleteKey)
-                {
-                    AnsiConsole.MarkupLine("[red]The saved API key is invalid or has expired.[/]");
-                    File.Delete(configFilePath);
-                }
-
-                return null;
-            },
-            _ =>
-            {
-                // Transient error - use saved key anyway
-                AnsiConsole.MarkupLine(
-                    "[yellow]Could not validate API key (API may be unavailable). Using saved key.[/]"
-                );
-                AnsiConsole.WriteLine();
-                WriteRule();
-                AnsiConsole.WriteLine();
-                return (string?)savedKey;
-            }
-        );
-
-        if (outcome is not null)
-        {
-            return outcome;
-        }
-
-        return await PromptForNewApiKeyAsync(configFilePath, cancellationToken);
-    }
-
-    /// <summary>
-    /// Prompts the user to enter a new API key and validates it.
-    /// </summary>
-    /// <param name="configFilePath">Path to save the API key.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>Valid API key or null if user cancels.</returns>
-    private async Task<string?> PromptForNewApiKeyAsync(string configFilePath, CancellationToken cancellationToken)
-    {
-        AnsiConsole.MarkupLine("[yellow]Forge API key not found or was invalid.[/]");
-        AnsiConsole.MarkupLine("Please generate an API key from your Forge account:");
-        AnsiConsole.MarkupLine("[blue][link]https://forge.sp-tarkov.com/user/api-tokens[/][/]");
-
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var promptTask = Task.Run(
-                () =>
-                    AnsiConsole.Prompt(
-                        new TextPrompt<string>("Enter your [green]API key[/]:").PromptStyle("green").Secret()
-                    ),
-                cancellationToken
-            );
-            var newKey = (await promptTask.WaitAsync(cancellationToken)).Trim();
-
-            if (string.IsNullOrWhiteSpace(newKey))
-            {
-                continue;
+                return;
             }
 
-            newKey = SecurityHelper.SanitizeInput(newKey);
-
-            AnsiConsole.Markup("Validating entered key... ");
-
-            var newKeyResult = await forgeApiService.ValidateApiKeyAsync(newKey, cancellationToken);
-
-            var isKeyValid = newKeyResult.Match(
-                isValid => isValid,
-                _ => false, // InvalidApiKey
-                _ => false // ApiError
-            );
-
-            if (!isKeyValid)
-            {
-                AnsiConsole.MarkupLine(
-                    "[red]Failed. The entered key is invalid or lacks 'read' permissions. Please try again.[/]"
-                );
-                continue;
-            }
-
-            AnsiConsole.MarkupLine("[green]OK[/]");
-            await File.WriteAllTextAsync(configFilePath, newKey, cancellationToken);
-            AnsiConsole.MarkupLine($"[green]API key saved successfully to:[/] [grey]{configFilePath}[/]");
-            AnsiConsole.WriteLine();
-            WriteRule();
-            AnsiConsole.WriteLine();
-            return newKey;
+            File.Delete(configFilePath);
+            logger.LogInformation("Removed legacy API key file: {Path}", configFilePath);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to remove legacy API key file");
         }
     }
 }

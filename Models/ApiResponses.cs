@@ -3,14 +3,6 @@ using System.Text.Json.Serialization;
 namespace CheckMods.Models;
 
 /// <summary>
-/// Response from the Forge API authentication abilities endpoint.
-/// </summary>
-public record AuthAbilitiesResponse(
-    [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("data")] List<string>? Data
-);
-
-/// <summary>
 /// Response from the Forge API mod search endpoint.
 /// </summary>
 public record ModSearchApiResponse(

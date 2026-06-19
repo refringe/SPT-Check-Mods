@@ -23,12 +23,6 @@ public readonly record struct RateLimited;
 public readonly record struct InvalidInput(string ParameterName, string Message);
 
 /// <summary>
-/// Represents an invalid or expired API key.
-/// </summary>
-/// <param name="ShouldDeleteKey">Whether the stored key should be deleted.</param>
-public readonly record struct InvalidApiKey(bool ShouldDeleteKey);
-
-/// <summary>
 /// Represents an invalid SPT version that doesn't exist in the Forge API.
 /// </summary>
 public readonly record struct InvalidSptVersion;
