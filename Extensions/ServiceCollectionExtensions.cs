@@ -29,6 +29,9 @@ public static class ServiceCollectionExtensions
         services.Configure<ModScannerOptions>(_ => { });
         services.Configure<LoggingOptions>(_ => { });
 
+        // In-memory cache used by ForgeApiService to dedupe identical API requests within a run.
+        services.AddMemoryCache();
+
         // Register logging infrastructure
         services.AddLogging(builder =>
         {
