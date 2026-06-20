@@ -12,7 +12,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
@@ -38,15 +38,15 @@ jobs:
         echo "Version: ${VERSION_WITH_BUILD}"
     
     - name: Restore dependencies
-      run: dotnet restore
-    
+      run: dotnet restore CheckMods.csproj
+
     - name: Build and Publish Windows x64
       run: |
-        dotnet publish -c Release -r win-x64 -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/win-x64
+        dotnet publish CheckMods.csproj -c Release -r win-x64 -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/win-x64
 
     - name: Build and Publish Linux x64
       run: |
-        dotnet publish -c Release -r linux-x64 -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/linux-x64
+        dotnet publish CheckMods.csproj -c Release -r linux-x64 -p:BuildVersion=${{ steps.version.outputs.version }} -o ./publish/linux-x64
     
     - name: Create Release
       uses: softprops/action-gh-release@v3
