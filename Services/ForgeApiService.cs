@@ -45,7 +45,10 @@ public partial class ForgeApiService(
     /// </summary>
     private sealed record CachedResponse(HttpStatusCode StatusCode, string Body)
     {
-        public bool IsSuccessStatusCode => (int)StatusCode is >= 200 and < 300;
+        public bool IsSuccessStatusCode
+        {
+            get { return (int)StatusCode is >= 200 and < 300; }
+        }
     }
 
     /// <summary>
