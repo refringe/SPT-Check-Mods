@@ -1,7 +1,7 @@
-using System.Reflection;
 using CheckMods.Configuration;
 using CheckMods.Extensions;
 using CheckMods.Services.Interfaces;
+using CheckMods.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
@@ -65,12 +65,11 @@ public class Program
 
             AnsiConsole.WriteLine();
 
-            // Display git hash and log file location
-            var gitHash = GetGitHash();
-            AnsiConsole.MarkupLine($"[grey]Build: {gitHash}[/]");
+            // Display version, build hash, and log file location
+            AnsiConsole.MarkupLine($"[grey]Check Mods v{VersionInfo.SemVer} (build {VersionInfo.GitHash})[/]");
             AnsiConsole.MarkupLine($"[grey]Log file: {LoggingOptions.CurrentLogFilePath}[/]");
 
-            // Wait for user input (if not manually canceled)
+            // Wait for user input (if not manually cancelled)
             if (!_wasCancelled)
             {
                 // Drain any keystrokes buffered during the run so ReadKey actually waits.
@@ -96,20 +95,5 @@ public class Program
         _wasCancelled = true;
         _cts?.Cancel();
         AnsiConsole.MarkupLine("[yellow]Cancellation requested. Shutting down gracefully...[/]");
-    }
-
-    /// <summary>
-    /// Gets the git hash from the assembly metadata.
-    /// </summary>
-    /// <returns>The git hash or "unknown" if not found.</returns>
-    private static string GetGitHash()
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-
-        var gitHashAttribute = assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .FirstOrDefault(attr => attr.Key == "GitHash");
-
-        return gitHashAttribute?.Value ?? "unknown";
     }
 }

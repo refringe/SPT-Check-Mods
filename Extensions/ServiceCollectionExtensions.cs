@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.Configure<RateLimitOptions>(_ => { });
         services.Configure<ModScannerOptions>(_ => { });
         services.Configure<LoggingOptions>(_ => { });
+        services.Configure<UpdateCheckOptions>(_ => { });
 
         // In-memory cache used by ForgeApiService to dedupe identical API requests within a run.
         services.AddMemoryCache();

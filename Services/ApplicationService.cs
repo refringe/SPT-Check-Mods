@@ -20,6 +20,7 @@ public sealed class ApplicationService(
     IModMatchingService modMatchingService,
     IModEnrichmentService modEnrichmentService,
     IModDependencyService modDependencyService,
+    IUpdateCheckService updateCheckService,
     ILogger<ApplicationService> logger
 ) : IApplicationService
 {
@@ -59,6 +60,10 @@ public sealed class ApplicationService(
             }
 
             logger.LogInformation("SPT version validated: {SptVersion}", sptVersion);
+
+            // Check for Check Mods updates (Must run after the SPT update check)
+            logger.LogDebug("Checking for Check Mods updates");
+            await CheckForCheckModsUpdateAsync(sptVersion, cancellationToken);
 
             AnsiConsole.MarkupLine("[bold blue]Loading mods...[/]");
 
@@ -279,6 +284,80 @@ public sealed class ApplicationService(
         {
             AnsiConsole.MarkupLine($"[grey]{latestUpdate.Link}[/]");
         }
+    }
+
+    /// <summary>
+    /// Checks whether a newer version of Check Mods is available on the Forge and displays the result.
+    /// </summary>
+    /// <param name="sptVersion">The installed SPT version, used for compatibility filtering.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    private async Task CheckForCheckModsUpdateAsync(
+        SemanticVersioning.Version sptVersion,
+        CancellationToken cancellationToken = default
+    )
+    {
+        AnsiConsole.MarkupLine("[bold blue]Checking for Check Mods updates...[/]");
+
+        CheckModsUpdateResult result;
+        try
+        {
+            result = await updateCheckService.CheckAsync(sptVersion, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Check Mods update check failed unexpectedly");
+            AnsiConsole.MarkupLine("[grey]Could not check for Check Mods updates.[/]");
+            AnsiConsole.WriteLine();
+            WriteRule();
+            return;
+        }
+
+        switch (result.Status)
+        {
+            case CheckModsUpdateStatus.UpdateAvailable:
+                AnsiConsole.MarkupLine(
+                    $"[yellow]A new version of Check Mods is available:[/] [bold]v{(result.LatestVersion ?? "?").EscapeMarkup()}[/] [grey](you have v{result.CurrentVersion.EscapeMarkup()})[/]"
+                );
+                if (!string.IsNullOrWhiteSpace(result.DownloadLink))
+                {
+                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink}[/]");
+                }
+                break;
+
+            case CheckModsUpdateStatus.UpToDate:
+                AnsiConsole.MarkupLine(
+                    $"[green]Check Mods is up to date (v{result.CurrentVersion.EscapeMarkup()}).[/]"
+                );
+                break;
+
+            case CheckModsUpdateStatus.IncompatibleWithSpt:
+                AnsiConsole.MarkupLine(
+                    $"[grey]A newer version of Check Mods exists but isn't compatible with SPT {sptVersion.ToString().EscapeMarkup()}.[/]"
+                );
+                break;
+
+            case CheckModsUpdateStatus.UnrecognizedBuild:
+                AnsiConsole.MarkupLine(
+                    $"[grey]You're running an unrecognized Check Mods build (v{result.CurrentVersion.EscapeMarkup()}). Consider the stable version on the Forge: v{(result.LatestVersion ?? "?").EscapeMarkup()}.[/]"
+                );
+                if (!string.IsNullOrWhiteSpace(result.DownloadLink))
+                {
+                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink}[/]");
+                }
+
+                break;
+
+            default:
+                AnsiConsole.MarkupLine("[grey]Could not check for Check Mods updates.[/]");
+                break;
+        }
+
+        AnsiConsole.WriteLine();
+        WriteRule();
     }
 
     /// <summary>

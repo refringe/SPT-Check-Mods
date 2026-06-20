@@ -22,20 +22,18 @@ jobs:
     - name: Extract version from tag
       id: version
       run: |
-        # Extract version from tag (e.g., v1.2.3 -> 1.2.3.0, v1.0.0-beta.1 -> 1.0.0.0)
+        # Extract the clean semver from the tag (e.g., v1.2.3 -> 1.2.3, v1.0.0-beta.1 -> 1.0.0-beta.1).
+        # MSBuild derives the numeric AssemblyVersion/FileVersion from this value.
         VERSION=${GITHUB_REF#refs/tags/}
         VERSION_CLEAN=${VERSION#v}
-        # Extract only the numeric version (before any hyphen) for assembly version
-        VERSION_NUMERIC=${VERSION_CLEAN%%-*}
-        VERSION_WITH_BUILD="${VERSION_NUMERIC}.0"
         # Check if this is a prerelease (contains hyphen)
         if [[ "$VERSION_CLEAN" == *-* ]]; then
           echo "prerelease=true" >> $GITHUB_OUTPUT
         else
           echo "prerelease=false" >> $GITHUB_OUTPUT
         fi
-        echo "version=${VERSION_WITH_BUILD}" >> $GITHUB_OUTPUT
-        echo "Version: ${VERSION_WITH_BUILD}"
+        echo "version=${VERSION_CLEAN}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION_CLEAN}"
     
     - name: Restore dependencies
       run: dotnet restore CheckMods.csproj
