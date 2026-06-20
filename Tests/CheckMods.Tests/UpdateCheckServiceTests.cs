@@ -45,7 +45,7 @@ public sealed class UpdateCheckServiceTests
         var result = UpdateCheckService.InterpretUpdates(data, ModId, "1.0.0");
 
         Assert.NotNull(result);
-        Assert.Equal(CheckModsUpdateStatus.UpdateAvailable, result!.Status);
+        Assert.Equal(CheckModsUpdateStatus.UpdateAvailable, result.Status);
         Assert.Equal("1.0.1", result.LatestVersion);
         Assert.Equal("https://forge.sp-tarkov.com/mod/download/2471/check-mods/1.0.1", result.DownloadLink);
     }
@@ -63,7 +63,7 @@ public sealed class UpdateCheckServiceTests
         var result = UpdateCheckService.InterpretUpdates(data, ModId, "1.0.1");
 
         Assert.NotNull(result);
-        Assert.Equal(CheckModsUpdateStatus.UpToDate, result!.Status);
+        Assert.Equal(CheckModsUpdateStatus.UpToDate, result.Status);
     }
 
     [Fact]
@@ -75,14 +75,22 @@ public sealed class UpdateCheckServiceTests
             UpToDate: null,
             Incompatible:
             [
-                new IncompatibleMod(null, ModId, "com.refringe.checkmods", "Check Mods", "1.0.1", "no_version_for_spt", null),
+                new IncompatibleMod(
+                    null,
+                    ModId,
+                    "com.refringe.checkmods",
+                    "Check Mods",
+                    "1.0.1",
+                    "no_version_for_spt",
+                    null
+                ),
             ]
         );
 
         var result = UpdateCheckService.InterpretUpdates(data, ModId, "1.0.1");
 
         Assert.NotNull(result);
-        Assert.Equal(CheckModsUpdateStatus.IncompatibleWithSpt, result!.Status);
+        Assert.Equal(CheckModsUpdateStatus.IncompatibleWithSpt, result.Status);
     }
 
     [Fact]
@@ -101,7 +109,11 @@ public sealed class UpdateCheckServiceTests
         var data = new ModUpdatesData(
             SafeToUpdate:
             [
-                new SafeToUpdateMod(Version(9999, "1.0.0"), Version(9999, "2.0.0", "https://x"), "newer_version_available"),
+                new SafeToUpdateMod(
+                    Version(9999, "1.0.0"),
+                    Version(9999, "2.0.0", "https://x"),
+                    "newer_version_available"
+                ),
             ],
             Blocked: null,
             UpToDate: [new UpToDateMod(null, 8888, "com.other", "Another", "1.0.0", null)],
