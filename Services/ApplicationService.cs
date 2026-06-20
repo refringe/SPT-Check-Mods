@@ -593,16 +593,34 @@ public sealed class ApplicationService(
                         AnsiConsole.MarkupLine($"    [yellow]- {note.EscapeMarkup()}[/]");
                     }
 
-                    // Show source code URL if available, otherwise show Forge mod page
-                    if (!string.IsNullOrWhiteSpace(pair.SelectedMod.ApiSourceCodeUrl))
+                    var reportUrl = !string.IsNullOrWhiteSpace(pair.SelectedMod.ApiSourceCodeUrl)
+                        ? pair.SelectedMod.ApiSourceCodeUrl
+                        : pair.SelectedMod.ApiUrl;
+
+                    // A GUID mismatch only happens on a name match (same name, unrelated IDs). Likely mismatched
+                    // packaging or two mods in one folder, so soften the report prompt.
+                    var guidMismatch = !string.Equals(
+                        pair.ServerMod.Guid,
+                        pair.ClientMod.Guid,
+                        StringComparison.OrdinalIgnoreCase
+                    );
+
+                    if (guidMismatch)
                     {
                         AnsiConsole.MarkupLine(
-                            $"      [grey]Please report:[/] [link]{pair.SelectedMod.ApiSourceCodeUrl}[/]"
+                            "      [grey]Matched by name, but the IDs differ. This is either a mod packaged with mismatched GUIDs or, more likely, two different mods with one copied into the other's folder. Check that each mod sits in its own folder under BepInEx/plugins.[/]"
                         );
+
+                        if (!string.IsNullOrWhiteSpace(reportUrl))
+                        {
+                            AnsiConsole.MarkupLine(
+                                $"      [grey]If this is wrong, report it here:[/] [link]{reportUrl}[/]"
+                            );
+                        }
                     }
-                    else if (!string.IsNullOrWhiteSpace(pair.SelectedMod.ApiUrl))
+                    else if (!string.IsNullOrWhiteSpace(reportUrl))
                     {
-                        AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{pair.SelectedMod.ApiUrl}[/]");
+                        AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{reportUrl}[/]");
                     }
                 }
 
