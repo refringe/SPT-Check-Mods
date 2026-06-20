@@ -127,7 +127,7 @@ public sealed class ApplicationService(
         "Scav karma not affected by usage.",
         "No insurance fraud detected.",
         "Jaeger would make this a daily quest.",
-        "Tested on scavs!.",
+        "Tested on scavs!",
         "More reliable than a PM pistol.",
         "Killa can't spawn here. You're safe.",
         "Side effects may include mod addiction.",
