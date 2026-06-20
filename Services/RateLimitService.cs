@@ -124,7 +124,11 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
             {
                 if (++retryCount > _options.MaxRetries)
                 {
-                    _logger.LogError("Request failed after {MaxRetries} retries: {Message}", _options.MaxRetries, transientError.Message);
+                    _logger.LogError(
+                        "Request failed after {MaxRetries} retries: {Message}",
+                        _options.MaxRetries,
+                        transientError.Message
+                    );
                     throw transientError is OperationCanceledException
                         ? new HttpRequestException("Request timed out after retries", transientError)
                         : new HttpRequestException("Request failed after retries", transientError);
@@ -202,11 +206,12 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
     /// </summary>
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)
     {
-        return statusCode is HttpStatusCode.RequestTimeout // 408
-            or HttpStatusCode.InternalServerError // 500
-            or HttpStatusCode.BadGateway // 502
-            or HttpStatusCode.ServiceUnavailable // 503
-            or HttpStatusCode.GatewayTimeout; // 504
+        return statusCode
+            is HttpStatusCode.RequestTimeout // 408
+                or HttpStatusCode.InternalServerError // 500
+                or HttpStatusCode.BadGateway // 502
+                or HttpStatusCode.ServiceUnavailable // 503
+                or HttpStatusCode.GatewayTimeout; // 504
     }
 
     /// <summary>

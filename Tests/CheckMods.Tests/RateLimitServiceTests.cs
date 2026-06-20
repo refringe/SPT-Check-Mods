@@ -65,9 +65,10 @@ public sealed class RateLimitServiceTests
     public async Task Retries_after_rate_limit_then_succeeds()
     {
         using var service = CreateService();
-        var queue = new Queue<HttpResponseMessage>(
-            [Response(HttpStatusCode.TooManyRequests, TimeSpan.FromMilliseconds(1)), Response(HttpStatusCode.OK)]
-        );
+        var queue = new Queue<HttpResponseMessage>([
+            Response(HttpStatusCode.TooManyRequests, TimeSpan.FromMilliseconds(1)),
+            Response(HttpStatusCode.OK),
+        ]);
         var calls = 0;
 
         var result = await service.ExecuteWithRetryAsync(() =>
@@ -84,9 +85,10 @@ public sealed class RateLimitServiceTests
     public async Task Retries_after_server_error_then_succeeds()
     {
         using var service = CreateService();
-        var queue = new Queue<HttpResponseMessage>(
-            [Response(HttpStatusCode.ServiceUnavailable), Response(HttpStatusCode.OK)]
-        );
+        var queue = new Queue<HttpResponseMessage>([
+            Response(HttpStatusCode.ServiceUnavailable),
+            Response(HttpStatusCode.OK),
+        ]);
         var calls = 0;
 
         var result = await service.ExecuteWithRetryAsync(() =>
