@@ -66,6 +66,26 @@ public sealed class ApplicationService(
 
             logger.LogInformation("SPT version validated: {SptVersion}", sptVersion);
 
+            AnsiConsole.MarkupLine("[bold blue]Loading mods...[/]");
+
+            // Detect improperly installed mods
+            logger.LogDebug("Checking for improperly installed mods");
+            AnsiConsole.MarkupLine("[grey]Checking mod installation locations...[/]");
+            var misplacedReport = modScannerService.DetectMisplacedMods(sptPath, cancellationToken);
+            if (misplacedReport.Any)
+            {
+                logger.LogWarning(
+                    "Found {WrongFolder} misplaced mods and {CrossInstalled} cross-installed directories; halting",
+                    misplacedReport.WrongFolder.Count,
+                    misplacedReport.CrossInstalled.Count
+                );
+                DisplayMisplacedMods(misplacedReport);
+
+                // Full stop
+                Environment.ExitCode = 1;
+                return;
+            }
+
             // Load and reconcile local mods
             logger.LogDebug("Scanning and reconciling mods");
             var mods = await ScanAndReconcileModsAsync(sptPath, sptVersion, cancellationToken);
@@ -297,8 +317,6 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        AnsiConsole.MarkupLine("[bold blue]Loading mods...[/]");
-
         var (serverMods, clientMods) = await modScannerService.ScanAllModsAsync(sptPath, cancellationToken);
 
         // Early exit if no mods found at all
@@ -636,6 +654,107 @@ public sealed class ApplicationService(
         );
         AnsiConsole.WriteLine();
         WriteRule();
+    }
+
+    /// <summary>
+    /// Displays mods that are installed in the wrong location and instructs the user to move them. Shown right before
+    /// the workflow halts.
+    /// </summary>
+    /// <param name="report">The misplaced and cross-installed mods detected during scanning.</param>
+    private static void DisplayMisplacedMods(MisplacedModReport report)
+    {
+        AnsiConsole.WriteLine();
+        WriteRule();
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[red bold]Improperly installed mods detected.[/]");
+        AnsiConsole.MarkupLine(
+            "[grey]The following mods are possibly installed incorrectly. Review the mod page for install instructions, move them to the correct location, and run this tool again.[/]"
+        );
+        AnsiConsole.WriteLine();
+
+        var serverInClient = report.WrongFolder.Where(m => m.IsServerMod).ToList();
+        var clientInServer = report.WrongFolder.Where(m => !m.IsServerMod).ToList();
+
+        if (serverInClient.Count > 0)
+        {
+            AnsiConsole.MarkupLine(
+                "[yellow]Server mods found in the client folder[/] [grey](BepInEx/plugins)[/][yellow]. Move them into[/] [grey]SPT/user/mods[/][yellow]:[/]"
+            );
+            foreach (var mod in serverInClient)
+            {
+                PrintMisplacedMod(mod);
+            }
+            AnsiConsole.WriteLine();
+        }
+
+        if (clientInServer.Count > 0)
+        {
+            AnsiConsole.MarkupLine(
+                "[yellow]Client mods found in the server folder[/] [grey](SPT/user/mods)[/][yellow]. Move them into[/] [grey]BepInEx/plugins[/][yellow]:[/]"
+            );
+            foreach (var mod in clientInServer)
+            {
+                PrintMisplacedMod(mod);
+            }
+            AnsiConsole.WriteLine();
+        }
+
+        foreach (var directory in report.CrossInstalled)
+        {
+            PrintCrossInstalledDirectory(directory);
+        }
+
+        AnsiConsole.MarkupLine(
+            "[red]Halting. You need to resolve the mod installation issues before this tool can continue.[/]"
+        );
+        AnsiConsole.WriteLine();
+        WriteRule();
+    }
+
+    /// <summary>
+    /// Prints a plugins subdirectory that contains unrelated mods. When the intruder is known it is named and the user
+    /// is told to give it its own folder. When it is ambiguous, the whole directory is surfaced for review.
+    /// </summary>
+    /// <param name="directory">The cross-installed directory to print.</param>
+    private static void PrintCrossInstalledDirectory(CrossInstalledDirectory directory)
+    {
+        if (directory.Ambiguous)
+        {
+            AnsiConsole.MarkupLine(
+                "[yellow]Unrelated mods share one folder under[/] [grey](BepInEx/plugins)[/][yellow]. One is likely in the wrong place. Review the install instructions for each:[/]"
+            );
+            AnsiConsole.MarkupLine($"  [grey]{directory.Directory.EscapeMarkup()}[/]");
+            foreach (var mod in directory.Mods)
+            {
+                PrintMisplacedMod(mod);
+            }
+        }
+        else
+        {
+            AnsiConsole.MarkupLine(
+                "[yellow]Mods found inside another mod's folder under[/] [grey](BepInEx/plugins)[/][yellow]. Review the mod's installation instructions:[/]"
+            );
+            AnsiConsole.MarkupLine($"  [grey]{directory.Directory.EscapeMarkup()}[/]");
+            foreach (var mod in directory.Misplaced)
+            {
+                PrintMisplacedMod(mod);
+            }
+        }
+
+        AnsiConsole.WriteLine();
+    }
+
+    /// <summary>
+    /// Prints a single misplaced mod entry.
+    /// </summary>
+    /// <param name="mod">The misplaced mod to print.</param>
+    private static void PrintMisplacedMod(MisplacedMod mod)
+    {
+        var name = !string.IsNullOrWhiteSpace(mod.Name) ? mod.Name : Path.GetFileName(mod.FilePath);
+        var guidSuffix = !string.IsNullOrWhiteSpace(mod.Guid) ? $" [grey]({mod.Guid.EscapeMarkup()})[/]" : string.Empty;
+
+        AnsiConsole.MarkupLine($"  [white]{name.EscapeMarkup()}[/]{guidSuffix}");
+        AnsiConsole.MarkupLine($"    [grey]{mod.FilePath.EscapeMarkup()}[/]");
     }
 
     /// <summary>

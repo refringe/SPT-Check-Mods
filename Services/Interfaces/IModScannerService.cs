@@ -3,8 +3,7 @@ using CheckMods.Models;
 namespace CheckMods.Services.Interfaces;
 
 /// <summary>
-/// Service responsible for scanning and loading mods from disk.
-/// Returns unified Mod objects with validation warnings populated.
+/// Service responsible for scanning and loading mods from disk. Returns unified Mod objects with validation warnings.
 /// </summary>
 public interface IModScannerService
 {
@@ -41,4 +40,16 @@ public interface IModScannerService
     /// <param name="sptPath">Path to the SPT installation directory.</param>
     /// <returns>The SPT version string, or null if not found.</returns>
     string? GetSptVersion(string sptPath);
+
+    /// <summary>
+    /// Detects mods installed in the wrong location. A server mod inside the client folder, a client mod inside the
+    /// server folder, or unrelated mods sharing a single plugins subdirectory (one copied into another's folder).
+    /// </summary>
+    /// <param name="sptPath">Path to the SPT installation directory.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// A report of misplaced and cross-installed mods; <see cref="MisplacedModReport.Any"/> is false when every mod is
+    /// correctly placed.
+    /// </returns>
+    MisplacedModReport DetectMisplacedMods(string sptPath, CancellationToken cancellationToken = default);
 }

@@ -11,8 +11,7 @@ using SPTarkov.DI.Annotations;
 namespace CheckMods.Services;
 
 /// <summary>
-/// Unified service for scanning both server and client mods from disk.
-/// Returns Mod objects directly with validation warnings populated.
+/// Unified service for scanning both server and client mods from disk. Returns unified Mod objects with validation warnings.
 /// </summary>
 [Injectable(InjectionType.Transient)]
 public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogger<ModScannerService> logger)
@@ -109,17 +108,12 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
             dllsByDirectory.Remove(pluginsDir);
         }
 
-        // Process DLLs in subdirectories - consolidate each directory into a single mod
-        var consolidatedMods = dllsByDirectory
-            .Select(kvp =>
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                return ConsolidateDirectoryMods(kvp.Key, kvp.Value);
-            })
-            .Where(mod => mod is not null)
-            .Cast<Mod>();
-
-        mods.AddRange(consolidatedMods);
+        // Group each subdirectory's DLLs into the mods they belong to
+        foreach (var (directory, directoryDlls) in dllsByDirectory)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            mods.AddRange(ConsolidateDirectoryMods(directory, directoryDlls));
+        }
 
         logger.LogInformation("Found {ModCount} client mods", mods.Count);
         AnsiConsole.MarkupLine($"[grey]Found {mods.Count} client mods.[/]");
@@ -162,12 +156,30 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
     }
 
     /// <summary>
-    /// Consolidates multiple DLLs from a single directory into one mod entry.
+    /// Turns a directory's DLLs into mods. DLLs that reference each other become one mod, while unrelated DLLs (a mod
+    /// copied into another's folder) stay separate.
     /// </summary>
-    private Mod? ConsolidateDirectoryMods(string directory, List<string> dllPaths)
+    private List<Mod> ConsolidateDirectoryMods(string directory, List<string> dllPaths)
     {
-        // Extract metadata from all DLLs
-        List<(string DllPath, BepInPluginAttribute Plugin)> allPlugins = [];
+        var allPlugins = ReadPluginDlls(dllPaths);
+
+        if (allPlugins.Count == 0)
+        {
+            return [];
+        }
+
+        var directoryName = Path.GetFileName(directory);
+
+        return PartitionByRelatedness(allPlugins).Select(group => CreateConsolidatedMod(group, directoryName)).ToList();
+    }
+
+    /// <summary>
+    /// Reads plugin metadata and assembly references from each BepInPlugin DLL, skipping any that can't be read
+    /// or that carry no BepInPlugin attribute.
+    /// </summary>
+    private List<PluginDll> ReadPluginDlls(List<string> dllPaths)
+    {
+        List<PluginDll> plugins = [];
 
         foreach (var dllPath in dllPaths)
         {
@@ -182,7 +194,13 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
                     continue;
                 }
 
-                allPlugins.Add((dllPath, plugin));
+                var referencedNames = assembly
+                    .GetReferencedAssemblies()
+                    .Select(name => name.Name)
+                    .OfType<string>()
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                plugins.Add(new PluginDll(dllPath, plugin, assembly.GetName().Name, referencedNames));
             }
             catch
             {
@@ -190,21 +208,24 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
             }
         }
 
-        if (allPlugins.Count == 0)
-        {
-            return null;
-        }
+        return plugins;
+    }
 
-        // Select the primary plugin
-        var directoryName = Path.GetFileName(directory);
-        var (primaryDll, primaryPlugin) = SelectPrimaryPlugin(allPlugins, directoryName);
+    /// <summary>
+    /// Builds one mod from a group of related DLLs; the primary plugin, plus the rest as alternate GUIDs.
+    /// </summary>
+    private Mod CreateConsolidatedMod(List<PluginDll> group, string directoryName)
+    {
+        var plugins = group.Select(item => (item.DllPath, item.Plugin)).ToList();
+
+        var (primaryDll, primaryPlugin) = SelectPrimaryPlugin(plugins, directoryName);
 
         // Create the mod from the primary plugin
         var mod = CreateModFromBepInPlugin(primaryPlugin, primaryDll);
 
-        // Add alternate GUIDs from other plugins
-        var alternateGuids = allPlugins
-            .Select(p => p.Plugin.Guid)
+        // Record the other plugins' GUIDs as alternates
+        var alternateGuids = plugins
+            .Select(item => item.Plugin.Guid)
             .Where(guid => !guid.Equals(primaryPlugin.Guid, StringComparison.OrdinalIgnoreCase))
             .Except(mod.AlternateGuids, StringComparer.OrdinalIgnoreCase);
 
@@ -215,6 +236,143 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
 
         return mod;
     }
+
+    /// <summary>
+    /// Groups plugin DLLs that belong to the same mod and separates those that don't. Two DLLs are treated as related
+    /// when one references the other's assembly or when their GUIDs share an author namespace.
+    /// </summary>
+    private static List<List<PluginDll>> PartitionByRelatedness(List<PluginDll> plugins)
+    {
+        // Union-find; connect DLLs that are related, then group by component.
+        var parents = Enumerable.Range(0, plugins.Count).ToArray();
+
+        int Find(int node)
+        {
+            while (parents[node] != node)
+            {
+                parents[node] = parents[parents[node]];
+                node = parents[node];
+            }
+
+            return node;
+        }
+
+        for (var i = 0; i < plugins.Count; i++)
+        {
+            for (var j = i + 1; j < plugins.Count; j++)
+            {
+                if (AreRelated(plugins[i], plugins[j]))
+                {
+                    parents[Find(i)] = Find(j);
+                }
+            }
+        }
+
+        return plugins
+            .Select((plugin, index) => (plugin, Root: Find(index)))
+            .GroupBy(item => item.Root)
+            .Select(group => group.Select(item => item.plugin).ToList())
+            .ToList();
+    }
+
+    /// <summary>
+    /// Determines whether two co-located plugin DLLs belong to the same mod. Either one references the other's
+    /// assembly, or their GUIDs share an author namespace.
+    /// </summary>
+    private static bool AreRelated(PluginDll a, PluginDll b)
+    {
+        return References(a, b) || References(b, a) || SameAuthorNamespace(a.Plugin.Guid, b.Plugin.Guid);
+    }
+
+    /// <summary>
+    /// Determines whether <paramref name="from"/> references the assembly of <paramref name="to"/>.
+    /// </summary>
+    private static bool References(PluginDll from, PluginDll to)
+    {
+        return !string.IsNullOrEmpty(to.AssemblyName) && from.ReferencedAssemblyNames.Contains(to.AssemblyName);
+    }
+
+    /// <summary>
+    /// Generic leading GUID segments (reverse-DNS TLDs and hosts) that, on their own, carry no author identity. A
+    /// shared prefix made up only of these does not imply two mods are related.
+    /// </summary>
+    private static readonly HashSet<string> _genericGuidSegments = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "com",
+        "org",
+        "net",
+        "io",
+        "dev",
+        "co",
+        "app",
+        "me",
+        "gg",
+        "xyz",
+        "github",
+        "gitlab",
+        "gitee",
+    };
+
+    /// <summary>
+    /// Determines whether two GUIDs share an author namespace. The namespace is the GUID without its final segment
+    /// (the mod identifier), e.g. "com.janky.hollywoodfx" -> "com.janky". Two namespaces match when one is a
+    /// segment-prefix of the other (loosely, so "com.author" matches "com.author.shared") and the shared prefix
+    /// contains at least one non-generic segment... so "com.janky.*" pairs match on "janky", but unrelated "com.foo"
+    /// and "com.bar.baz" do not match on the bare "com".
+    /// </summary>
+    private static bool SameAuthorNamespace(string guidA, string guidB)
+    {
+        var nsA = AuthorNamespaceSegments(guidA);
+        var nsB = AuthorNamespaceSegments(guidB);
+
+        if (nsA.Count == 0 || nsB.Count == 0)
+        {
+            return false;
+        }
+
+        var min = Math.Min(nsA.Count, nsB.Count);
+
+        var shared = 0;
+        while (shared < min && string.Equals(nsA[shared], nsB[shared], StringComparison.OrdinalIgnoreCase))
+        {
+            shared++;
+        }
+
+        // One namespace must be a full segment-prefix of the other...
+        if (shared < min)
+        {
+            return false;
+        }
+
+        // ...and the shared prefix must include at least one meaningful (non-generic) author segment.
+        return nsA.Take(shared).Any(segment => !_genericGuidSegments.Contains(segment));
+    }
+
+    /// <summary>
+    /// Splits a GUID into its author-namespace segments. All dot-delimited segments except the final one (the mod
+    /// identifier). Returns an empty list for GUIDs with one or fewer segments, which carry no namespace.
+    /// </summary>
+    private static List<string> AuthorNamespaceSegments(string? guid)
+    {
+        if (string.IsNullOrWhiteSpace(guid))
+        {
+            return [];
+        }
+
+        var parts = guid.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return parts.Length <= 1 ? [] : parts[..^1].ToList();
+    }
+
+    /// <summary>
+    /// A BepInPlugin DLL plus the assembly-reference data used to group related DLLs.
+    /// </summary>
+    private sealed record PluginDll(
+        string DllPath,
+        BepInPluginAttribute Plugin,
+        string? AssemblyName,
+        IReadOnlySet<string> ReferencedAssemblyNames
+    );
 
     /// <summary>
     /// Selects the primary plugin from a list of plugins in the same directory.
@@ -352,6 +510,253 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
 
         return null;
     }
+
+    #region Misplaced Mod Detection
+
+    /// <inheritdoc />
+    public MisplacedModReport DetectMisplacedMods(string sptPath, CancellationToken cancellationToken = default)
+    {
+        List<MisplacedMod> wrongFolder = [];
+
+        // Client mods incorrectly placed in the server folder (SPT/user/mods). Scans recursively (including DLLs loose
+        // in the mods root and nested in subfolders) so a client mod copied anywhere under the server folder is caught,
+        // not just top-level DLLs in mod directories.
+        var serverModsDir = Path.Combine(sptPath, "SPT", "user", "mods");
+        if (Directory.Exists(serverModsDir))
+        {
+            foreach (var dllPath in Directory.GetFiles(serverModsDir, "*.dll", SearchOption.AllDirectories))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var clientMod = TryDetectClientMod(dllPath);
+                if (clientMod is not null)
+                {
+                    wrongFolder.Add(
+                        new MisplacedMod(false, clientMod.Guid, clientMod.LocalName, clientMod.LocalVersion, dllPath)
+                    );
+                }
+            }
+        }
+
+        // Server mods incorrectly placed in the client folder (BepInEx/plugins). Mirrors ScanClientModsAsync; all valid
+        // client DLLs (recursive, excluding the SPT framework folder).
+        var pluginsDir = Path.Combine(sptPath, "BepInEx", "plugins");
+        if (Directory.Exists(pluginsDir))
+        {
+            foreach (var dllPath in GetValidClientDllFiles(pluginsDir))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var serverMod = TryDetectServerMod(dllPath, sptPath);
+                if (serverMod is not null)
+                {
+                    wrongFolder.Add(
+                        new MisplacedMod(true, serverMod.Guid, serverMod.LocalName, serverMod.LocalVersion, dllPath)
+                    );
+                }
+            }
+        }
+
+        var crossInstalled = DetectCrossInstalledDirectories(pluginsDir, cancellationToken);
+
+        logger.LogDebug(
+            "Detected {WrongFolder} misplaced mods and {CrossInstalled} cross-installed directories",
+            wrongFolder.Count,
+            crossInstalled.Count
+        );
+
+        return new MisplacedModReport(wrongFolder, crossInstalled);
+    }
+
+    /// <summary>
+    /// Finds BepInEx/plugins subdirectories that contain two or more unrelated mods. The signature that one mod has
+    /// been copied into another mod's folder. Loose DLLs directly in the plugins root are not considered.
+    /// </summary>
+    private List<CrossInstalledDirectory> DetectCrossInstalledDirectories(
+        string pluginsDir,
+        CancellationToken cancellationToken
+    )
+    {
+        List<CrossInstalledDirectory> crossInstalled = [];
+
+        if (!Directory.Exists(pluginsDir))
+        {
+            return crossInstalled;
+        }
+
+        var dllsByDirectory = GroupDllsByDirectory(GetValidClientDllFiles(pluginsDir), pluginsDir);
+        dllsByDirectory.Remove(pluginsDir);
+
+        foreach (var (directory, directoryDlls) in dllsByDirectory)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var plugins = ReadPluginDlls(directoryDlls);
+            if (plugins.Count < 2)
+            {
+                continue;
+            }
+
+            var components = PartitionByRelatedness(plugins);
+            if (components.Count < 2)
+            {
+                continue;
+            }
+
+            crossInstalled.Add(AttributeCrossInstall(directory, components));
+        }
+
+        return crossInstalled;
+    }
+
+    /// <summary>
+    /// Decides which mods in a cross-installed directory are the intruder. Attribution prefers a component whose DLL
+    /// filename matches the folder name (the folder's intended occupant). Failing that, a single largest component (by
+    /// DLL count). When neither yields a single winner, the result is marked ambiguous so the user is pointed at the
+    /// whole directory.
+    /// </summary>
+    private CrossInstalledDirectory AttributeCrossInstall(string directory, List<List<PluginDll>> components)
+    {
+        var directoryName = Path.GetFileName(directory);
+        var allMods = components.Select(group => ToMisplacedMod(group, directoryName)).ToList();
+
+        int? legitimateIndex = null;
+
+        // Folder-name match: a component owning a DLL named after the folder is the intended occupant.
+        var folderMatches = components
+            .Select((group, index) => (group, index))
+            .Where(item =>
+                item.group.Any(plugin =>
+                    MatchesFolderName(Path.GetFileNameWithoutExtension(plugin.DllPath), directoryName)
+                )
+            )
+            .Select(item => item.index)
+            .ToList();
+
+        if (folderMatches.Count == 1)
+        {
+            legitimateIndex = folderMatches[0];
+        }
+        else
+        {
+            // The unique largest component (by DLL count) is taken to be the intended occupant.
+            var maxSize = components.Max(group => group.Count);
+            var largest = components
+                .Select((group, index) => (group, index))
+                .Where(item => item.group.Count == maxSize)
+                .Select(item => item.index)
+                .ToList();
+
+            if (largest.Count == 1)
+            {
+                legitimateIndex = largest[0];
+            }
+        }
+
+        if (legitimateIndex is null)
+        {
+            // Cannot tell which mod is the intruder. Surface the whole directory for review.
+            return new CrossInstalledDirectory(directory, [], allMods, Ambiguous: true);
+        }
+
+        var misplaced = allMods.Where((_, index) => index != legitimateIndex).ToList();
+        return new CrossInstalledDirectory(directory, misplaced, allMods, Ambiguous: false);
+    }
+
+    /// <summary>
+    /// Describes a relatedness component as a single mod, using its primary plugin for the name, GUID, and path.
+    /// </summary>
+    private MisplacedMod ToMisplacedMod(List<PluginDll> group, string directoryName)
+    {
+        var (primaryDll, primaryPlugin) = SelectPrimaryPlugin(
+            group.Select(plugin => (plugin.DllPath, plugin.Plugin)).ToList(),
+            directoryName
+        );
+
+        var mod = CreateModFromBepInPlugin(primaryPlugin, primaryDll);
+        return new MisplacedMod(false, mod.Guid, mod.LocalName, mod.LocalVersion, primaryDll);
+    }
+
+    /// <summary>
+    /// Determines whether a DLL filename identifies its folder's intended occupant. Both are normalized (lower case,
+    /// separators removed) and matched by prefix in either direction, so a folder named "Mod" owns "Mod.dll",
+    /// "Mod.Core.dll", or "ModCore.dll", while an unrelated "Other.dll" does not.
+    /// </summary>
+    private static bool MatchesFolderName(string fileName, string directoryName)
+    {
+        var file = NormalizeIdentifier(fileName);
+        var directory = NormalizeIdentifier(directoryName);
+
+        if (file.Length == 0 || directory.Length == 0)
+        {
+            return false;
+        }
+
+        return file.StartsWith(directory, StringComparison.Ordinal)
+            || directory.StartsWith(file, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Lower-cases an identifier and strips separators (dots, dashes, underscores, spaces) so names can be compared
+    /// regardless of punctuation style.
+    /// </summary>
+    private static string NormalizeIdentifier(string value)
+    {
+        return new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Attempts to read the DLL as a client (BepInEx) mod. Returns the mod if a BepInPlugin attribute is found,
+    /// otherwise null. All load failures are swallowed... a DLL that cannot be read is simply not a client mod.
+    /// </summary>
+    private Mod? TryDetectClientMod(string dllPath)
+    {
+        try
+        {
+            using var loadContext = CreateMetadataLoadContext(dllPath);
+            var assembly = loadContext.LoadFromByteArray(File.ReadAllBytes(dllPath));
+
+            foreach (var type in GetLoadableTypes(assembly))
+            {
+                try
+                {
+                    var plugin = ExtractBepInPluginAttribute(type);
+                    if (plugin is not null)
+                    {
+                        return CreateModFromBepInPlugin(plugin, dllPath);
+                    }
+                }
+                catch
+                {
+                    // Skip types that can't be inspected
+                }
+            }
+        }
+        catch
+        {
+            // Not a client mod
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Attempts to read the DLL as a server (SPT) mod. Returns the mod if SPT mod metadata is found, otherwise null.
+    /// All load failures are swallowed... a DLL that cannot be read is simply not a server mod.
+    /// </summary>
+    private Mod? TryDetectServerMod(string dllPath, string sptPath)
+    {
+        try
+        {
+            return ExtractServerModMetadata(dllPath, sptPath);
+        }
+        catch
+        {
+            return null; // Not a server mod
+        }
+    }
+
+    #endregion
 
     #region Server Mod Extraction
 
