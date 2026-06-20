@@ -125,3 +125,4 @@ Generated\ Files/
 *.v2
 *.vsidx
 DocumentLayout.json
+.idea
