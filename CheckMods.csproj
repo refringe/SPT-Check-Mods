@@ -107,12 +107,12 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <PackageReference Include="OneOf" Version="3.0.271" />
     <PackageReference Include="SemanticVersioning" Version="3.0.0" />
     <PackageReference Include="Spectre.Console" Version="0.57.0" />
     <PackageReference Include="SPTarkov.DI" Version="4.0.13" />
-    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="10.0.8" />
-    <PackageReference Include="System.Threading.RateLimiting" Version="10.0.8" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="10.0.9" />
+    <PackageReference Include="System.Threading.RateLimiting" Version="10.0.9" />
   </ItemGroup>
 </Project>
