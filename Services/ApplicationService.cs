@@ -687,7 +687,8 @@ public sealed class ApplicationService(
     }
 
     /// <summary>
-    /// Displays warnings for mods that could not be verified against the Forge API.
+    /// Lists mods with no Forge match. Informational: a mod may be unpublished, or a plugin bundled
+    /// inside another mod's download.
     /// </summary>
     /// <param name="mods">Mods to check for verification status.</param>
     private static void DisplayUnverifiedModWarnings(List<Mod> mods)
@@ -700,7 +701,7 @@ public sealed class ApplicationService(
         }
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Unverified mods:[/]");
+        AnsiConsole.MarkupLine("[yellow]Mods not found on Forge:[/]");
 
         foreach (var mod in unverifiedMods)
         {
@@ -711,9 +712,15 @@ public sealed class ApplicationService(
             }
 
             AnsiConsole.MarkupLine($"  [white]{modDisplayName}[/]");
-            AnsiConsole.MarkupLine($"    [yellow]- Could not find matching record on Forge[/]");
         }
 
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine(
+            "  [grey]These weren't matched to a Forge listing. That's expected for a mod that isn't "
+                + "published on Forge, or for a plugin bundled inside another mod you already have "
+                + "installed. No action is needed unless you expected one of these to be its own mod "
+                + "on Forge.[/]"
+        );
         AnsiConsole.WriteLine();
     }
 
