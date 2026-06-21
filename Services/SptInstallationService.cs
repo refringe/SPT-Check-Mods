@@ -68,8 +68,18 @@ public sealed class SptInstallationService(
             return null;
         }
 
+        // Forge accepted the version string, but parse it without throwing in case its format differs from what the
+        // SemanticVersioning library's strict constructor accepts.
+        var localSptVersion = SemVer.TryParse(localSptVersionStr);
+        if (localSptVersion is null)
+        {
+            logger.LogError("Could not parse SPT version '{SptVersion}'", localSptVersionStr);
+            reporter.Error($"Failed. Could not parse SPT version '{localSptVersionStr}'.");
+            return null;
+        }
+
         reporter.Success("OK");
-        return new SemanticVersioning.Version(localSptVersionStr);
+        return localSptVersion;
     }
 
     /// <inheritdoc />
