@@ -30,6 +30,12 @@ public sealed partial class ForgeApiService(
 {
     private readonly ForgeApiOptions _options = options.Value;
 
+    /// <summary>
+    /// Maximum number of mods sent in a single batch updates request. Mods are chunked so the request URL stays
+    /// comfortably within server and proxy length limits, even for installs with many mods.
+    /// </summary>
+    private const int MaxModsPerUpdateRequest = 50;
+
     private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>
@@ -439,13 +445,71 @@ public sealed partial class ForgeApiService(
             return new NotFound();
         }
 
+        // Combine results across chunks. Mods are batched so the request URL stays within length limits.
+        var safeToUpdate = new List<SafeToUpdateMod>();
+        var blocked = new List<BlockedUpdateMod>();
+        var upToDate = new List<UpToDateMod>();
+        var incompatible = new List<IncompatibleMod>();
+        var anyData = false;
+
+        foreach (var chunk in modList.Chunk(MaxModsPerUpdateRequest))
+        {
+            var chunkResult = await GetModUpdatesChunkAsync(chunk, sptVersion, cancellationToken);
+
+            // Surface the first API error; a chunk with no data simply contributes nothing.
+            if (chunkResult.TryPickT2(out var error, out _))
+            {
+                return error;
+            }
+
+            if (!chunkResult.TryPickT0(out var data, out _))
+            {
+                continue;
+            }
+
+            anyData = true;
+            if (data.SafeToUpdate is not null)
+            {
+                safeToUpdate.AddRange(data.SafeToUpdate);
+            }
+
+            if (data.Blocked is not null)
+            {
+                blocked.AddRange(data.Blocked);
+            }
+
+            if (data.UpToDate is not null)
+            {
+                upToDate.AddRange(data.UpToDate);
+            }
+
+            if (data.Incompatible is not null)
+            {
+                incompatible.AddRange(data.Incompatible);
+            }
+        }
+
+        if (!anyData)
+        {
+            return new NotFound();
+        }
+
+        return new ModUpdatesData(safeToUpdate, blocked, upToDate, incompatible);
+    }
+
+    /// <summary>
+    /// Retrieves batch update information for a single chunk of mods.
+    /// </summary>
+    private async Task<OneOf<ModUpdatesData, NotFound, ApiError>> GetModUpdatesChunkAsync(
+        IReadOnlyList<(int ModId, string CurrentVersion)> chunk,
+        SemanticVersioning.Version sptVersion,
+        CancellationToken cancellationToken
+    )
+    {
         try
         {
             // Build mods query parameter as comma-separated "id:version" pairs
-            var modsParam = string.Join(
-                ",",
-                modList.Select(m => $"{m.ModId}:{Uri.EscapeDataString(m.CurrentVersion)}")
-            );
+            var modsParam = string.Join(",", chunk.Select(m => $"{m.ModId}:{Uri.EscapeDataString(m.CurrentVersion)}"));
 
             var url = $"{_options.BaseUrl}mods/updates?mods={modsParam}&spt_version={sptVersion}";
 
