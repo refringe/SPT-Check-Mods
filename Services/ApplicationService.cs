@@ -103,7 +103,7 @@ public sealed class ApplicationService(
 
             // Check SPT version compatibility for matched mods
             logger.LogDebug("Checking mod version compatibility");
-            await CheckModVersionCompatibilityAsync(mods, sptVersion);
+            CheckModVersionCompatibility(mods, sptVersion);
 
             // Enrich matched mods with version data and display results
             logger.LogDebug("Enriching mods with version data");
@@ -926,7 +926,7 @@ public sealed class ApplicationService(
     /// </summary>
     /// <param name="mods">Mods to check.</param>
     /// <param name="sptVersion">The installed SPT version.</param>
-    private Task CheckModVersionCompatibilityAsync(List<Mod> mods, SemanticVersioning.Version sptVersion)
+    private void CheckModVersionCompatibility(List<Mod> mods, SemanticVersioning.Version sptVersion)
     {
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold blue]Checking mod version compatibility...[/]");
@@ -988,7 +988,7 @@ public sealed class ApplicationService(
             AnsiConsole.MarkupLine("[green]All mod versions are compatible![/]");
             AnsiConsole.WriteLine();
             WriteRule();
-            return Task.CompletedTask;
+            return;
         }
 
         AnsiConsole.MarkupLine($"[yellow]Found {incompatibleMods.Count} incompatible mod(s).[/]");
@@ -1026,8 +1026,6 @@ public sealed class ApplicationService(
 
         AnsiConsole.WriteLine();
         WriteRule();
-
-        return Task.CompletedTask;
     }
 
     /// <summary>
