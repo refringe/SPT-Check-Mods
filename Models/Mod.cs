@@ -88,21 +88,6 @@ public sealed class Mod
     public string? ApiUrl { get; private set; }
 
     /// <summary>
-    /// A short description or teaser for the mod.
-    /// </summary>
-    public string? ApiTeaser { get; private set; }
-
-    /// <summary>
-    /// URL to the mod's thumbnail image.
-    /// </summary>
-    public string? ApiThumbnail { get; private set; }
-
-    /// <summary>
-    /// Total download count for the mod.
-    /// </summary>
-    public int? ApiDownloads { get; private set; }
-
-    /// <summary>
     /// URL to the mod's source code repository.
     /// </summary>
     public string? ApiSourceCodeUrl { get; private set; }
@@ -120,11 +105,6 @@ public sealed class Mod
     /// The latest SPT-compatible version available on Forge.
     /// </summary>
     public string? LatestVersion { get; private set; }
-
-    /// <summary>
-    /// When the latest version was published.
-    /// </summary>
-    public DateTime? LatestVersionDate { get; private set; }
 
     /// <summary>
     /// The update status compared to the latest available version.
@@ -186,11 +166,6 @@ public sealed class Mod
     public MatchMethod MatchMethod { get; private set; } = MatchMethod.None;
 
     /// <summary>
-    /// Whether the user has confirmed a low-confidence match.
-    /// </summary>
-    public bool IsConfirmed { get; set; }
-
-    /// <summary>
     /// Warnings encountered during scanning/loading.
     /// </summary>
     public List<string> LoadWarnings { get; init; } = [];
@@ -213,14 +188,6 @@ public sealed class Mod
     public string DisplayAuthor
     {
         get { return ApiAuthor?.Name ?? LocalAuthor; }
-    }
-
-    /// <summary>
-    /// The installed version for display purposes.
-    /// </summary>
-    public string DisplayVersion
-    {
-        get { return LocalVersion; }
     }
 
     /// <summary>
@@ -256,16 +223,12 @@ public sealed class Mod
         ApiAuthor = apiResult.Owner;
         ApiSlug = apiResult.Slug;
         ApiUrl = apiResult.DetailUrl;
-        ApiTeaser = apiResult.Teaser;
-        ApiThumbnail = apiResult.Thumbnail;
-        ApiDownloads = apiResult.Downloads;
         ApiSourceCodeUrl = apiResult.SourceCodeUrl;
         ApiVersions = apiResult.Versions?.ToList().AsReadOnly();
 
         MatchConfidence = confidence;
         MatchMethod = method;
         Status = ModStatus.Verified;
-        IsConfirmed = confidence >= 100;
     }
 
     /// <summary>
@@ -323,36 +286,6 @@ public sealed class Mod
         IncompatibilityReason = reason;
         CompatibleVersionString = compatibleVersion;
         CompatibleVersionDownloadLink = downloadLink;
-    }
-
-    /// <summary>
-    /// Clears API match data (used when user rejects a low-confidence match).
-    /// </summary>
-    public void ClearApiMatch()
-    {
-        ApiModId = null;
-        ApiName = null;
-        ApiAuthor = null;
-        ApiSlug = null;
-        ApiUrl = null;
-        ApiTeaser = null;
-        ApiThumbnail = null;
-        ApiDownloads = null;
-        ApiSourceCodeUrl = null;
-        ApiVersions = null;
-
-        MatchConfidence = 0;
-        MatchMethod = MatchMethod.None;
-        Status = ModStatus.NoMatch;
-        IsConfirmed = false;
-
-        LatestVersion = null;
-        LatestVersionDate = null;
-        UpdateStatus = UpdateStatus.Unknown;
-        DownloadLink = null;
-        BlockingMods = null;
-        BlockReason = null;
-        IncompatibilityReason = null;
     }
 
     #endregion
