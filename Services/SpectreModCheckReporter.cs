@@ -310,10 +310,8 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <inheritdoc />
-    public void LoadingWarnings(List<Mod> serverMods, List<Mod> clientMods)
+    public void LoadingWarnings(List<Mod> modsWithWarnings)
     {
-        var modsWithWarnings = serverMods.Concat(clientMods).Where(m => m.HasWarnings).ToList();
-
         if (modsWithWarnings.Count == 0)
         {
             return;

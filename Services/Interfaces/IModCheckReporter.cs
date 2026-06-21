@@ -71,8 +71,8 @@ public interface IModCheckReporter
     /// <summary>Displays an unhandled exception.</summary>
     void Exception(Exception ex);
 
-    /// <summary>Displays warnings for mods with loading issues.</summary>
-    void LoadingWarnings(List<Mod> serverMods, List<Mod> clientMods);
+    /// <summary>Displays warnings for the given mods that have loading issues.</summary>
+    void LoadingWarnings(List<Mod> modsWithWarnings);
 
     /// <summary>Displays the results of mod reconciliation.</summary>
     void ReconciliationResults(ModReconciliationResult result);

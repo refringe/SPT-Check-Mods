@@ -282,7 +282,7 @@ public sealed class ApplicationService(
             await FetchSourceCodeUrlsForModsAsync(modsWithWarnings, sptVersion, cancellationToken);
         }
 
-        reporter.LoadingWarnings(serverMods, clientMods);
+        reporter.LoadingWarnings(modsWithWarnings);
 
         reporter.Blank();
         reporter.Rule();
