@@ -71,6 +71,73 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <inheritdoc />
+    public void Heading(string text)
+    {
+        AnsiConsole.MarkupLine($"[bold blue]{text.EscapeMarkup()}[/]");
+    }
+
+    /// <inheritdoc />
+    public void Status(string text)
+    {
+        AnsiConsole.MarkupLine($"[grey]{text.EscapeMarkup()}[/]");
+    }
+
+    /// <inheritdoc />
+    public void Success(string text)
+    {
+        AnsiConsole.MarkupLine($"[green]{text.EscapeMarkup()}[/]");
+    }
+
+    /// <inheritdoc />
+    public void Warning(string text)
+    {
+        AnsiConsole.MarkupLine($"[yellow]{text.EscapeMarkup()}[/]");
+    }
+
+    /// <inheritdoc />
+    public void Error(string text)
+    {
+        AnsiConsole.MarkupLine($"[red]{text.EscapeMarkup()}[/]");
+    }
+
+    /// <inheritdoc />
+    public async Task RunForgeQueryProgressAsync(int total, Func<Action<int>, Task> work)
+    {
+        await CreateForgeProgress()
+            .StartAsync(async ctx =>
+            {
+                var task = ctx.AddTask("[grey]Querying Forge API[/]", maxValue: total);
+                await work(current => task.Value = current);
+                task.StopTask();
+            });
+    }
+
+    /// <inheritdoc />
+    public async Task<T> RunForgeQueryProgressAsync<T>(int total, Func<Action<int>, Task<T>> work)
+    {
+        return await CreateForgeProgress()
+            .StartAsync(async ctx =>
+            {
+                var task = ctx.AddTask("[grey]Querying Forge API[/]", maxValue: total);
+                var result = await work(current => task.Value = current);
+                task.StopTask();
+                return result;
+            });
+    }
+
+    private static Progress CreateForgeProgress()
+    {
+        return AnsiConsole
+            .Progress()
+            .Columns(
+                new SpinnerColumn(Spinner.Known.Dots) { Style = Style.Parse("blue") },
+                new TaskDescriptionColumn(),
+                new ProgressBarColumn(),
+                new PercentageColumn()
+            );
+    }
+
+    /// <inheritdoc />
     public void LoadingWarnings(List<Mod> serverMods, List<Mod> clientMods)
     {
         var modsWithWarnings = serverMods.Concat(clientMods).Where(m => m.HasWarnings).ToList();

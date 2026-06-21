@@ -545,35 +545,21 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[bold blue]Verifying Forge records for {mods.Count} mods...[/]");
+        reporter.Blank();
+        reporter.Heading($"Verifying Forge records for {mods.Count} mods...");
 
-        await AnsiConsole
-            .Progress()
-            .Columns(
-                new SpinnerColumn(Spinner.Known.Dots) { Style = Style.Parse("blue") },
-                new TaskDescriptionColumn(),
-                new ProgressBarColumn(),
-                new PercentageColumn()
-            )
-            .StartAsync(async ctx =>
-            {
-                var progressTask = ctx.AddTask("[grey]Querying Forge API[/]", maxValue: mods.Count);
-
-                await modMatchingService.MatchModsAsync(
+        await reporter.RunForgeQueryProgressAsync(
+            mods.Count,
+            setValue =>
+                modMatchingService.MatchModsAsync(
                     mods,
                     sptVersion,
-                    (_, current, _) =>
-                    {
-                        progressTask.Value = current;
-                    },
+                    (_, current, _) => setValue(current),
                     cancellationToken
-                );
+                )
+        );
 
-                progressTask.StopTask();
-            });
-
-        AnsiConsole.MarkupLine("[green]Forge verification complete![/]");
+        reporter.Success("Forge verification complete!");
 
         // Display warnings for mods that couldn't be verified
         reporter.UnverifiedMods(mods);
@@ -721,7 +707,7 @@ public sealed class ApplicationService(
             return;
         }
 
-        AnsiConsole.WriteLine();
+        reporter.Blank();
 
         // Build set of installed mod GUIDs
         var installedGuids = mods.Where(m => !string.IsNullOrWhiteSpace(m.Guid))
@@ -731,33 +717,18 @@ public sealed class ApplicationService(
         // Count matched mods for progress
         var matchedCount = mods.Count(m => m.IsMatched && m.ApiModId.HasValue);
 
-        AnsiConsole.MarkupLine($"[bold blue]Checking mod dependencies for {matchedCount} mods...[/]");
+        reporter.Heading($"Checking mod dependencies for {matchedCount} mods...");
 
-        var result = await AnsiConsole
-            .Progress()
-            .Columns(
-                new SpinnerColumn(Spinner.Known.Dots) { Style = Style.Parse("blue") },
-                new TaskDescriptionColumn(),
-                new ProgressBarColumn(),
-                new PercentageColumn()
-            )
-            .StartAsync(async ctx =>
-            {
-                var progressTask = ctx.AddTask("[grey]Querying Forge API[/]", maxValue: matchedCount);
-
-                var analysis = await modDependencyService.AnalyzeDependenciesAsync(
+        var result = await reporter.RunForgeQueryProgressAsync(
+            matchedCount,
+            setValue =>
+                modDependencyService.AnalyzeDependenciesAsync(
                     mods,
                     installedGuids,
-                    (current, _) =>
-                    {
-                        progressTask.Value = current;
-                    },
+                    (current, _) => setValue(current),
                     cancellationToken
-                );
-
-                progressTask.StopTask();
-                return analysis;
-            });
+                )
+        );
 
         reporter.DependencyResults(result);
     }

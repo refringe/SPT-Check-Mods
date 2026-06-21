@@ -17,6 +17,27 @@ public interface IModCheckReporter
     /// <summary>Writes a blank line.</summary>
     void Blank();
 
+    /// <summary>Writes a section heading.</summary>
+    void Heading(string text);
+
+    /// <summary>Writes a muted status line.</summary>
+    void Status(string text);
+
+    /// <summary>Writes a success line.</summary>
+    void Success(string text);
+
+    /// <summary>Writes a warning line.</summary>
+    void Warning(string text);
+
+    /// <summary>Writes an error line.</summary>
+    void Error(string text);
+
+    /// <summary>Runs work under a Forge-query progress bar, passing a callback to report completed-item counts.</summary>
+    Task RunForgeQueryProgressAsync(int total, Func<Action<int>, Task> work);
+
+    /// <summary>Runs work under a Forge-query progress bar and returns its result.</summary>
+    Task<T> RunForgeQueryProgressAsync<T>(int total, Func<Action<int>, Task<T>> work);
+
     /// <summary>Displays warnings for mods with loading issues.</summary>
     void LoadingWarnings(List<Mod> serverMods, List<Mod> clientMods);
 
