@@ -676,7 +676,11 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         {
             label = $"[link={node.Mod.ApiUrl}][{nameColor}]{name}[/][/] [grey]v{version}[/]";
         }
-        else if (node.DependencyInfo != null && node.DependencyInfo.Id > 0)
+        else if (
+            node.DependencyInfo != null
+            && node.DependencyInfo.Id > 0
+            && !string.IsNullOrWhiteSpace(node.DependencyInfo.Slug)
+        )
         {
             var url = ForgeUrls.ModPage(node.DependencyInfo.Id, node.DependencyInfo.Slug);
             label = $"[link={url}][{nameColor}]{name}[/][/] [grey]v{version}[/]";
@@ -708,7 +712,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             AnsiConsole.MarkupLine($"  {nameDisplay}");
             AnsiConsole.MarkupLine($"    [yellow]- {conflict.Description.EscapeMarkup()}[/]");
 
-            if (conflict.DependencyInfo.Id > 0)
+            if (conflict.DependencyInfo.Id > 0 && !string.IsNullOrWhiteSpace(conflict.DependencyInfo.Slug))
             {
                 var url = ForgeUrls.ModPage(conflict.DependencyInfo.Id, conflict.DependencyInfo.Slug);
                 AnsiConsole.MarkupLine($"      [grey]View on Forge:[/] [link]{url}[/]");
