@@ -12,6 +12,9 @@ bld/
 [Oo]bj/
 [Ll]og/
 
+# Publish output
+publish/
+
 # User-specific stuff
 .idea/**/workspace.xml
 .idea/**/tasks.xml
