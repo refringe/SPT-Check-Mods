@@ -1,6 +1,5 @@
 using CheckMods.Models;
 using CheckMods.Services;
-using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -96,7 +95,7 @@ public sealed class ModDependencyServiceTests
         var api = new FakeForgeApiService
         {
             OnGetModDependencies = id =>
-                id == "100" ? new List<ModDependency> { Dep("com.author.dep", "Dep", id: 200) } : new List<ModDependency>(),
+                id == "100" ? new List<ModDependency> { Dep("com.author.dep", id: 200) } : new List<ModDependency>(),
         };
 
         var result = await CreateService(api).AnalyzeDependenciesAsync([main, depMod], []);
@@ -109,7 +108,7 @@ public sealed class ModDependencyServiceTests
     {
         var api = new FakeForgeApiService
         {
-            OnGetModDependencies = _ => new List<ModDependency> { Dep("com.author.dep", "Dep", id: 200) },
+            OnGetModDependencies = _ => new List<ModDependency> { Dep("com.author.dep", id: 200) },
         };
 
         var result = await CreateService(api)

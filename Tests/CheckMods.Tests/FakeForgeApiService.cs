@@ -62,11 +62,17 @@ internal sealed class FakeForgeApiService : IForgeApiService
     public Task<OneOf<bool, InvalidSptVersion, ApiError>> ValidateSptVersionAsync(
         string sptVersion,
         CancellationToken cancellationToken = default
-    ) => throw new NotSupportedException();
+    )
+    {
+        throw new NotSupportedException();
+    }
 
     public Task<OneOf<List<SptVersionResult>, ApiError>> GetAllSptVersionsAsync(
         CancellationToken cancellationToken = default
-    ) => throw new NotSupportedException();
+    )
+    {
+        throw new NotSupportedException();
+    }
 
     public Task<OneOf<ModSearchResult, NotFound, InvalidInput, ApiError>> GetModByIdAsync(
         int modId,
