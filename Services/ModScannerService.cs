@@ -919,24 +919,9 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         CancellationToken cancellationToken = default
     )
     {
-        var tasks = dllFiles.Select(async dllPath =>
-        {
-            try
-            {
-                return await Task.Run(() => ExtractClientModMetadata(dllPath), cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine(
-                    $"[yellow]Warning: Failed to scan {Path.GetFileName(dllPath)}: {ex.Message.EscapeMarkup()}[/]"
-                );
-                return null;
-            }
-        });
+        // ExtractClientModMetadata handles its own per-DLL failures (logging a warning and returning null), so the
+        // only exception that escapes here is cancellation, which is allowed to propagate through Task.WhenAll.
+        var tasks = dllFiles.Select(dllPath => Task.Run(() => ExtractClientModMetadata(dllPath), cancellationToken));
 
         var results = await Task.WhenAll(tasks);
         return results.Where(r => r is not null).Cast<Mod>().ToList();
