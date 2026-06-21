@@ -108,6 +108,16 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
         }
 
         EnsureLogDirectoryExists();
+        OpenLogFile();
+        WriteStartupBanner();
+    }
+
+    /// <summary>
+    /// Rotates the log if it is over the size cap, then opens a fresh auto-flushing handle for the current log
+    /// file. Shared by first-time setup and mid-session rollover so both go through the same guarded path.
+    /// </summary>
+    private void OpenLogFile()
+    {
         RotateLogsIfNeeded();
 
         // Keep a single shared, auto-flushing handle open for the session rather than reopening the file per line.
@@ -115,13 +125,11 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
         var stream = new FileStream(_logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
         _writer = new StreamWriter(stream) { AutoFlush = true };
 
-        // Latch only after the handle is open. If the open above throws (e.g. a brief exclusive lock at startup),
-        // WriteLog's catch swallows it but _initialized stays false, so the next write retries rather than leaving
-        // file logging permanently dead for the session. This must precede WriteStartupBanner, whose nested
-        // WriteLog re-enters EnsureInitialized and would otherwise recurse.
+        // Latch only after the handle is open. If the open above throws (e.g. a brief exclusive lock), WriteLog's
+        // catch swallows it but _initialized stays false, so the next write retries rather than leaving file logging
+        // permanently dead. Setting it here also precedes the startup banner, whose nested WriteLog re-enters
+        // EnsureInitialized and would otherwise recurse.
         _initialized = true;
-
-        WriteStartupBanner();
     }
 
     public ILogger CreateLogger(string categoryName)
@@ -141,13 +149,41 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
             try
             {
                 EnsureInitialized();
-                _writer?.Write(message);
+                if (_writer is null)
+                {
+                    return;
+                }
+
+                _writer.Write(message);
+
+                // Enforce the size cap throughout the session, not just at startup: once the active file passes the
+                // limit, roll it over so a single long run can't grow the log unbounded.
+                if (_writer.BaseStream.Length >= _options.MaxFileSizeBytes)
+                {
+                    RollActiveLog();
+                }
             }
             catch
             {
                 // Silently fail if we can't write to the log file
             }
         }
+    }
+
+    /// <summary>
+    /// Closes the active log file once it reaches the size cap and reopens a fresh one, rotating the full file out
+    /// of the way. Only ever called from <see cref="WriteLog"/>, so it runs under <see cref="_writeLock"/>.
+    /// </summary>
+    private void RollActiveLog()
+    {
+        _writer?.Flush();
+        _writer?.Dispose();
+        _writer = null;
+
+        // Reopen through the shared path. If the reopen throws it propagates to WriteLog's catch with _initialized
+        // false, so the next write re-initializes instead of writing to a disposed handle.
+        _initialized = false;
+        OpenLogFile();
     }
 
     private void EnsureLogDirectoryExists()
