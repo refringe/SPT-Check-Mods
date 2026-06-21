@@ -451,15 +451,20 @@ public sealed partial class ForgeApiService(
         var upToDate = new List<UpToDateMod>();
         var incompatible = new List<IncompatibleMod>();
         var anyData = false;
+        ApiError? firstError = null;
 
         foreach (var chunk in modList.Chunk(MaxModsPerUpdateRequest))
         {
             var chunkResult = await GetModUpdatesChunkAsync(chunk, sptVersion, cancellationToken);
 
-            // Surface the first API error; a chunk with no data simply contributes nothing.
+            // A failing chunk must not discard update data already gathered from earlier chunks. Remember the first
+            // error so it can be surfaced only when no chunk yields any data, and keep going so the mods in the
+            // remaining chunks are still reported on.
             if (chunkResult.TryPickT2(out var error, out _))
             {
-                return error;
+                firstError ??= error;
+                logger.LogDebug("A mod-updates chunk failed ({Error}); continuing with remaining chunks", error.Message);
+                continue;
             }
 
             if (!chunkResult.TryPickT0(out var data, out _))
@@ -491,7 +496,8 @@ public sealed partial class ForgeApiService(
 
         if (!anyData)
         {
-            return new NotFound();
+            // Nothing succeeded: surface the error if a chunk failed, otherwise report a clean miss.
+            return firstError is not null ? firstError.Value : new NotFound();
         }
 
         return new ModUpdatesData(safeToUpdate, blocked, upToDate, incompatible);
