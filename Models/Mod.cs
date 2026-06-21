@@ -148,7 +148,7 @@ public sealed class Mod
     /// <summary>
     /// The current processing/verification status of the mod.
     /// </summary>
-    public ModStatus Status { get; set; } = ModStatus.NoMatch;
+    public ModStatus Status { get; private set; } = ModStatus.NoMatch;
 
     /// <summary>
     /// Warnings encountered during scanning/loading.
@@ -210,6 +210,14 @@ public sealed class Mod
         ApiVersions = apiResult.Versions?.ToList().AsReadOnly();
 
         Status = ModStatus.Verified;
+    }
+
+    /// <summary>
+    /// Marks the mod as having no Forge API match.
+    /// </summary>
+    public void MarkUnmatched()
+    {
+        Status = ModStatus.NoMatch;
     }
 
     /// <summary>

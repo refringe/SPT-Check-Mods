@@ -85,7 +85,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
         }
 
         logger.LogDebug("No match found for mod: {ModName}", mod.LocalName);
-        mod.Status = ModStatus.NoMatch;
+        mod.MarkUnmatched();
         return mod;
     }
 
