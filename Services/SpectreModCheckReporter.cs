@@ -101,6 +101,20 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <inheritdoc />
+    public void CouldNotReadModDll(string fileName, string reason)
+    {
+        AnsiConsole.MarkupLine(
+            $"[orange1]Warning:[/] Could not read mod DLL [grey]{fileName.EscapeMarkup()}[/]. Reason: {reason.EscapeMarkup()}"
+        );
+    }
+
+    /// <inheritdoc />
+    public void CouldNotReadSptVersion(string reason)
+    {
+        AnsiConsole.MarkupLine($"[orange1]Warning:[/] Could not read SPT version. Reason: {reason.EscapeMarkup()}");
+    }
+
+    /// <inheritdoc />
     public async Task RunForgeQueryProgressAsync(int total, Func<Action<int>, Task> work)
     {
         await CreateForgeProgress()

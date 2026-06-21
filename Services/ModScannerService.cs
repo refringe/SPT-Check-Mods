@@ -6,7 +6,6 @@ using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Spectre.Console;
 using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
@@ -15,8 +14,11 @@ namespace CheckMods.Services;
 /// Unified service for scanning both server and client mods from disk. Returns unified Mod objects with validation warnings.
 /// </summary>
 [Injectable(InjectionType.Transient)]
-public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogger<ModScannerService> logger)
-    : IModScannerService
+public sealed class ModScannerService(
+    IOptions<ModScannerOptions> options,
+    IModCheckReporter reporter,
+    ILogger<ModScannerService> logger
+) : IModScannerService
 {
     private readonly ModScannerOptions _options = options.Value;
 
@@ -31,13 +33,13 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         if (!Directory.Exists(modsDir))
         {
             logger.LogDebug("Server mods directory not found: {ModsDir}", modsDir);
-            AnsiConsole.MarkupLine("[grey]Scanning server mods... none found.[/]");
+            reporter.Status("Scanning server mods... none found.");
             return mods;
         }
 
         var modDirs = Directory.GetDirectories(modsDir);
         logger.LogDebug("Found {DirCount} mod directories", modDirs.Length);
-        AnsiConsole.MarkupLine($"[grey]Scanning {modDirs.Length} mod directories for server mods...[/]");
+        reporter.Status($"Scanning {modDirs.Length} mod directories for server mods...");
 
         foreach (var modDir in modDirs)
         {
@@ -60,15 +62,13 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
                 }
                 catch (Exception ex)
                 {
-                    AnsiConsole.MarkupLine(
-                        $"[orange1]Warning:[/] Could not read mod DLL [grey]{Path.GetFileName(dllPath)}[/]. Reason: {ex.Message.EscapeMarkup()}"
-                    );
+                    reporter.CouldNotReadModDll(Path.GetFileName(dllPath), ex.Message);
                 }
             }
         }
 
         logger.LogInformation("Found {ModCount} server mods", mods.Count);
-        AnsiConsole.MarkupLine($"[grey]Found {mods.Count} server mods.[/]");
+        reporter.Status($"Found {mods.Count} server mods.");
         return mods;
     }
 
@@ -83,20 +83,18 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         if (!Directory.Exists(pluginsDir))
         {
             logger.LogWarning("BepInEx plugins directory not found: {PluginsDir}", pluginsDir);
-            AnsiConsole.MarkupLine(
-                $"[yellow]Warning: BepInEx plugins directory not found: {pluginsDir.EscapeMarkup()}[/]"
-            );
+            reporter.Warning($"Warning: BepInEx plugins directory not found: {pluginsDir}");
             return mods;
         }
 
         var dllFiles = GetValidClientDllFiles(pluginsDir);
         if (dllFiles.Count == 0)
         {
-            AnsiConsole.MarkupLine("[grey]No DLL files found in plugins directory.[/]");
+            reporter.Status("No DLL files found in plugins directory.");
             return mods;
         }
 
-        AnsiConsole.MarkupLine($"[grey]Scanning {dllFiles.Count} DLL files for BepInEx plugins...[/]");
+        reporter.Status($"Scanning {dllFiles.Count} DLL files for BepInEx plugins...");
 
         // Group DLLs by their parent directory
         var dllsByDirectory = GroupDllsByDirectory(dllFiles, pluginsDir);
@@ -117,7 +115,7 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         }
 
         logger.LogInformation("Found {ModCount} client mods", mods.Count);
-        AnsiConsole.MarkupLine($"[grey]Found {mods.Count} client mods.[/]");
+        reporter.Status($"Found {mods.Count} client mods.");
         return mods;
     }
 
@@ -505,9 +503,7 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine(
-                $"[orange1]Warning:[/] Could not read SPT version. Reason: {ex.Message.EscapeMarkup()}"
-            );
+            reporter.CouldNotReadSptVersion(ex.Message);
         }
 
         return null;
@@ -943,9 +939,7 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine(
-                $"[yellow]Warning: Failed to extract BepInPlugin from {Path.GetFileName(dllPath)}: {ex.Message.EscapeMarkup()}[/]"
-            );
+            reporter.Warning($"Warning: Failed to extract BepInPlugin from {Path.GetFileName(dllPath)}: {ex.Message}");
             return null;
         }
     }

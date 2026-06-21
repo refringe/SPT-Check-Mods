@@ -32,6 +32,12 @@ public interface IModCheckReporter
     /// <summary>Writes an error line.</summary>
     void Error(string text);
 
+    /// <summary>Warns that a mod DLL could not be read during scanning.</summary>
+    void CouldNotReadModDll(string fileName, string reason);
+
+    /// <summary>Warns that the SPT version could not be read.</summary>
+    void CouldNotReadSptVersion(string reason);
+
     /// <summary>Runs work under a Forge-query progress bar, passing a callback to report completed-item counts.</summary>
     Task RunForgeQueryProgressAsync(int total, Func<Action<int>, Task> work);
 
