@@ -953,55 +953,31 @@ public sealed class ApplicationService(
                 continue;
             }
 
-            try
-            {
-                var range = new SemanticVersioning.Range(installedApiVersion.SptVersionConstraint);
-                if (range.IsSatisfied(sptVersion))
-                {
-                    // The installed version is compatible - no issue
-                    continue;
-                }
-
-                // The installed version is NOT compatible with the installed SPT version
-                var reason = $"Version {mod.LocalVersion} requires SPT {installedApiVersion.SptVersionConstraint}";
-
-                // Find a compatible version to suggest
-                string? compatibleVersion = null;
-
-                var compatibleApiVersion = mod.ApiVersions!.Where(v =>
-                    {
-                        if (string.IsNullOrWhiteSpace(v.SptVersionConstraint))
-                        {
-                            return false;
-                        }
-
-                        try
-                        {
-                            var versionRange = new SemanticVersioning.Range(v.SptVersionConstraint);
-                            return versionRange.IsSatisfied(sptVersion);
-                        }
-                        catch
-                        {
-                            return false;
-                        }
-                    })
-                    .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
-                    .FirstOrDefault();
-
-                if (compatibleApiVersion is not null)
-                {
-                    compatibleVersion = compatibleApiVersion.Version;
-                }
-
-                mod.SetLocalSptIncompatible(reason, compatibleVersion);
-            }
-            catch
+            if (!SemanticVersioning.Range.TryParse(installedApiVersion.SptVersionConstraint, out var range))
             {
                 // Invalid version constraint format from API - add a warning
                 mod.LoadWarnings.Add(
                     $"Invalid SPT version constraint from Forge: {installedApiVersion.SptVersionConstraint}"
                 );
+                continue;
             }
+
+            if (range.IsSatisfied(sptVersion))
+            {
+                // The installed version is compatible - no issue
+                continue;
+            }
+
+            // The installed version is NOT compatible with the installed SPT version
+            var reason = $"Version {mod.LocalVersion} requires SPT {installedApiVersion.SptVersionConstraint}";
+
+            // Find the latest compatible version to suggest
+            var compatibleApiVersion = mod
+                .ApiVersions!.Where(v => SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion))
+                .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
+                .FirstOrDefault();
+
+            mod.SetLocalSptIncompatible(reason, compatibleApiVersion?.Version);
         }
 
         // Display results

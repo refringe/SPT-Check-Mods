@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using CheckMods.Configuration;
 using CheckMods.Models;
 using CheckMods.Services.Interfaces;
+using CheckMods.Utils;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -360,22 +361,8 @@ public partial class ForgeApiService(
             }
 
             var hasCompatibleVersion = result.Versions.Any(v =>
-            {
-                if (string.IsNullOrWhiteSpace(v.SptVersionConstraint))
-                {
-                    return false;
-                }
-
-                try
-                {
-                    var range = new SemanticVersioning.Range(v.SptVersionConstraint);
-                    return range.IsSatisfied(sptVersion.ToString());
-                }
-                catch
-                {
-                    return false;
-                }
-            });
+                SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion)
+            );
 
             if (!hasCompatibleVersion)
             {

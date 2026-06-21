@@ -28,4 +28,18 @@ public static class SemVer
     {
         return TryParse(version) ?? new SemanticVersioning.Version(0, 0, 0);
     }
+
+    /// <summary>
+    /// Determines whether <paramref name="version"/> satisfies the given SPT version constraint (a semver range).
+    /// Returns false when the constraint is missing or cannot be parsed.
+    /// </summary>
+    /// <param name="constraint">The semver range constraint (e.g. "~4.0.0").</param>
+    /// <param name="version">The version to test against the constraint.</param>
+    /// <returns>True if the version satisfies the constraint; false if it does not or the constraint is invalid.</returns>
+    public static bool SatisfiesRange(string? constraint, SemanticVersioning.Version version)
+    {
+        return !string.IsNullOrWhiteSpace(constraint)
+            && SemanticVersioning.Range.TryParse(constraint, out var range)
+            && range.IsSatisfied(version);
+    }
 }
