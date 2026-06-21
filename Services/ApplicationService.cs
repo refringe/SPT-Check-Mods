@@ -1018,8 +1018,7 @@ public sealed class ApplicationService(
             // Use Forge download link format
             if (mod.ApiModId.HasValue && !string.IsNullOrWhiteSpace(mod.ApiSlug))
             {
-                var forgeDownloadUrl =
-                    $"https://forge.sp-tarkov.com/mod/download/{mod.ApiModId}/{mod.ApiSlug}/{mod.CompatibleVersionString}";
+                var forgeDownloadUrl = ForgeUrls.Download(mod.ApiModId.Value, mod.ApiSlug, mod.CompatibleVersionString);
                 AnsiConsole.MarkupLine($"      [grey]Download:[/] [link]{forgeDownloadUrl}[/]");
             }
         }
@@ -1198,7 +1197,7 @@ public sealed class ApplicationService(
         }
         else if (node.DependencyInfo != null && node.DependencyInfo.Id > 0)
         {
-            var url = $"https://forge.sp-tarkov.com/mod/{node.DependencyInfo.Id}/{node.DependencyInfo.Slug}";
+            var url = ForgeUrls.ModPage(node.DependencyInfo.Id, node.DependencyInfo.Slug);
             label = $"[link={url}][{nameColor}]{name}[/][/] [grey]v{version}[/]";
         }
         else
@@ -1231,8 +1230,7 @@ public sealed class ApplicationService(
 
             if (conflict.DependencyInfo.Id > 0)
             {
-                var url =
-                    $"https://forge.sp-tarkov.com/mod/{conflict.DependencyInfo.Id}/{conflict.DependencyInfo.Slug}";
+                var url = ForgeUrls.ModPage(conflict.DependencyInfo.Id, conflict.DependencyInfo.Slug);
                 AnsiConsole.MarkupLine($"      [grey]View on Forge:[/] [link]{url}[/]");
             }
         }
@@ -1254,7 +1252,7 @@ public sealed class ApplicationService(
             string nameDisplay;
             if (dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug))
             {
-                var url = $"https://forge.sp-tarkov.com/mod/{dep.ModId}/{dep.Slug}";
+                var url = ForgeUrls.ModPage(dep.ModId, dep.Slug);
                 nameDisplay = $"[link={url}]{dep.Name.EscapeMarkup()}[/]";
             }
             else

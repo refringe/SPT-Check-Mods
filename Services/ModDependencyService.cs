@@ -1,5 +1,6 @@
 using CheckMods.Models;
 using CheckMods.Services.Interfaces;
+using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
 using SPTarkov.DI.Annotations;
 
@@ -202,8 +203,11 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
                 && !string.IsNullOrWhiteSpace(dependency.LatestCompatibleVersion?.Version)
             )
             {
-                downloadLink =
-                    $"https://forge.sp-tarkov.com/mod/download/{dependency.Id}/{dependency.Slug}/{dependency.LatestCompatibleVersion.Version}";
+                downloadLink = ForgeUrls.Download(
+                    dependency.Id,
+                    dependency.Slug,
+                    dependency.LatestCompatibleVersion.Version
+                );
             }
 
             missingDeps[dependency.Guid] = new MissingDependency
