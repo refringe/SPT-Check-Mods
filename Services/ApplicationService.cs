@@ -3,7 +3,6 @@ using CheckMods.Models;
 using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
-using Spectre.Console;
 using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
@@ -66,11 +65,11 @@ public sealed class ApplicationService(
             logger.LogDebug("Checking for Check Mods updates");
             await CheckForCheckModsUpdateAsync(sptVersion, cancellationToken);
 
-            AnsiConsole.MarkupLine("[bold blue]Loading mods...[/]");
+            reporter.Heading("Loading mods...");
 
             // Detect improperly installed mods
             logger.LogDebug("Checking for improperly installed mods");
-            AnsiConsole.MarkupLine("[grey]Checking mod installation locations...[/]");
+            reporter.Status("Checking mod installation locations...");
             var misplacedReport = modScannerService.DetectMisplacedMods(sptPath, cancellationToken);
             if (misplacedReport.Any)
             {
@@ -92,7 +91,7 @@ public sealed class ApplicationService(
             if (mods.Count == 0)
             {
                 logger.LogInformation("No mods remaining after reconciliation");
-                AnsiConsole.MarkupLine("[yellow]No mods remaining after reconciliation.[/]");
+                reporter.Warning("No mods remaining after reconciliation.");
                 return;
             }
 
@@ -123,12 +122,12 @@ public sealed class ApplicationService(
         catch (OperationCanceledException)
         {
             logger.LogInformation("Operation was cancelled");
-            AnsiConsole.MarkupLine("[yellow]Operation cancelled.[/]");
+            reporter.Warning("Operation cancelled.");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error during mod check workflow");
-            AnsiConsole.WriteException(ex, ExceptionFormats.ShortenPaths);
+            reporter.Exception(ex);
         }
     }
 
@@ -270,15 +269,11 @@ public sealed class ApplicationService(
         if (serverMods.Count == 0 && clientMods.Count == 0)
         {
             logger.LogInformation("No mods found in SPT installation");
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[yellow]No mods found.[/]");
-            AnsiConsole.MarkupLine("[grey]Server mods should be located in:[/] SPT/user/mods");
-            AnsiConsole.MarkupLine("[grey]Client mods should be located in:[/] BepInEx/plugins");
-            AnsiConsole.WriteLine();
+            reporter.NoModsFound();
             return [];
         }
 
-        AnsiConsole.MarkupLine($"[green]Loaded {serverMods.Count} server mods and {clientMods.Count} client mods.[/]");
+        reporter.Success($"Loaded {serverMods.Count} server mods and {clientMods.Count} client mods.");
 
         // Fetch API info for mods with warnings to get source code URLs
         var modsWithWarnings = serverMods.Concat(clientMods).Where(m => m.HasWarnings).ToList();
@@ -289,10 +284,10 @@ public sealed class ApplicationService(
 
         reporter.LoadingWarnings(serverMods, clientMods);
 
-        AnsiConsole.WriteLine();
+        reporter.Blank();
         reporter.Rule();
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[bold blue]Reconciling mod components...[/]");
+        reporter.Blank();
+        reporter.Heading("Reconciling mod components...");
 
         var result = modReconciliationService.ReconcileMods(serverMods, clientMods);
 
@@ -540,8 +535,8 @@ public sealed class ApplicationService(
     /// <param name="sptVersion">The installed SPT version.</param>
     private void CheckModVersionCompatibility(List<Mod> mods, SemanticVersioning.Version sptVersion)
     {
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[bold blue]Checking mod version compatibility...[/]");
+        reporter.Blank();
+        reporter.Heading("Checking mod version compatibility...");
 
         // Only check mods that are matched with the API and have versions stored
         var matchedMods = mods.Where(m => m.IsMatched && m.ApiVersions is { Count: > 0 }).ToList();
@@ -592,51 +587,7 @@ public sealed class ApplicationService(
             mod.SetLocalSptIncompatible(reason, compatibleApiVersion?.Version);
         }
 
-        // Display results
-        var incompatibleMods = mods.Where(m => m.IsLocalSptIncompatible).ToList();
-
-        if (incompatibleMods.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[green]All mod versions are compatible![/]");
-            AnsiConsole.WriteLine();
-            reporter.Rule();
-            return;
-        }
-
-        AnsiConsole.MarkupLine($"[yellow]Found {incompatibleMods.Count} incompatible mod(s).[/]");
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Incompatible mods:[/]");
-
-        foreach (var mod in incompatibleMods)
-        {
-            // Link mod name to Forge page if available
-            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
-                : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
-
-            AnsiConsole.MarkupLine($"  {nameDisplay}");
-            AnsiConsole.MarkupLine($"    [yellow]- {mod.IncompatibilityReason?.EscapeMarkup()}[/]");
-
-            if (string.IsNullOrWhiteSpace(mod.CompatibleVersionString))
-            {
-                AnsiConsole.MarkupLine($"      [red]No compatible version available for SPT {sptVersion}[/]");
-                continue;
-            }
-
-            AnsiConsole.MarkupLine(
-                $"      [grey]Latest compatible version:[/] [green]{mod.CompatibleVersionString.EscapeMarkup()}[/]"
-            );
-
-            // Use Forge download link format
-            if (mod.ApiModId.HasValue && !string.IsNullOrWhiteSpace(mod.ApiSlug))
-            {
-                var forgeDownloadUrl = ForgeUrls.Download(mod.ApiModId.Value, mod.ApiSlug, mod.CompatibleVersionString);
-                AnsiConsole.MarkupLine($"      [grey]Download:[/] [link]{forgeDownloadUrl}[/]");
-            }
-        }
-
-        AnsiConsole.WriteLine();
-        reporter.Rule();
+        reporter.VersionCompatibilityResults(mods, sptVersion);
     }
 
     /// <summary>

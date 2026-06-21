@@ -221,6 +221,71 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <inheritdoc />
+    public void NoModsFound()
+    {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[yellow]No mods found.[/]");
+        AnsiConsole.MarkupLine("[grey]Server mods should be located in:[/] SPT/user/mods");
+        AnsiConsole.MarkupLine("[grey]Client mods should be located in:[/] BepInEx/plugins");
+        AnsiConsole.WriteLine();
+    }
+
+    /// <inheritdoc />
+    public void VersionCompatibilityResults(List<Mod> mods, SemanticVersioning.Version sptVersion)
+    {
+        var incompatibleMods = mods.Where(m => m.IsLocalSptIncompatible).ToList();
+
+        if (incompatibleMods.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[green]All mod versions are compatible![/]");
+            AnsiConsole.WriteLine();
+            Rule();
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[yellow]Found {incompatibleMods.Count} incompatible mod(s).[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[yellow]Incompatible mods:[/]");
+
+        foreach (var mod in incompatibleMods)
+        {
+            // Link mod name to Forge page if available
+            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
+                ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
+                : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
+
+            AnsiConsole.MarkupLine($"  {nameDisplay}");
+            AnsiConsole.MarkupLine($"    [yellow]- {mod.IncompatibilityReason?.EscapeMarkup()}[/]");
+
+            if (string.IsNullOrWhiteSpace(mod.CompatibleVersionString))
+            {
+                AnsiConsole.MarkupLine($"      [red]No compatible version available for SPT {sptVersion}[/]");
+                continue;
+            }
+
+            AnsiConsole.MarkupLine(
+                $"      [grey]Latest compatible version:[/] [green]{mod.CompatibleVersionString.EscapeMarkup()}[/]"
+            );
+
+            // Use Forge download link format
+            if (mod.ApiModId.HasValue && !string.IsNullOrWhiteSpace(mod.ApiSlug))
+            {
+                var forgeDownloadUrl = ForgeUrls.Download(mod.ApiModId.Value, mod.ApiSlug, mod.CompatibleVersionString);
+                AnsiConsole.MarkupLine($"      [grey]Download:[/] [link]{forgeDownloadUrl}[/]");
+            }
+        }
+
+        AnsiConsole.WriteLine();
+        Rule();
+    }
+
+    /// <inheritdoc />
+    public void Exception(Exception ex)
+    {
+        AnsiConsole.WriteException(ex, ExceptionFormats.ShortenPaths);
+    }
+
+    /// <inheritdoc />
     public void LoadingWarnings(List<Mod> serverMods, List<Mod> clientMods)
     {
         var modsWithWarnings = serverMods.Concat(clientMods).Where(m => m.HasWarnings).ToList();

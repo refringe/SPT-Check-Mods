@@ -53,6 +53,15 @@ public interface IModCheckReporter
     /// <summary>Displays the outcome of the Check Mods self-update check.</summary>
     void CheckModsUpdate(CheckModsUpdateResult result, SemanticVersioning.Version sptVersion);
 
+    /// <summary>Reports that no mods were found, with the expected install locations.</summary>
+    void NoModsFound();
+
+    /// <summary>Displays the SPT version-compatibility results for the checked mods.</summary>
+    void VersionCompatibilityResults(List<Mod> mods, SemanticVersioning.Version sptVersion);
+
+    /// <summary>Displays an unhandled exception.</summary>
+    void Exception(Exception ex);
+
     /// <summary>Displays warnings for mods with loading issues.</summary>
     void LoadingWarnings(List<Mod> serverMods, List<Mod> clientMods);
 
