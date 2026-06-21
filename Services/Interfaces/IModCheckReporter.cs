@@ -38,6 +38,12 @@ public interface IModCheckReporter
     /// <summary>Warns that the SPT version could not be read.</summary>
     void CouldNotReadSptVersion(string reason);
 
+    /// <summary>Warns that the BepInEx plugins directory could not be found during scanning.</summary>
+    void PluginsDirectoryNotFound(string path);
+
+    /// <summary>Warns that a client mod's metadata could not be extracted during scanning.</summary>
+    void CouldNotExtractClientMod(string fileName, string reason);
+
     /// <summary>Runs work under a Forge-query progress bar, passing a callback to report completed-item counts.</summary>
     Task RunForgeQueryProgressAsync(int total, Func<Action<int>, Task> work);
 

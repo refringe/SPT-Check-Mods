@@ -84,7 +84,7 @@ public sealed class ModScannerService(
         if (!Directory.Exists(pluginsDir))
         {
             logger.LogWarning("BepInEx plugins directory not found: {PluginsDir}", pluginsDir);
-            reporter.Warning($"Warning: BepInEx plugins directory not found: {pluginsDir}");
+            reporter.PluginsDirectoryNotFound(pluginsDir);
             return mods;
         }
 
@@ -920,16 +920,16 @@ public sealed class ModScannerService(
         // only exception that escapes here is cancellation, which is allowed to propagate through Task.WhenAll.
         // The shared console isn't safe for concurrent writes, so failures are gathered and surfaced on this thread
         // after the parallel scan rather than written from inside the worker tasks.
-        var warnings = new ConcurrentBag<string>();
+        var warnings = new ConcurrentBag<(string FileName, string Reason)>();
         var tasks = dllFiles.Select(dllPath =>
             Task.Run(() => ExtractClientModMetadata(dllPath, warnings), cancellationToken)
         );
 
         var results = await Task.WhenAll(tasks);
 
-        foreach (var warning in warnings)
+        foreach (var (fileName, reason) in warnings)
         {
-            reporter.Warning(warning);
+            reporter.CouldNotExtractClientMod(fileName, reason);
         }
 
         return results.Where(r => r is not null).Cast<Mod>().ToList();
@@ -940,7 +940,7 @@ public sealed class ModScannerService(
         return mods.DistinctBy(m => (m.LocalName.ToLowerInvariant(), m.LocalAuthor.ToLowerInvariant())).ToList();
     }
 
-    private Mod? ExtractClientModMetadata(string dllPath, ConcurrentBag<string> warnings)
+    private Mod? ExtractClientModMetadata(string dllPath, ConcurrentBag<(string FileName, string Reason)> warnings)
     {
         try
         {
@@ -953,7 +953,7 @@ public sealed class ModScannerService(
         {
             // Runs on a worker thread; collect rather than write so the caller can surface it without racing the
             // shared console.
-            warnings.Add($"Warning: Failed to extract BepInPlugin from {Path.GetFileName(dllPath)}: {ex.Message}");
+            warnings.Add((Path.GetFileName(dllPath), ex.Message));
             return null;
         }
     }
