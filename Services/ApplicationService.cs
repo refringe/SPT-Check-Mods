@@ -21,6 +21,7 @@ public sealed class ApplicationService(
     IModEnrichmentService modEnrichmentService,
     IModDependencyService modDependencyService,
     IUpdateCheckService updateCheckService,
+    IModCheckReporter reporter,
     ILogger<ApplicationService> logger
 ) : IApplicationService
 {
@@ -32,7 +33,7 @@ public sealed class ApplicationService(
     public async Task RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Starting mod check workflow");
-        DisplayBanner();
+        reporter.Banner();
 
         try
         {
@@ -132,60 +133,6 @@ public sealed class ApplicationService(
     }
 
     /// <summary>
-    /// Funny taglines displayed randomly in the banner.
-    /// </summary>
-    private static readonly string[] _bannerTaglines =
-    [
-        "Cheeki breeki, your mods are peaky!",
-        "No FiR tag required.",
-        "Opachki! Your mods are showing.",
-        "Warning: May cause gear fear.",
-        "Fence would sell this for 3x the price.",
-        "Not responsible for any leg meta incidents.",
-        "Ref approved.",
-        "Scav karma not affected by usage.",
-        "No insurance fraud detected.",
-        "Jaeger would make this a daily quest.",
-        "Tested on scavs!",
-        "More reliable than a PM pistol.",
-        "Killa can't spawn here. You're safe.",
-        "Side effects may include mod addiction.",
-        "Lighthouse rogues hate this one simple trick!",
-        "Your stash is safe. Your mods? Let's see...",
-        "Better odds than finding a GPU in raid.",
-        "Tagilla tested, Tagilla approved.",
-        "No extract campers were consulted.",
-        "Mechanic charges extra for this service.",
-        "Labs keycard not required.",
-        "Results may vary based on desync.",
-        "Powered by strong coffee.",
-    ];
-
-    /// <summary>
-    /// Displays the application banner and introductory information.
-    /// </summary>
-    private static void DisplayBanner()
-    {
-        var tagline = _bannerTaglines[Random.Shared.Next(_bannerTaglines.Length)];
-
-        AnsiConsole.Write(new FigletText("Check Mods").LeftJustified().Color(Color.Blue));
-        AnsiConsole.MarkupLine("[fuchsia]A tool to check for mod issues and updates.[/]");
-        AnsiConsole.MarkupLine($"[grey]{tagline}[/]");
-        AnsiConsole.MarkupLine("[link]https://forge.sp-tarkov.com[/]");
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Rule().RuleStyle("grey"));
-        AnsiConsole.WriteLine();
-    }
-
-    /// <summary>
-    /// Writes a horizontal rule separator to the console.
-    /// </summary>
-    private static void WriteRule()
-    {
-        AnsiConsole.Write(new Rule().RuleStyle("grey"));
-    }
-
-    /// <summary>
     /// Validates and returns the SPT installation path from arguments or current directory.
     /// </summary>
     /// <param name="args">Command line arguments.</param>
@@ -241,7 +188,7 @@ public sealed class ApplicationService(
         await CheckForSptUpdatesAsync(sptVersion, cancellationToken);
 
         AnsiConsole.WriteLine();
-        WriteRule();
+        reporter.Rule();
         AnsiConsole.WriteLine();
         return sptVersion;
     }
@@ -312,7 +259,7 @@ public sealed class ApplicationService(
             logger.LogWarning(ex, "Check Mods update check failed unexpectedly");
             AnsiConsole.MarkupLine("[grey]Could not check for Check Mods updates.[/]");
             AnsiConsole.WriteLine();
-            WriteRule();
+            reporter.Rule();
             return;
         }
 
@@ -357,7 +304,7 @@ public sealed class ApplicationService(
         }
 
         AnsiConsole.WriteLine();
-        WriteRule();
+        reporter.Rule();
     }
 
     /// <summary>
@@ -399,7 +346,7 @@ public sealed class ApplicationService(
         DisplayLoadingWarnings(serverMods, clientMods);
 
         AnsiConsole.WriteLine();
-        WriteRule();
+        reporter.Rule();
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold blue]Reconciling mod components...[/]");
 
@@ -632,7 +579,7 @@ public sealed class ApplicationService(
     /// <summary>
     /// Displays the results of mod reconciliation.
     /// </summary>
-    private static void DisplayReconciliationResults(ModReconciliationResult result)
+    private void DisplayReconciliationResults(ModReconciliationResult result)
     {
         var serverCount = result.ReconciledPairs.Count + result.UnmatchedServerMods.Count;
         var clientCount = result.ReconciledPairs.Count + result.UnmatchedClientMods.Count;
@@ -709,7 +656,7 @@ public sealed class ApplicationService(
                 + $"client-only: {result.UnmatchedClientMods.Count})[/]"
         );
         AnsiConsole.WriteLine();
-        WriteRule();
+        reporter.Rule();
     }
 
     /// <summary>
@@ -717,10 +664,10 @@ public sealed class ApplicationService(
     /// the workflow halts.
     /// </summary>
     /// <param name="report">The misplaced and cross-installed mods detected during scanning.</param>
-    private static void DisplayMisplacedMods(MisplacedModReport report)
+    private void DisplayMisplacedMods(MisplacedModReport report)
     {
         AnsiConsole.WriteLine();
-        WriteRule();
+        reporter.Rule();
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[red bold]Improperly installed mods detected.[/]");
         AnsiConsole.MarkupLine(
@@ -764,7 +711,7 @@ public sealed class ApplicationService(
             "[red]Halting. You need to resolve the mod installation issues before this tool can continue.[/]"
         );
         AnsiConsole.WriteLine();
-        WriteRule();
+        reporter.Rule();
     }
 
     /// <summary>
@@ -858,7 +805,7 @@ public sealed class ApplicationService(
         // Display warnings for mods that couldn't be verified
         DisplayUnverifiedModWarnings(mods);
 
-        WriteRule();
+        reporter.Rule();
     }
 
     /// <summary>
@@ -987,7 +934,7 @@ public sealed class ApplicationService(
         {
             AnsiConsole.MarkupLine("[green]All mod versions are compatible![/]");
             AnsiConsole.WriteLine();
-            WriteRule();
+            reporter.Rule();
             return;
         }
 
@@ -1024,7 +971,7 @@ public sealed class ApplicationService(
         }
 
         AnsiConsole.WriteLine();
-        WriteRule();
+        reporter.Rule();
     }
 
     /// <summary>
@@ -1081,7 +1028,7 @@ public sealed class ApplicationService(
         {
             AnsiConsole.MarkupLine("[grey]No dependency information available.[/]");
             AnsiConsole.WriteLine();
-            WriteRule();
+            reporter.Rule();
             return;
         }
 
@@ -1109,7 +1056,7 @@ public sealed class ApplicationService(
         }
 
         AnsiConsole.WriteLine();
-        WriteRule();
+        reporter.Rule();
     }
 
     /// <summary>
@@ -1278,7 +1225,7 @@ public sealed class ApplicationService(
     /// Displays a table showing version information for all verified mods.
     /// </summary>
     /// <param name="mods">Processed mods.</param>
-    private static void ShowVersionUpdateTable(List<Mod> mods)
+    private void ShowVersionUpdateTable(List<Mod> mods)
     {
         // Group by API mod ID to avoid duplicates, select the one with the highest version
         var verifiedMods = mods.Where(m => m.IsMatched && m.LatestVersion is not null)
@@ -1395,7 +1342,7 @@ public sealed class ApplicationService(
         }
 
         AnsiConsole.WriteLine();
-        WriteRule();
+        reporter.Rule();
         AnsiConsole.WriteLine();
 
         AnsiConsole.Write(new FigletText("FIN").LeftJustified().Color(Color.Fuchsia));
