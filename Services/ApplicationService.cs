@@ -14,7 +14,7 @@ namespace CheckMods.Services;
 [Injectable(InjectionType.Transient)]
 public sealed class ApplicationService(
     IForgeApiService forgeApiService,
-    IServerModService serverModService,
+    ISptInstallationService sptInstallationService,
     IModScannerService modScannerService,
     IModReconciliationService modReconciliationService,
     IModMatchingService modMatchingService,
@@ -229,7 +229,7 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        var sptVersion = await serverModService.GetAndValidateSptVersionAsync(sptPath, cancellationToken);
+        var sptVersion = await sptInstallationService.GetAndValidateSptVersionAsync(sptPath, cancellationToken);
         if (sptVersion is null)
         {
             return null;
@@ -259,7 +259,7 @@ public sealed class ApplicationService(
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[grey]Checking for SPT updates...[/]");
 
-        var availableUpdates = await serverModService.CheckForSptUpdatesAsync(currentVersion, cancellationToken);
+        var availableUpdates = await sptInstallationService.CheckForSptUpdatesAsync(currentVersion, cancellationToken);
 
         if (availableUpdates.Count == 0)
         {

@@ -44,7 +44,7 @@ dotnet run /path/to/spt
 SPT Check Mods uses a pipeline-based service architecture with dependency injection:
 
 - **ApplicationService**: Main orchestrator that coordinates the entire workflow
-- **ServerModService**: Validates SPT installation and extracts SPT version from `SPTarkov.Server.Core.dll`
+- **SptInstallationService**: Validates SPT installation and extracts SPT version from `SPTarkov.Server.Core.dll`
 - **ModScannerService**: Scans both server (`SPT/user/mods`) and client (`BepInEx/plugins`) mods
 - **ModReconciliationService**: Matches server/client components of the same mod
 - **ModMatchingService**: Matches local mods with the Forge API using GUID and fuzzy name matching

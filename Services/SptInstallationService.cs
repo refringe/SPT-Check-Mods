@@ -11,11 +11,11 @@ namespace CheckMods.Services;
 /// Service responsible for SPT installation validation.
 /// </summary>
 [Injectable(InjectionType.Transient)]
-public sealed class ServerModService(
+public sealed class SptInstallationService(
     IForgeApiService forgeApiService,
     IModScannerService scannerService,
-    ILogger<ServerModService> logger
-) : IServerModService
+    ILogger<SptInstallationService> logger
+) : ISptInstallationService
 {
     /// <inheritdoc />
     public async Task<SemanticVersioning.Version?> GetAndValidateSptVersionAsync(
