@@ -562,9 +562,11 @@ public sealed class ApplicationService(
 
             if (!SemanticVersioning.Range.TryParse(installedApiVersion.SptVersionConstraint, out var range))
             {
-                // Invalid version constraint format from API - add a warning
-                mod.LoadWarnings.Add(
-                    $"Invalid SPT version constraint from Forge: {installedApiVersion.SptVersionConstraint}"
+                // The constraint from Forge can't be parsed, so compatibility can't be evaluated. Surface it now:
+                // LoadWarnings are already rendered earlier in the run, so adding to them here would be invisible.
+                reporter.Warning(
+                    $"Could not verify SPT compatibility for {mod.DisplayName}: "
+                        + $"Forge reported an invalid version constraint ({installedApiVersion.SptVersionConstraint})."
                 );
                 continue;
             }
