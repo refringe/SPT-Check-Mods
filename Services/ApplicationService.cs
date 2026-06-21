@@ -312,11 +312,9 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        foreach (var mod in mods)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await FetchSourceCodeUrlForModAsync(mod, sptVersion, cancellationToken);
-        }
+        // Each mod's lookup is independent, so dispatch them together and let the rate limiter throttle rather than
+        // waiting for each round-trip in turn. Cancellation is honored by the API calls inside each task.
+        await Task.WhenAll(mods.Select(mod => FetchSourceCodeUrlForModAsync(mod, sptVersion, cancellationToken)));
     }
 
     /// <summary>
@@ -329,58 +327,68 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        foreach (var pair in pairs)
+        // Each pair's lookup is independent, so dispatch them together and let the rate limiter throttle. Cancellation
+        // is honored by the API calls inside each task.
+        await Task.WhenAll(pairs.Select(pair => FetchSourceCodeUrlForPairAsync(pair, sptVersion, cancellationToken)));
+    }
+
+    /// <summary>
+    /// Fetches and applies Forge API info for a single reconciled pair, trying both the server and client GUIDs
+    /// before falling back to a fuzzy name search.
+    /// </summary>
+    private async Task FetchSourceCodeUrlForPairAsync(
+        ModPair pair,
+        SemanticVersioning.Version sptVersion,
+        CancellationToken cancellationToken
+    )
+    {
+        var selectedMod = pair.SelectedMod;
+
+        // Skip if already has API info
+        if (selectedMod.ApiSourceCodeUrl is not null || selectedMod.ApiUrl is not null)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var selectedMod = pair.SelectedMod;
-
-            // Skip if already has API info
-            if (selectedMod.ApiSourceCodeUrl is not null || selectedMod.ApiUrl is not null)
-            {
-                continue;
-            }
-
-            ModSearchResult? apiResult = null;
-
-            // Collect all unique GUIDs to try (server GUID, client GUID)
-            List<string> guidsToTry = [];
-            if (!string.IsNullOrWhiteSpace(pair.ServerMod.Guid))
-            {
-                guidsToTry.Add(pair.ServerMod.Guid);
-            }
-
-            if (
-                !string.IsNullOrWhiteSpace(pair.ClientMod.Guid)
-                && !guidsToTry.Contains(pair.ClientMod.Guid, StringComparer.OrdinalIgnoreCase)
-            )
-            {
-                guidsToTry.Add(pair.ClientMod.Guid);
-            }
-
-            // Try each GUID until we find a match
-            foreach (var guid in guidsToTry)
-            {
-                var guidResult = await forgeApiService.GetModByGuidAsync(guid, sptVersion, cancellationToken);
-                if (!guidResult.TryPickT0(out var match, out _))
-                {
-                    continue;
-                }
-
-                apiResult = match;
-                break;
-            }
-
-            // If not found by any GUID, try searching by name with fuzzy matching
-            apiResult ??= await SearchModByNameAsync(selectedMod, sptVersion, cancellationToken);
-
-            if (apiResult is null)
-            {
-                continue;
-            }
-
-            selectedMod.UpdateFromApiMatch(apiResult);
+            return;
         }
+
+        ModSearchResult? apiResult = null;
+
+        // Collect all unique GUIDs to try (server GUID, client GUID)
+        List<string> guidsToTry = [];
+        if (!string.IsNullOrWhiteSpace(pair.ServerMod.Guid))
+        {
+            guidsToTry.Add(pair.ServerMod.Guid);
+        }
+
+        if (
+            !string.IsNullOrWhiteSpace(pair.ClientMod.Guid)
+            && !guidsToTry.Contains(pair.ClientMod.Guid, StringComparer.OrdinalIgnoreCase)
+        )
+        {
+            guidsToTry.Add(pair.ClientMod.Guid);
+        }
+
+        // Try each GUID until we find a match
+        foreach (var guid in guidsToTry)
+        {
+            var guidResult = await forgeApiService.GetModByGuidAsync(guid, sptVersion, cancellationToken);
+            if (!guidResult.TryPickT0(out var match, out _))
+            {
+                continue;
+            }
+
+            apiResult = match;
+            break;
+        }
+
+        // If not found by any GUID, try searching by name with fuzzy matching
+        apiResult ??= await SearchModByNameAsync(selectedMod, sptVersion, cancellationToken);
+
+        if (apiResult is null)
+        {
+            return;
+        }
+
+        selectedMod.UpdateFromApiMatch(apiResult);
     }
 
     /// <summary>
