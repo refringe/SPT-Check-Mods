@@ -138,6 +138,89 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <inheritdoc />
+    public void UsingPath(string path)
+    {
+        AnsiConsole.MarkupLine($"[grey]Using Path:[/] {path.EscapeMarkup()}");
+    }
+
+    /// <inheritdoc />
+    public void DirectoryDoesNotExist(string path)
+    {
+        AnsiConsole.MarkupLine($"[red]Error: Directory does not exist: {path.EscapeMarkup()}[/]");
+    }
+
+    /// <inheritdoc />
+    public void SptVersionValidated(string version)
+    {
+        AnsiConsole.MarkupLine($"[green]Successfully validated SPT Version:[/] [bold]{version.EscapeMarkup()}[/]");
+    }
+
+    /// <inheritdoc />
+    public void SptUpdateAvailable(SptVersionResult latest)
+    {
+        var versionDisplay = $"[bold]{latest.Version.EscapeMarkup()}[/]";
+
+        // Add mod count if available
+        if (latest.ModCount > 0)
+        {
+            versionDisplay += $" [grey]({latest.ModCount} mods)[/]";
+        }
+
+        AnsiConsole.MarkupLine($"[yellow]SPT update available:[/] {versionDisplay}");
+
+        // Add link on new line if available
+        if (!string.IsNullOrWhiteSpace(latest.Link))
+        {
+            AnsiConsole.MarkupLine($"[grey]{latest.Link}[/]");
+        }
+    }
+
+    /// <inheritdoc />
+    public void CheckModsUpdate(CheckModsUpdateResult result, SemanticVersioning.Version sptVersion)
+    {
+        switch (result.Status)
+        {
+            case CheckModsUpdateStatus.UpdateAvailable:
+                AnsiConsole.MarkupLine(
+                    $"[yellow]A new version of Check Mods is available:[/] [bold]v{(result.LatestVersion ?? "?").EscapeMarkup()}[/] [grey](you have v{result.CurrentVersion.EscapeMarkup()})[/]"
+                );
+                if (!string.IsNullOrWhiteSpace(result.DownloadLink))
+                {
+                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink}[/]");
+                }
+                break;
+
+            case CheckModsUpdateStatus.UpToDate:
+                AnsiConsole.MarkupLine($"[green]Check Mods is up to date (v{result.CurrentVersion.EscapeMarkup()}).[/]");
+                break;
+
+            case CheckModsUpdateStatus.IncompatibleWithSpt:
+                AnsiConsole.MarkupLine(
+                    $"[grey]A newer version of Check Mods exists but isn't compatible with SPT {sptVersion.ToString().EscapeMarkup()}.[/]"
+                );
+                break;
+
+            case CheckModsUpdateStatus.UnrecognizedBuild:
+                AnsiConsole.MarkupLine(
+                    $"[grey]You're running an unrecognized Check Mods build (v{result.CurrentVersion.EscapeMarkup()}). Consider the stable version on the Forge: v{(result.LatestVersion ?? "?").EscapeMarkup()}.[/]"
+                );
+                if (!string.IsNullOrWhiteSpace(result.DownloadLink))
+                {
+                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink}[/]");
+                }
+
+                break;
+
+            default:
+                AnsiConsole.MarkupLine("[grey]Could not check for Check Mods updates.[/]");
+                break;
+        }
+
+        AnsiConsole.WriteLine();
+        Rule();
+    }
+
+    /// <inheritdoc />
     public void LoadingWarnings(List<Mod> serverMods, List<Mod> clientMods)
     {
         var modsWithWarnings = serverMods.Concat(clientMods).Where(m => m.HasWarnings).ToList();

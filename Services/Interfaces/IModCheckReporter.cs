@@ -38,6 +38,21 @@ public interface IModCheckReporter
     /// <summary>Runs work under a Forge-query progress bar and returns its result.</summary>
     Task<T> RunForgeQueryProgressAsync<T>(int total, Func<Action<int>, Task<T>> work);
 
+    /// <summary>Reports the resolved SPT installation path.</summary>
+    void UsingPath(string path);
+
+    /// <summary>Reports that the provided directory does not exist.</summary>
+    void DirectoryDoesNotExist(string path);
+
+    /// <summary>Reports that the SPT version was validated.</summary>
+    void SptVersionValidated(string version);
+
+    /// <summary>Reports the latest available SPT update.</summary>
+    void SptUpdateAvailable(SptVersionResult latest);
+
+    /// <summary>Displays the outcome of the Check Mods self-update check.</summary>
+    void CheckModsUpdate(CheckModsUpdateResult result, SemanticVersioning.Version sptVersion);
+
     /// <summary>Displays warnings for mods with loading issues.</summary>
     void LoadingWarnings(List<Mod> serverMods, List<Mod> clientMods);
 

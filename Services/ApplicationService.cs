@@ -137,31 +137,31 @@ public sealed class ApplicationService(
     /// </summary>
     /// <param name="args">Command line arguments.</param>
     /// <returns>Validated SPT path or null if validation failed.</returns>
-    private static string? GetValidatedSptPath(string[] args)
+    private string? GetValidatedSptPath(string[] args)
     {
-        AnsiConsole.MarkupLine("[bold blue]Validating SPT installation...[/]");
+        reporter.Heading("Validating SPT installation...");
 
         if (args.Length == 0)
         {
             var currentPath = Directory.GetCurrentDirectory();
-            AnsiConsole.MarkupLine($"[grey]Using Path:[/] {currentPath.EscapeMarkup()}");
+            reporter.UsingPath(currentPath);
             return currentPath;
         }
 
         var safePath = SecurityHelper.GetSafePath(args[0]);
         if (safePath is null)
         {
-            AnsiConsole.MarkupLine("[red]Error: Invalid path provided.[/]");
+            reporter.Error("Error: Invalid path provided.");
             return null;
         }
 
         if (!Directory.Exists(safePath))
         {
-            AnsiConsole.MarkupLine($"[red]Error: Directory does not exist: {safePath.EscapeMarkup()}[/]");
+            reporter.DirectoryDoesNotExist(safePath);
             return null;
         }
 
-        AnsiConsole.MarkupLine($"[grey]Using Path:[/] {safePath.EscapeMarkup()}");
+        reporter.UsingPath(safePath);
         return safePath;
     }
 
@@ -182,14 +182,14 @@ public sealed class ApplicationService(
             return null;
         }
 
-        AnsiConsole.MarkupLine($"[green]Successfully validated SPT Version:[/] [bold]{sptVersion}[/]");
+        reporter.SptVersionValidated(sptVersion.ToString());
 
         // Check for SPT updates
         await CheckForSptUpdatesAsync(sptVersion, cancellationToken);
 
-        AnsiConsole.WriteLine();
+        reporter.Blank();
         reporter.Rule();
-        AnsiConsole.WriteLine();
+        reporter.Blank();
         return sptVersion;
     }
 
@@ -203,34 +203,19 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[grey]Checking for SPT updates...[/]");
+        reporter.Blank();
+        reporter.Status("Checking for SPT updates...");
 
         var availableUpdates = await sptInstallationService.CheckForSptUpdatesAsync(currentVersion, cancellationToken);
 
         if (availableUpdates.Count == 0)
         {
-            AnsiConsole.MarkupLine("[green]You are running the latest version of SPT![/]");
+            reporter.Success("You are running the latest version of SPT!");
             return;
         }
 
         // Show only the latest available update
-        var latestUpdate = availableUpdates[0];
-        var versionDisplay = $"[bold]{latestUpdate.Version.EscapeMarkup()}[/]";
-
-        // Add mod count if available
-        if (latestUpdate.ModCount > 0)
-        {
-            versionDisplay += $" [grey]({latestUpdate.ModCount} mods)[/]";
-        }
-
-        AnsiConsole.MarkupLine($"[yellow]SPT update available:[/] {versionDisplay}");
-
-        // Add link on new line if available
-        if (!string.IsNullOrWhiteSpace(latestUpdate.Link))
-        {
-            AnsiConsole.MarkupLine($"[grey]{latestUpdate.Link}[/]");
-        }
+        reporter.SptUpdateAvailable(availableUpdates[0]);
     }
 
     /// <summary>
@@ -243,7 +228,7 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        AnsiConsole.MarkupLine("[bold blue]Checking for Check Mods updates...[/]");
+        reporter.Heading("Checking for Check Mods updates...");
 
         CheckModsUpdateResult result;
         try
@@ -257,54 +242,13 @@ public sealed class ApplicationService(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Check Mods update check failed unexpectedly");
-            AnsiConsole.MarkupLine("[grey]Could not check for Check Mods updates.[/]");
-            AnsiConsole.WriteLine();
+            reporter.Status("Could not check for Check Mods updates.");
+            reporter.Blank();
             reporter.Rule();
             return;
         }
 
-        switch (result.Status)
-        {
-            case CheckModsUpdateStatus.UpdateAvailable:
-                AnsiConsole.MarkupLine(
-                    $"[yellow]A new version of Check Mods is available:[/] [bold]v{(result.LatestVersion ?? "?").EscapeMarkup()}[/] [grey](you have v{result.CurrentVersion.EscapeMarkup()})[/]"
-                );
-                if (!string.IsNullOrWhiteSpace(result.DownloadLink))
-                {
-                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink}[/]");
-                }
-                break;
-
-            case CheckModsUpdateStatus.UpToDate:
-                AnsiConsole.MarkupLine(
-                    $"[green]Check Mods is up to date (v{result.CurrentVersion.EscapeMarkup()}).[/]"
-                );
-                break;
-
-            case CheckModsUpdateStatus.IncompatibleWithSpt:
-                AnsiConsole.MarkupLine(
-                    $"[grey]A newer version of Check Mods exists but isn't compatible with SPT {sptVersion.ToString().EscapeMarkup()}.[/]"
-                );
-                break;
-
-            case CheckModsUpdateStatus.UnrecognizedBuild:
-                AnsiConsole.MarkupLine(
-                    $"[grey]You're running an unrecognized Check Mods build (v{result.CurrentVersion.EscapeMarkup()}). Consider the stable version on the Forge: v{(result.LatestVersion ?? "?").EscapeMarkup()}.[/]"
-                );
-                if (!string.IsNullOrWhiteSpace(result.DownloadLink))
-                {
-                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink}[/]");
-                }
-
-                break;
-
-            default:
-                AnsiConsole.MarkupLine("[grey]Could not check for Check Mods updates.[/]");
-                break;
-        }
-
-        AnsiConsole.WriteLine();
-        reporter.Rule();
+        reporter.CheckModsUpdate(result, sptVersion);
     }
 
     /// <summary>
