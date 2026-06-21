@@ -166,7 +166,9 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     /// <inheritdoc />
     public void ValidatingSptVersion(string version)
     {
-        AnsiConsole.Markup($"Found local SPT version [bold blue]{version.EscapeMarkup()}[/]. Validating with Forge API... ");
+        AnsiConsole.Markup(
+            $"Found local SPT version [bold blue]{version.EscapeMarkup()}[/]. Validating with Forge API... "
+        );
     }
 
     /// <inheritdoc />
@@ -211,7 +213,9 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                 break;
 
             case CheckModsUpdateStatus.UpToDate:
-                AnsiConsole.MarkupLine($"[green]Check Mods is up to date (v{result.CurrentVersion.EscapeMarkup()}).[/]");
+                AnsiConsole.MarkupLine(
+                    $"[green]Check Mods is up to date (v{result.CurrentVersion.EscapeMarkup()}).[/]"
+                );
                 break;
 
             case CheckModsUpdateStatus.IncompatibleWithSpt:

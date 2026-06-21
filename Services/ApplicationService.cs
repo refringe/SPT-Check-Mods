@@ -579,8 +579,9 @@ public sealed class ApplicationService(
             var reason = $"Version {mod.LocalVersion} requires SPT {installedApiVersion.SptVersionConstraint}";
 
             // Find the latest compatible version to suggest
-            var compatibleApiVersion = mod
-                .ApiVersions!.Where(v => SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion))
+            var compatibleApiVersion = mod.ApiVersions!.Where(v =>
+                    SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion)
+                )
                 .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
                 .FirstOrDefault();
 
