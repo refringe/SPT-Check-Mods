@@ -282,7 +282,7 @@ public partial class ForgeApiService(
                 return new ApiError($"API returned status {response.StatusCode}", (int)response.StatusCode);
             }
 
-            var jsonDoc = JsonDocument.Parse(response.Body);
+            using var jsonDoc = JsonDocument.Parse(response.Body);
 
             if (
                 !jsonDoc.RootElement.TryGetProperty("success", out var successElement)
