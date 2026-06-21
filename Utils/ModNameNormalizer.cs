@@ -1,11 +1,9 @@
-using System.Text.RegularExpressions;
-
 namespace CheckMods.Utils;
 
 /// <summary>
 /// Provides centralized name normalization for mod matching operations.
 /// </summary>
-public static partial class ModNameNormalizer
+public static class ModNameNormalizer
 {
     /// <summary>
     /// Characters to remove during normalization.
@@ -75,22 +73,6 @@ public static partial class ModNameNormalizer
     }
 
     /// <summary>
-    /// Converts a camelCase or PascalCase name to space-separated words.
-    /// Useful for improving search queries.
-    /// </summary>
-    /// <param name="name">The camelCase/PascalCase name.</param>
-    /// <returns>Space-separated words.</returns>
-    public static string CamelCaseToSpaces(string? name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return string.Empty;
-        }
-
-        return CamelCaseRegex().Replace(name, " $1").Trim();
-    }
-
-    /// <summary>
     /// Calculates the fuzzy match score between two names.
     /// </summary>
     /// <param name="name1">The first name.</param>
@@ -123,7 +105,4 @@ public static partial class ModNameNormalizer
 
         return !string.IsNullOrEmpty(normalized1) && string.Equals(normalized1, normalized2, StringComparison.Ordinal);
     }
-
-    [GeneratedRegex(@"(?<!^)([A-Z])")]
-    private static partial Regex CamelCaseRegex();
 }

@@ -11,11 +11,6 @@ public readonly record struct NotFound;
 public readonly record struct NoCompatibleVersion;
 
 /// <summary>
-/// Represents a rate limit being exceeded after retries.
-/// </summary>
-public readonly record struct RateLimited;
-
-/// <summary>
 /// Represents an invalid input parameter.
 /// </summary>
 /// <param name="ParameterName">The name of the invalid parameter.</param>
