@@ -1088,9 +1088,7 @@ public sealed class ApplicationService(
 
         AnsiConsole.MarkupLine($"[bold blue]Checking mod dependencies for {matchedCount} mods...[/]");
 
-        DependencyAnalysisResult result = null!;
-
-        await AnsiConsole
+        var result = await AnsiConsole
             .Progress()
             .Columns(
                 new SpinnerColumn(Spinner.Known.Dots) { Style = Style.Parse("blue") },
@@ -1102,7 +1100,7 @@ public sealed class ApplicationService(
             {
                 var progressTask = ctx.AddTask("[grey]Querying Forge API[/]", maxValue: matchedCount);
 
-                result = await modDependencyService.AnalyzeDependenciesAsync(
+                var analysis = await modDependencyService.AnalyzeDependenciesAsync(
                     mods,
                     installedGuids,
                     (current, _) =>
@@ -1113,6 +1111,7 @@ public sealed class ApplicationService(
                 );
 
                 progressTask.StopTask();
+                return analysis;
             });
 
         if (result.RootMods.Count == 0)
