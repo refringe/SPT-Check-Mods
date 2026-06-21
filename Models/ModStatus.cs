@@ -14,19 +14,4 @@ public enum ModStatus
     /// No matching mod was found in the Forge API.
     /// </summary>
     NoMatch,
-
-    /// <summary>
-    /// The mod is incompatible with the current SPT version or is blacklisted.
-    /// </summary>
-    Incompatible,
-
-    /// <summary>
-    /// The mod has an invalid version format that cannot be parsed.
-    /// </summary>
-    InvalidVersion,
-
-    /// <summary>
-    /// The mod matched with low confidence and needs user confirmation.
-    /// </summary>
-    NeedsConfirmation,
 }
