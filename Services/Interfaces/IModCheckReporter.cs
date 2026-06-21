@@ -28,4 +28,10 @@ public interface IModCheckReporter
 
     /// <summary>Lists mods with no Forge match (informational).</summary>
     void UnverifiedMods(List<Mod> mods);
+
+    /// <summary>Displays the dependency tree and any conflicts or missing dependencies.</summary>
+    void DependencyResults(DependencyAnalysisResult result);
+
+    /// <summary>Displays the final version summary table and update/blocked lists.</summary>
+    void VersionTable(List<Mod> mods);
 }

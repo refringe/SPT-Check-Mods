@@ -1,5 +1,7 @@
+using CheckMods.Configuration;
 using CheckMods.Models;
 using CheckMods.Services.Interfaces;
+using CheckMods.Utils;
 using Spectre.Console;
 using SPTarkov.DI.Annotations;
 
@@ -317,5 +319,381 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                 + "on Forge.[/]"
         );
         AnsiConsole.WriteLine();
+    }
+
+    /// <inheritdoc />
+    public void DependencyResults(DependencyAnalysisResult result)
+    {
+        if (result.RootMods.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[grey]No dependency information available.[/]");
+            AnsiConsole.WriteLine();
+            Rule();
+            return;
+        }
+
+        AnsiConsole.MarkupLine("[green]Dependency analysis complete.[/]");
+        AnsiConsole.WriteLine();
+
+        // Display the dependency tree
+        DependencyTree(result);
+
+        // Display conflicts (warnings section)
+        if (result.Conflicts.Count > 0)
+        {
+            DependencyConflicts(result.Conflicts);
+        }
+
+        // Display missing dependencies (download list section)
+        if (result.MissingDependencies.Count > 0)
+        {
+            MissingDependencies(result.MissingDependencies);
+        }
+
+        if (!result.HasIssues)
+        {
+            AnsiConsole.MarkupLine("[green]All dependencies are satisfied![/]");
+        }
+
+        AnsiConsole.WriteLine();
+        Rule();
+    }
+
+    /// <summary>
+    /// Displays the dependency tree using Spectre.Console Tree component.
+    /// </summary>
+    private static void DependencyTree(DependencyAnalysisResult result)
+    {
+        var tree = new Tree("[bold white]Mod Dependencies[/]");
+
+        // Sort mods alphabetically and add each with their dependencies as children
+        var sortedMods = result.RootMods.OrderBy(n => n.Mod.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+
+        foreach (var node in sortedMods)
+        {
+            var label = FormatDependencyNodeLabel(node);
+            var treeNode = tree.AddNode(label);
+
+            // Add dependencies as children recursively
+            if (node.Children.Count > 0)
+            {
+                AddDependencyChildrenToTree(treeNode, node.Children);
+            }
+        }
+
+        AnsiConsole.Write(tree);
+        AnsiConsole.WriteLine();
+    }
+
+    /// <summary>
+    /// Recursively adds dependency children to a tree node.
+    /// </summary>
+    private static void AddDependencyChildrenToTree(TreeNode parent, List<DependencyNode> children)
+    {
+        foreach (var child in children.OrderBy(c => c.Mod.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            var label = FormatDependencyNodeLabel(child);
+            var childTreeNode = parent.AddNode(label);
+
+            // Recursively add nested dependencies
+            if (child.Children.Count > 0)
+            {
+                AddDependencyChildrenToTree(childTreeNode, child.Children);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Formats the label for a dependency tree node.
+    /// </summary>
+    private static string FormatDependencyNodeLabel(DependencyNode node)
+    {
+        var name = node.Mod.DisplayName.EscapeMarkup();
+        var version = node.Mod.LocalVersion.EscapeMarkup();
+
+        // Determine status color and indicator
+        string statusIndicator;
+        string nameColor;
+
+        if (!node.IsInstalled)
+        {
+            statusIndicator = "[red](missing)[/]";
+            nameColor = "red";
+        }
+        else if (node.DependencyInfo?.Conflict == true)
+        {
+            statusIndicator = "[yellow](conflict)[/]";
+            nameColor = "yellow";
+        }
+        else
+        {
+            statusIndicator = "";
+            nameColor = "white";
+        }
+
+        // Build the label with optional link
+        string label;
+        if (!string.IsNullOrWhiteSpace(node.Mod.ApiUrl))
+        {
+            label = $"[link={node.Mod.ApiUrl}][{nameColor}]{name}[/][/] [grey]v{version}[/]";
+        }
+        else if (node.DependencyInfo != null && node.DependencyInfo.Id > 0)
+        {
+            var url = ForgeUrls.ModPage(node.DependencyInfo.Id, node.DependencyInfo.Slug);
+            label = $"[link={url}][{nameColor}]{name}[/][/] [grey]v{version}[/]";
+        }
+        else
+        {
+            label = $"[{nameColor}]{name}[/] [grey]v{version}[/]";
+        }
+
+        if (!string.IsNullOrWhiteSpace(statusIndicator))
+        {
+            label += $" {statusIndicator}";
+        }
+
+        return label;
+    }
+
+    /// <summary>
+    /// Displays dependency conflicts in the warning style.
+    /// </summary>
+    private static void DependencyConflicts(List<DependencyConflict> conflicts)
+    {
+        AnsiConsole.MarkupLine("[yellow]Dependency conflicts:[/]");
+
+        foreach (var conflict in conflicts)
+        {
+            var nameDisplay = $"[white]{conflict.ModName.EscapeMarkup()}[/]";
+
+            AnsiConsole.MarkupLine($"  {nameDisplay}");
+            AnsiConsole.MarkupLine($"    [yellow]- {conflict.Description.EscapeMarkup()}[/]");
+
+            if (conflict.DependencyInfo.Id > 0)
+            {
+                var url = ForgeUrls.ModPage(conflict.DependencyInfo.Id, conflict.DependencyInfo.Slug);
+                AnsiConsole.MarkupLine($"      [grey]View on Forge:[/] [link]{url}[/]");
+            }
+        }
+
+        AnsiConsole.WriteLine();
+    }
+
+    /// <summary>
+    /// Displays missing dependencies in the download list style.
+    /// </summary>
+    private static void MissingDependencies(List<MissingDependency> missingDeps)
+    {
+        AnsiConsole.MarkupLine("[red]Missing dependencies:[/]");
+
+        foreach (var dep in missingDeps)
+        {
+            // Link mod name to Forge page
+            string nameDisplay;
+            if (dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug))
+            {
+                var url = ForgeUrls.ModPage(dep.ModId, dep.Slug);
+                nameDisplay = $"[link={url}]{dep.Name.EscapeMarkup()}[/]";
+            }
+            else
+            {
+                nameDisplay = $"[white]{dep.Name.EscapeMarkup()}[/]";
+            }
+
+            AnsiConsole.MarkupLine($"  {nameDisplay}");
+            AnsiConsole.MarkupLine(
+                $"    [grey]Recommended version:[/] [green]{dep.RecommendedVersion.EscapeMarkup()}[/]"
+            );
+
+            if (!string.IsNullOrWhiteSpace(dep.DownloadLink))
+            {
+                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{dep.DownloadLink}[/]");
+            }
+        }
+
+        AnsiConsole.WriteLine();
+    }
+
+    /// <inheritdoc />
+    public void VersionTable(List<Mod> mods)
+    {
+        // Group by API mod ID to avoid duplicates, select the one with the highest version
+        var verifiedMods = mods.Where(m => m.IsMatched && m.LatestVersion is not null)
+            .GroupBy(m => m.ApiModId!.Value)
+            .Select(g => g.OrderByDescending(m => SemVer.ParseOrZero(m.LocalVersion)).First())
+            .ToList();
+
+        if (verifiedMods.Count == 0)
+        {
+            return;
+        }
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold blue]Checking for mod updates...[/]");
+        AnsiConsole.MarkupLine(
+            "[white]This tool depends on mod authors to use and update valid version numbers. If you notice a version number in the Current Version column that is incorrect, please contact the author of the mod to have it updated.[/]"
+        );
+        AnsiConsole.WriteLine();
+
+        var table = new Table()
+            .Title("[blue]Mod Version Summary[/]")
+            .BorderColor(Color.Grey)
+            .AddColumn("[white]Name[/]")
+            .AddColumn("[white]Author[/]")
+            .AddColumn("[white]Current Version[/]")
+            .AddColumn("[white]Latest Version[/]");
+
+        foreach (var mod in verifiedMods)
+        {
+            var (displayName, displayAuthor) = FormatModDisplayStrings(mod.DisplayName, mod.DisplayAuthor);
+
+            var latestVersionDisplay = FormatVersionDisplay(mod);
+
+            // Link mod name to Forge page if available
+            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
+                ? $"[link={mod.ApiUrl}]{displayName.EscapeMarkup()}[/]"
+                : displayName.EscapeMarkup();
+
+            table.AddRow(
+                nameDisplay,
+                displayAuthor.EscapeMarkup(),
+                mod.LocalVersion.EscapeMarkup(),
+                latestVersionDisplay
+            );
+        }
+
+        AnsiConsole.Write(table);
+
+        AnsiConsole.MarkupLine(
+            "[grey]Version colors: [green]Up to date[/] | [red]Update available[/] | [darkorange]Update blocked[/] | [blue]Newer than latest[/][/]"
+        );
+
+        // Display mods with available updates
+        var modsWithUpdates = verifiedMods.Where(m => m.UpdateStatus == UpdateStatus.UpdateAvailable).ToList();
+        if (modsWithUpdates.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[red]Updates available:[/]");
+
+            foreach (var mod in modsWithUpdates)
+            {
+                // Link mod name to Forge page if available
+                var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
+                    ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
+                    : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
+
+                AnsiConsole.MarkupLine($"  {nameDisplay}");
+                AnsiConsole.MarkupLine(
+                    $"    [grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [green]{mod.LatestVersion!.EscapeMarkup()}[/]"
+                );
+
+                if (string.IsNullOrWhiteSpace(mod.DownloadLink))
+                {
+                    continue;
+                }
+
+                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{mod.DownloadLink}[/]");
+            }
+        }
+
+        // Display mods with blocked updates
+        var modsWithBlockedUpdates = verifiedMods.Where(m => m.UpdateStatus == UpdateStatus.UpdateBlocked).ToList();
+        if (modsWithBlockedUpdates.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[darkorange]Updates blocked:[/]");
+
+            foreach (var mod in modsWithBlockedUpdates)
+            {
+                var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
+                    ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
+                    : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
+
+                AnsiConsole.MarkupLine($"  {nameDisplay}");
+                AnsiConsole.MarkupLine(
+                    $"    [grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [darkorange]{mod.LatestVersion!.EscapeMarkup()}[/]"
+                );
+
+                if (!string.IsNullOrWhiteSpace(mod.BlockReason))
+                {
+                    AnsiConsole.MarkupLine($"    [grey]Reason:[/] {FormatBlockReason(mod.BlockReason).EscapeMarkup()}");
+                }
+
+                if (mod.BlockingMods is { Count: > 0 })
+                {
+                    foreach (var blocker in mod.BlockingMods)
+                    {
+                        AnsiConsole.MarkupLine(
+                            $"    [grey]Blocked by:[/] {blocker.Name.EscapeMarkup()} [grey]({blocker.Constraint.EscapeMarkup()})[/]"
+                        );
+                    }
+                }
+            }
+        }
+
+        AnsiConsole.WriteLine();
+        Rule();
+        AnsiConsole.WriteLine();
+
+        AnsiConsole.Write(new FigletText("FIN").LeftJustified().Color(Color.Fuchsia));
+        AnsiConsole.MarkupLine("[fuchsia]Scroll up to read details about your mods![/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[grey]Pro tip:    Mod names are clickable.[/]");
+        AnsiConsole.MarkupLine("[grey]Expert tip: Read the mod page before installing or updating mods.[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine(
+            "[white]Find an issue [italic]with this tool[/]? Find Refringe on Discord, or [link=https://github.com/refringe/SPT-Check-Mods/issues/new]submit a bug report[/].[/]"
+        );
+    }
+
+    /// <summary>
+    /// Formats the version display with appropriate color coding.
+    /// </summary>
+    private static string FormatVersionDisplay(Mod mod)
+    {
+        if (mod.LatestVersion is null)
+        {
+            return "[grey]No versions found[/]";
+        }
+
+        return mod.UpdateStatus switch
+        {
+            UpdateStatus.UpToDate => $"[green]{mod.LatestVersion.EscapeMarkup()}[/]",
+            UpdateStatus.UpdateAvailable => $"[red]{mod.LatestVersion.EscapeMarkup()}[/]",
+            UpdateStatus.UpdateBlocked => $"[darkorange]{mod.LatestVersion.EscapeMarkup()}[/]",
+            UpdateStatus.NewerInstalled => $"[blue]{mod.LatestVersion.EscapeMarkup()}[/]",
+            UpdateStatus.NoVersionsFound => "[grey]No versions found[/]",
+            _ => mod.LatestVersion.EscapeMarkup(),
+        };
+    }
+
+    /// <summary>
+    /// Formats a raw block reason string from the API into a human-readable description.
+    /// </summary>
+    private static string FormatBlockReason(string reason)
+    {
+        return reason switch
+        {
+            "dependency_constraint_violation" => "A dependency has a version constraint that prevents this update",
+            "chain_dependency_conflict" => "A dependency chain conflict prevents this update",
+            _ => reason.Replace('_', ' '),
+        };
+    }
+
+    /// <summary>
+    /// Formats mod name and author strings for display with proper truncation.
+    /// </summary>
+    private static (string displayName, string displayAuthor) FormatModDisplayStrings(string modName, string author)
+    {
+        var displayName =
+            modName.Length > MatchingConstants.MaxDisplayNameLength
+                ? modName[..(MatchingConstants.MaxDisplayNameLength - 3)] + "..."
+                : modName;
+        var displayAuthor =
+            author.Length > MatchingConstants.MaxDisplayAuthorLength
+                ? author[..(MatchingConstants.MaxDisplayAuthorLength - 3)] + "..."
+                : author;
+
+        return (displayName, displayAuthor);
     }
 }
