@@ -493,7 +493,7 @@ public sealed class ApplicationService(
                 continue;
             }
 
-            selectedMod.UpdateFromApiMatch(apiResult, MatchingConstants.ExactGuidConfidence, MatchMethod.ExactGuid);
+            selectedMod.UpdateFromApiMatch(apiResult);
         }
     }
 
@@ -532,7 +532,7 @@ public sealed class ApplicationService(
             return;
         }
 
-        mod.UpdateFromApiMatch(apiResult, MatchingConstants.ExactGuidConfidence, MatchMethod.ExactGuid);
+        mod.UpdateFromApiMatch(apiResult);
     }
 
     /// <summary>

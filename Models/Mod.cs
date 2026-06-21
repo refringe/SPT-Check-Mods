@@ -151,16 +151,6 @@ public sealed class Mod
     public ModStatus Status { get; set; } = ModStatus.NoMatch;
 
     /// <summary>
-    /// The confidence score (0-100) of the API match.
-    /// </summary>
-    public int MatchConfidence { get; private set; }
-
-    /// <summary>
-    /// The method used to match this mod with the API.
-    /// </summary>
-    public MatchMethod MatchMethod { get; private set; } = MatchMethod.None;
-
-    /// <summary>
     /// Warnings encountered during scanning/loading.
     /// </summary>
     public List<string> LoadWarnings { get; init; } = [];
@@ -209,9 +199,7 @@ public sealed class Mod
     /// Updates the mod with API match data from a search result.
     /// </summary>
     /// <param name="apiResult">The API search result to populate from.</param>
-    /// <param name="confidence">The confidence score of the match (0-100).</param>
-    /// <param name="method">The method used to find this match.</param>
-    public void UpdateFromApiMatch(ModSearchResult apiResult, int confidence, MatchMethod method)
+    public void UpdateFromApiMatch(ModSearchResult apiResult)
     {
         ApiModId = apiResult.Id;
         ApiName = apiResult.Name;
@@ -221,8 +209,6 @@ public sealed class Mod
         ApiSourceCodeUrl = apiResult.SourceCodeUrl;
         ApiVersions = apiResult.Versions?.ToList().AsReadOnly();
 
-        MatchConfidence = confidence;
-        MatchMethod = method;
         Status = ModStatus.Verified;
     }
 
