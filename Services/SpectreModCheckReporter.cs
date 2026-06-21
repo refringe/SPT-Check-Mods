@@ -889,19 +889,17 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     /// </summary>
     private static string FormatVersionDisplay(Mod mod)
     {
-        if (mod.LatestVersion is null)
-        {
-            return "[grey]No versions found[/]";
-        }
+        // VersionTable only passes mods whose LatestVersion is resolved (it filters on LatestVersion is not null), so
+        // it is non-null here.
+        var latestVersion = mod.LatestVersion!;
 
         return mod.UpdateStatus switch
         {
-            UpdateStatus.UpToDate => $"[green]{mod.LatestVersion.EscapeMarkup()}[/]",
-            UpdateStatus.UpdateAvailable => $"[red]{mod.LatestVersion.EscapeMarkup()}[/]",
-            UpdateStatus.UpdateBlocked => $"[darkorange]{mod.LatestVersion.EscapeMarkup()}[/]",
-            UpdateStatus.NewerInstalled => $"[blue]{mod.LatestVersion.EscapeMarkup()}[/]",
-            UpdateStatus.NoVersionsFound => "[grey]No versions found[/]",
-            _ => mod.LatestVersion.EscapeMarkup(),
+            UpdateStatus.UpToDate => $"[green]{latestVersion.EscapeMarkup()}[/]",
+            UpdateStatus.UpdateAvailable => $"[red]{latestVersion.EscapeMarkup()}[/]",
+            UpdateStatus.UpdateBlocked => $"[darkorange]{latestVersion.EscapeMarkup()}[/]",
+            UpdateStatus.NewerInstalled => $"[blue]{latestVersion.EscapeMarkup()}[/]",
+            _ => latestVersion.EscapeMarkup(),
         };
     }
 
