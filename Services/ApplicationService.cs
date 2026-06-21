@@ -79,7 +79,7 @@ public sealed class ApplicationService(
                     misplacedReport.WrongFolder.Count,
                     misplacedReport.CrossInstalled.Count
                 );
-                DisplayMisplacedMods(misplacedReport);
+                reporter.MisplacedMods(misplacedReport);
 
                 // Full stop
                 Environment.ExitCode = 1;
@@ -343,7 +343,7 @@ public sealed class ApplicationService(
             await FetchSourceCodeUrlsForModsAsync(modsWithWarnings, sptVersion, cancellationToken);
         }
 
-        DisplayLoadingWarnings(serverMods, clientMods);
+        reporter.LoadingWarnings(serverMods, clientMods);
 
         AnsiConsole.WriteLine();
         reporter.Rule();
@@ -359,7 +359,7 @@ public sealed class ApplicationService(
             await FetchSourceCodeUrlsForPairedModsAsync(pairsWithNotes, sptVersion, cancellationToken);
         }
 
-        DisplayReconciliationResults(result);
+        reporter.ReconciliationResults(result);
 
         return result.Mods.ToList();
     }
@@ -534,233 +534,6 @@ public sealed class ApplicationService(
     }
 
     /// <summary>
-    /// Displays warnings for mods with loading issues.
-    /// </summary>
-    private static void DisplayLoadingWarnings(List<Mod> serverMods, List<Mod> clientMods)
-    {
-        var modsWithWarnings = serverMods.Concat(clientMods).Where(m => m.HasWarnings).ToList();
-
-        if (modsWithWarnings.Count == 0)
-        {
-            return;
-        }
-
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Mod loading warnings:[/]");
-
-        foreach (var mod in modsWithWarnings)
-        {
-            var modType = mod.IsServerMod ? "Server" : "Client";
-            var modName = !string.IsNullOrWhiteSpace(mod.LocalName) ? mod.LocalName : Path.GetFileName(mod.FilePath);
-
-            // Link mod name to Forge page if available
-            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                ? $"[link={mod.ApiUrl}]{modName.EscapeMarkup()}[/]"
-                : $"[white]{modName.EscapeMarkup()}[/]";
-
-            AnsiConsole.MarkupLine($"  [grey]{modType}:[/] {nameDisplay}");
-            foreach (var warning in mod.LoadWarnings)
-            {
-                AnsiConsole.MarkupLine($"    [yellow]- {warning.EscapeMarkup()}[/]");
-            }
-
-            // Show source code URL if available, otherwise show Forge mod page
-            if (!string.IsNullOrWhiteSpace(mod.ApiSourceCodeUrl))
-            {
-                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiSourceCodeUrl}[/]");
-            }
-            else if (!string.IsNullOrWhiteSpace(mod.ApiUrl))
-            {
-                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiUrl}[/]");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Displays the results of mod reconciliation.
-    /// </summary>
-    private void DisplayReconciliationResults(ModReconciliationResult result)
-    {
-        var serverCount = result.ReconciledPairs.Count + result.UnmatchedServerMods.Count;
-        var clientCount = result.ReconciledPairs.Count + result.UnmatchedClientMods.Count;
-        AnsiConsole.MarkupLine($"[grey]Comparing {serverCount} server mods with {clientCount} client mods...[/]");
-
-        if (result.ReconciledPairs.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[grey]No matching server/client mod pairs found.[/]");
-        }
-        else
-        {
-            AnsiConsole.MarkupLine($"[green]Matched {result.ReconciledPairs.Count} server/client mod pairs.[/]");
-
-            var pairsWithNotes = result.ReconciledPairs.Where(p => p.Notes.Count > 0).ToList();
-            if (pairsWithNotes.Count > 0)
-            {
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[yellow]Reconciliation warnings:[/]");
-
-                foreach (var pair in pairsWithNotes)
-                {
-                    var modName = pair.SelectedMod.LocalName;
-
-                    // Link mod name to Forge page if available
-                    var nameDisplay = !string.IsNullOrWhiteSpace(pair.SelectedMod.ApiUrl)
-                        ? $"[link={pair.SelectedMod.ApiUrl}]{modName.EscapeMarkup()}[/]"
-                        : $"[white]{modName.EscapeMarkup()}[/]";
-
-                    AnsiConsole.MarkupLine($"  {nameDisplay}");
-                    foreach (var note in pair.Notes)
-                    {
-                        AnsiConsole.MarkupLine($"    [yellow]- {note.EscapeMarkup()}[/]");
-                    }
-
-                    var reportUrl = !string.IsNullOrWhiteSpace(pair.SelectedMod.ApiSourceCodeUrl)
-                        ? pair.SelectedMod.ApiSourceCodeUrl
-                        : pair.SelectedMod.ApiUrl;
-
-                    // A GUID mismatch only happens on a name match (same name, unrelated IDs). Likely mismatched
-                    // packaging or two mods in one folder, so soften the report prompt.
-                    var guidMismatch = !string.Equals(
-                        pair.ServerMod.Guid,
-                        pair.ClientMod.Guid,
-                        StringComparison.OrdinalIgnoreCase
-                    );
-
-                    if (guidMismatch)
-                    {
-                        AnsiConsole.MarkupLine(
-                            "      [grey]Matched by name, but the IDs differ. This is either a mod packaged with mismatched GUIDs or, more likely, two different mods with one copied into the other's folder. Check that each mod sits in its own folder under BepInEx/plugins.[/]"
-                        );
-
-                        if (!string.IsNullOrWhiteSpace(reportUrl))
-                        {
-                            AnsiConsole.MarkupLine(
-                                $"      [grey]If this is wrong, report it here:[/] [link]{reportUrl}[/]"
-                            );
-                        }
-                    }
-                    else if (!string.IsNullOrWhiteSpace(reportUrl))
-                    {
-                        AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{reportUrl}[/]");
-                    }
-                }
-
-                AnsiConsole.WriteLine();
-            }
-        }
-
-        AnsiConsole.MarkupLine(
-            $"[grey]Final mod count: {result.Mods.Count} "
-                + $"(matched pairs: {result.ReconciledPairs.Count}, "
-                + $"server-only: {result.UnmatchedServerMods.Count}, "
-                + $"client-only: {result.UnmatchedClientMods.Count})[/]"
-        );
-        AnsiConsole.WriteLine();
-        reporter.Rule();
-    }
-
-    /// <summary>
-    /// Displays mods that are installed in the wrong location and instructs the user to move them. Shown right before
-    /// the workflow halts.
-    /// </summary>
-    /// <param name="report">The misplaced and cross-installed mods detected during scanning.</param>
-    private void DisplayMisplacedMods(MisplacedModReport report)
-    {
-        AnsiConsole.WriteLine();
-        reporter.Rule();
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[red bold]Improperly installed mods detected.[/]");
-        AnsiConsole.MarkupLine(
-            "[grey]The following mods are possibly installed incorrectly. Review the mod page for install instructions, move them to the correct location, and run this tool again.[/]"
-        );
-        AnsiConsole.WriteLine();
-
-        var serverInClient = report.WrongFolder.Where(m => m.IsServerMod).ToList();
-        var clientInServer = report.WrongFolder.Where(m => !m.IsServerMod).ToList();
-
-        if (serverInClient.Count > 0)
-        {
-            AnsiConsole.MarkupLine(
-                "[yellow]Server mods found in the client folder[/] [grey](BepInEx/plugins)[/][yellow]. Move them into[/] [grey]SPT/user/mods[/][yellow]:[/]"
-            );
-            foreach (var mod in serverInClient)
-            {
-                PrintMisplacedMod(mod);
-            }
-            AnsiConsole.WriteLine();
-        }
-
-        if (clientInServer.Count > 0)
-        {
-            AnsiConsole.MarkupLine(
-                "[yellow]Client mods found in the server folder[/] [grey](SPT/user/mods)[/][yellow]. Move them into[/] [grey]BepInEx/plugins[/][yellow]:[/]"
-            );
-            foreach (var mod in clientInServer)
-            {
-                PrintMisplacedMod(mod);
-            }
-            AnsiConsole.WriteLine();
-        }
-
-        foreach (var directory in report.CrossInstalled)
-        {
-            PrintCrossInstalledDirectory(directory);
-        }
-
-        AnsiConsole.MarkupLine(
-            "[red]Halting. You need to resolve the mod installation issues before this tool can continue.[/]"
-        );
-        AnsiConsole.WriteLine();
-        reporter.Rule();
-    }
-
-    /// <summary>
-    /// Prints a plugins subdirectory that contains unrelated mods. When the intruder is known it is named and the user
-    /// is told to give it its own folder. When it is ambiguous, the whole directory is surfaced for review.
-    /// </summary>
-    /// <param name="directory">The cross-installed directory to print.</param>
-    private static void PrintCrossInstalledDirectory(CrossInstalledDirectory directory)
-    {
-        if (directory.Ambiguous)
-        {
-            AnsiConsole.MarkupLine(
-                "[yellow]Unrelated mods share one folder under[/] [grey](BepInEx/plugins)[/][yellow]. One is likely in the wrong place. Review the install instructions for each:[/]"
-            );
-            AnsiConsole.MarkupLine($"  [grey]{directory.Directory.EscapeMarkup()}[/]");
-            foreach (var mod in directory.Mods)
-            {
-                PrintMisplacedMod(mod);
-            }
-        }
-        else
-        {
-            AnsiConsole.MarkupLine(
-                "[yellow]Mods found inside another mod's folder under[/] [grey](BepInEx/plugins)[/][yellow]. Review the mod's installation instructions:[/]"
-            );
-            AnsiConsole.MarkupLine($"  [grey]{directory.Directory.EscapeMarkup()}[/]");
-            foreach (var mod in directory.Misplaced)
-            {
-                PrintMisplacedMod(mod);
-            }
-        }
-
-        AnsiConsole.WriteLine();
-    }
-
-    /// <summary>
-    /// Prints a single misplaced mod entry.
-    /// </summary>
-    /// <param name="mod">The misplaced mod to print.</param>
-    private static void PrintMisplacedMod(MisplacedMod mod)
-    {
-        var name = !string.IsNullOrWhiteSpace(mod.Name) ? mod.Name : Path.GetFileName(mod.FilePath);
-        var guidSuffix = !string.IsNullOrWhiteSpace(mod.Guid) ? $" [grey]({mod.Guid.EscapeMarkup()})[/]" : string.Empty;
-
-        AnsiConsole.MarkupLine($"  [white]{name.EscapeMarkup()}[/]{guidSuffix}");
-        AnsiConsole.MarkupLine($"    [grey]{mod.FilePath.EscapeMarkup()}[/]");
-    }
-
-    /// <summary>
     /// Matches mods with the Forge API.
     /// </summary>
     /// <param name="mods">Mods to match.</param>
@@ -803,47 +576,9 @@ public sealed class ApplicationService(
         AnsiConsole.MarkupLine("[green]Forge verification complete![/]");
 
         // Display warnings for mods that couldn't be verified
-        DisplayUnverifiedModWarnings(mods);
+        reporter.UnverifiedMods(mods);
 
         reporter.Rule();
-    }
-
-    /// <summary>
-    /// Lists mods with no Forge match. Informational: a mod may be unpublished, or a plugin bundled
-    /// inside another mod's download.
-    /// </summary>
-    /// <param name="mods">Mods to check for verification status.</param>
-    private static void DisplayUnverifiedModWarnings(List<Mod> mods)
-    {
-        var unverifiedMods = mods.Where(m => m.Status == ModStatus.NoMatch).ToList();
-
-        if (unverifiedMods.Count == 0)
-        {
-            return;
-        }
-
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Mods not found on Forge:[/]");
-
-        foreach (var mod in unverifiedMods)
-        {
-            var modDisplayName = mod.DisplayName.EscapeMarkup();
-            if (!string.IsNullOrWhiteSpace(mod.DisplayAuthor))
-            {
-                modDisplayName += $" by {mod.DisplayAuthor.EscapeMarkup()}";
-            }
-
-            AnsiConsole.MarkupLine($"  [white]{modDisplayName}[/]");
-        }
-
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(
-            "  [grey]These weren't matched to a Forge listing. That's expected for a mod that isn't "
-                + "published on Forge, or for a plugin bundled inside another mod you already have "
-                + "installed. No action is needed unless you expected one of these to be its own mod "
-                + "on Forge.[/]"
-        );
-        AnsiConsole.WriteLine();
     }
 
     /// <summary>

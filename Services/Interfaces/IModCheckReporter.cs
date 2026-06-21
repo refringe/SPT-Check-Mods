@@ -1,3 +1,5 @@
+using CheckMods.Models;
+
 namespace CheckMods.Services.Interfaces;
 
 /// <summary>
@@ -14,4 +16,16 @@ public interface IModCheckReporter
 
     /// <summary>Writes a blank line.</summary>
     void Blank();
+
+    /// <summary>Displays warnings for mods with loading issues.</summary>
+    void LoadingWarnings(List<Mod> serverMods, List<Mod> clientMods);
+
+    /// <summary>Displays the results of mod reconciliation.</summary>
+    void ReconciliationResults(ModReconciliationResult result);
+
+    /// <summary>Displays mods installed in the wrong location, shown right before the workflow halts.</summary>
+    void MisplacedMods(MisplacedModReport report);
+
+    /// <summary>Lists mods with no Forge match (informational).</summary>
+    void UnverifiedMods(List<Mod> mods);
 }
