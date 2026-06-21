@@ -107,7 +107,6 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
             return;
         }
 
-        _initialized = true;
         EnsureLogDirectoryExists();
         RotateLogsIfNeeded();
 
@@ -115,6 +114,12 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
         // FileShare.ReadWrite lets other processes (e.g. a second instance) read or append concurrently.
         var stream = new FileStream(_logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
         _writer = new StreamWriter(stream) { AutoFlush = true };
+
+        // Latch only after the handle is open. If the open above throws (e.g. a brief exclusive lock at startup),
+        // WriteLog's catch swallows it but _initialized stays false, so the next write retries rather than leaving
+        // file logging permanently dead for the session. This must precede WriteStartupBanner, whose nested
+        // WriteLog re-enters EnsureInitialized and would otherwise recurse.
+        _initialized = true;
 
         WriteStartupBanner();
     }
