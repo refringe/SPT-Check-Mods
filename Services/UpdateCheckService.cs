@@ -118,7 +118,7 @@ public sealed class UpdateCheckService(
         }
 
         var latestStable = mod
-            .Versions.Select(v => (Raw: v, Parsed: TryParseVersion(v.Version)))
+            .Versions.Select(v => (Raw: v, Parsed: SemVer.TryParse(v.Version)))
             .Where(x => x.Parsed is not null && string.IsNullOrEmpty(x.Parsed!.PreRelease))
             .OrderByDescending(x => x.Parsed)
             .Select(x => x.Raw)
@@ -136,25 +136,5 @@ public sealed class UpdateCheckService(
             latestStable.Version,
             downloadLink
         );
-    }
-
-    /// <summary>
-    /// Parses a semantic version string, returning null when it is invalid.
-    /// </summary>
-    private static SemanticVersioning.Version? TryParseVersion(string? version)
-    {
-        if (string.IsNullOrWhiteSpace(version))
-        {
-            return null;
-        }
-
-        try
-        {
-            return new SemanticVersioning.Version(version);
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

@@ -189,8 +189,8 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
         }
 
         // Compare versions
-        var serverVersion = ParseVersion(serverMod.LocalVersion);
-        var clientVersion = ParseVersion(clientMod.LocalVersion);
+        var serverVersion = SemVer.TryParse(serverMod.LocalVersion);
+        var clientVersion = SemVer.TryParse(clientMod.LocalVersion);
 
         if (serverVersion is not null && clientVersion is not null)
         {
@@ -223,25 +223,5 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
 
         // Versions are equal or both invalid - prefer server mod (has SPT version info)
         return (serverMod, notes);
-    }
-
-    /// <summary>
-    /// Parses a version string, returning null if invalid.
-    /// </summary>
-    private static SemanticVersioning.Version? ParseVersion(string version)
-    {
-        if (string.IsNullOrWhiteSpace(version))
-        {
-            return null;
-        }
-
-        try
-        {
-            return new SemanticVersioning.Version(version);
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

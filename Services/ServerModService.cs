@@ -1,5 +1,6 @@
 using CheckMods.Models;
 using CheckMods.Services.Interfaces;
+using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
 using SPTarkov.DI.Annotations;
@@ -86,32 +87,10 @@ public sealed class ServerModService(
         return versionsResult.Match(
             versions =>
             {
-                // Filter to versions newer than the current version
+                // Filter to versions newer than the current version, skipping any that can't be parsed.
                 var newerVersions = versions
-                    .Where(v =>
-                    {
-                        try
-                        {
-                            var semVer = new SemanticVersioning.Version(v.Version);
-                            return semVer > currentVersion;
-                        }
-                        catch
-                        {
-                            // Skip versions that can't be parsed
-                            return false;
-                        }
-                    })
-                    .OrderByDescending(v =>
-                    {
-                        try
-                        {
-                            return new SemanticVersioning.Version(v.Version);
-                        }
-                        catch
-                        {
-                            return new SemanticVersioning.Version(0, 0, 0);
-                        }
-                    })
+                    .Where(v => SemVer.TryParse(v.Version) is { } semVer && semVer > currentVersion)
+                    .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
                     .ToList();
 
                 logger.LogDebug("Found {Count} newer SPT versions", newerVersions.Count);

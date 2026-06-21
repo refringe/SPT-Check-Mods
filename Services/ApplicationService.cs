@@ -985,17 +985,7 @@ public sealed class ApplicationService(
                             return false;
                         }
                     })
-                    .OrderByDescending(v =>
-                    {
-                        try
-                        {
-                            return new SemanticVersioning.Version(v.Version);
-                        }
-                        catch
-                        {
-                            return new SemanticVersioning.Version(0, 0, 0);
-                        }
-                    })
+                    .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
                     .FirstOrDefault();
 
                 if (compatibleApiVersion is not null)
@@ -1321,7 +1311,7 @@ public sealed class ApplicationService(
         // Group by API mod ID to avoid duplicates, select the one with the highest version
         var verifiedMods = mods.Where(m => m.IsMatched && m.LatestVersion is not null)
             .GroupBy(m => m.ApiModId!.Value)
-            .Select(g => g.OrderByDescending(m => GetVersionForComparison(m.LocalVersion)).First())
+            .Select(g => g.OrderByDescending(m => SemVer.ParseOrZero(m.LocalVersion)).First())
             .ToList();
 
         if (verifiedMods.Count == 0)
@@ -1496,26 +1486,6 @@ public sealed class ApplicationService(
                 : author;
 
         return (displayName, displayAuthor);
-    }
-
-    /// <summary>
-    /// Parses a version string for comparison purposes.
-    /// </summary>
-    private static SemanticVersioning.Version GetVersionForComparison(string versionString)
-    {
-        if (string.IsNullOrWhiteSpace(versionString))
-        {
-            return new SemanticVersioning.Version(0, 0, 0);
-        }
-
-        try
-        {
-            return new SemanticVersioning.Version(versionString);
-        }
-        catch
-        {
-            return new SemanticVersioning.Version(0, 0, 0);
-        }
     }
 
     /// <summary>

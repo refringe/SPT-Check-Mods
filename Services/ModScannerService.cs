@@ -3,6 +3,7 @@ using System.Runtime.Loader;
 using CheckMods.Configuration;
 using CheckMods.Models;
 using CheckMods.Services.Interfaces;
+using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
@@ -1118,15 +1119,7 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
 
     private static bool IsValidVersion(string version)
     {
-        try
-        {
-            _ = new SemanticVersioning.Version(version);
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
+        return SemVer.TryParse(version) is not null;
     }
 
     #endregion
