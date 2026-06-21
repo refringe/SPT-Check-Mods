@@ -150,6 +150,12 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <inheritdoc />
+    public void ValidatingSptVersion(string version)
+    {
+        AnsiConsole.Markup($"Found local SPT version [bold blue]{version.EscapeMarkup()}[/]. Validating with Forge API... ");
+    }
+
+    /// <inheritdoc />
     public void SptVersionValidated(string version)
     {
         AnsiConsole.MarkupLine($"[green]Successfully validated SPT Version:[/] [bold]{version.EscapeMarkup()}[/]");

@@ -44,6 +44,9 @@ public interface IModCheckReporter
     /// <summary>Reports that the provided directory does not exist.</summary>
     void DirectoryDoesNotExist(string path);
 
+    /// <summary>Reports the local SPT version and that validation is in progress (no trailing newline).</summary>
+    void ValidatingSptVersion(string version);
+
     /// <summary>Reports that the SPT version was validated.</summary>
     void SptVersionValidated(string version);
 

@@ -2,7 +2,6 @@ using CheckMods.Models;
 using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
-using Spectre.Console;
 using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
@@ -14,6 +13,7 @@ namespace CheckMods.Services;
 public sealed class SptInstallationService(
     IForgeApiService forgeApiService,
     IModScannerService scannerService,
+    IModCheckReporter reporter,
     ILogger<SptInstallationService> logger
 ) : ISptInstallationService
 {
@@ -29,8 +29,8 @@ public sealed class SptInstallationService(
         if (!File.Exists(coreDllPath))
         {
             logger.LogError("SPT core DLL not found: {CoreDllPath}", coreDllPath);
-            AnsiConsole.MarkupLine(
-                "[red]Error: Could not find SPT installation. Run this file in your root SPT directory, or provide the SPT path as an argument.[/]"
+            reporter.Error(
+                "Error: Could not find SPT installation. Run this file in your root SPT directory, or provide the SPT path as an argument."
             );
             return null;
         }
@@ -40,15 +40,13 @@ public sealed class SptInstallationService(
         if (string.IsNullOrWhiteSpace(localSptVersionStr))
         {
             logger.LogError("Could not extract SPT version from core DLL");
-            AnsiConsole.MarkupLine("[red]Error: SPT version not found in SPTarkov.Server.Core.dll.[/]");
+            reporter.Error("Error: SPT version not found in SPTarkov.Server.Core.dll.");
             return null;
         }
 
         logger.LogDebug("Found local SPT version: {SptVersion}", localSptVersionStr);
 
-        AnsiConsole.Markup(
-            $"Found local SPT version [bold blue]{localSptVersionStr}[/]. Validating with Forge API... "
-        );
+        reporter.ValidatingSptVersion(localSptVersionStr);
 
         var validationResult = await forgeApiService.ValidateSptVersionAsync(localSptVersionStr, cancellationToken);
 
@@ -63,14 +61,14 @@ public sealed class SptInstallationService(
             // Provide more specific error messages based on the result type
             validationResult.Switch(
                 _ => { }, // Success - handled above
-                _ => AnsiConsole.MarkupLine("[red]Failed. SPT version not recognized by Forge API.[/]"),
-                apiError => AnsiConsole.MarkupLine($"[red]Failed. API error: {apiError.Message.EscapeMarkup()}[/]")
+                _ => reporter.Error("Failed. SPT version not recognized by Forge API."),
+                apiError => reporter.Error($"Failed. API error: {apiError.Message}")
             );
 
             return null;
         }
 
-        AnsiConsole.MarkupLine("[green]OK[/]");
+        reporter.Success("OK");
         return new SemanticVersioning.Version(localSptVersionStr);
     }
 
