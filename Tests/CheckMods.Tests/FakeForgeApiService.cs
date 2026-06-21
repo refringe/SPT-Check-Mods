@@ -16,6 +16,12 @@ internal sealed class FakeForgeApiService : IForgeApiService
     /// <summary>Handler for name searches (server and client). Defaults to an empty result list.</summary>
     public Func<string, OneOf<List<ModSearchResult>, ApiError>>? OnSearch { get; set; }
 
+    /// <summary>Handler for the batch updates endpoint. Required by tests that call it.</summary>
+    public Func<OneOf<ModUpdatesData, NotFound, ApiError>>? OnGetModUpdates { get; set; }
+
+    /// <summary>Handler for by-ID lookups. Required by tests that call it.</summary>
+    public Func<int, OneOf<ModSearchResult, NotFound, InvalidInput, ApiError>>? OnGetModById { get; set; }
+
     public Task<OneOf<ModSearchResult, NotFound, NoCompatibleVersion, ApiError>> GetModByGuidAsync(
         string modGuid,
         SemanticVersioning.Version sptVersion,
@@ -62,13 +68,29 @@ internal sealed class FakeForgeApiService : IForgeApiService
     public Task<OneOf<ModSearchResult, NotFound, InvalidInput, ApiError>> GetModByIdAsync(
         int modId,
         CancellationToken cancellationToken = default
-    ) => throw new NotSupportedException();
+    )
+    {
+        if (OnGetModById is null)
+        {
+            throw new NotSupportedException();
+        }
+
+        return Task.FromResult(OnGetModById(modId));
+    }
 
     public Task<OneOf<ModUpdatesData, NotFound, ApiError>> GetModUpdatesAsync(
         IEnumerable<(int ModId, string CurrentVersion)> modUpdates,
         SemanticVersioning.Version sptVersion,
         CancellationToken cancellationToken = default
-    ) => throw new NotSupportedException();
+    )
+    {
+        if (OnGetModUpdates is null)
+        {
+            throw new NotSupportedException();
+        }
+
+        return Task.FromResult(OnGetModUpdates());
+    }
 
     public Task<OneOf<List<ModDependency>, NotFound, ApiError>> GetModDependenciesAsync(
         IEnumerable<(string Identifier, string Version)> modVersions,
