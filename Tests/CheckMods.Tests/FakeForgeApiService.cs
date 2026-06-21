@@ -22,6 +22,9 @@ internal sealed class FakeForgeApiService : IForgeApiService
     /// <summary>Handler for by-ID lookups. Required by tests that call it.</summary>
     public Func<int, OneOf<ModSearchResult, NotFound, InvalidInput, ApiError>>? OnGetModById { get; set; }
 
+    /// <summary>Handler for the dependencies endpoint, keyed by the first requested identifier (the mod ID).</summary>
+    public Func<string, OneOf<List<ModDependency>, NotFound, ApiError>>? OnGetModDependencies { get; set; }
+
     public Task<OneOf<ModSearchResult, NotFound, NoCompatibleVersion, ApiError>> GetModByGuidAsync(
         string modGuid,
         SemanticVersioning.Version sptVersion,
@@ -95,5 +98,14 @@ internal sealed class FakeForgeApiService : IForgeApiService
     public Task<OneOf<List<ModDependency>, NotFound, ApiError>> GetModDependenciesAsync(
         IEnumerable<(string Identifier, string Version)> modVersions,
         CancellationToken cancellationToken = default
-    ) => throw new NotSupportedException();
+    )
+    {
+        if (OnGetModDependencies is null)
+        {
+            throw new NotSupportedException();
+        }
+
+        var identifier = modVersions.Select(m => m.Identifier).FirstOrDefault() ?? string.Empty;
+        return Task.FromResult(OnGetModDependencies(identifier));
+    }
 }
