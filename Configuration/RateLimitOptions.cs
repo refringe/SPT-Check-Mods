@@ -11,11 +11,6 @@ namespace CheckMods.Configuration;
 public class RateLimitOptions
 {
     /// <summary>
-    /// The configuration section name for binding from appsettings.
-    /// </summary>
-    public const string SectionName = "RateLimit";
-
-    /// <summary>
     /// Maximum requests allowed within the burst window. Kept below the server's burst limit (40 / 10s) for margin.
     /// </summary>
     public int BurstLimit { get; set; } = 35;

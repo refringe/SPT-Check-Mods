@@ -8,11 +8,6 @@ namespace CheckMods.Configuration;
 public class LoggingOptions
 {
     /// <summary>
-    /// The configuration section name for binding from appsettings.
-    /// </summary>
-    public const string SectionName = "Logging";
-
-    /// <summary>
     /// Whether file logging is enabled. Default is true.
     /// </summary>
     public bool EnableFileLogging { get; set; } = true;

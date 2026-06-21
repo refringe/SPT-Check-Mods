@@ -6,11 +6,6 @@ namespace CheckMods.Configuration;
 public class ModScannerOptions
 {
     /// <summary>
-    /// The configuration section name for binding from appsettings.
-    /// </summary>
-    public const string SectionName = "ModScanner";
-
-    /// <summary>
     /// Maximum DLL file size in bytes to scan (default: 100MB).
     /// Files larger than this are skipped.
     /// </summary>
