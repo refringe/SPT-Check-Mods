@@ -173,6 +173,8 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
         var modList = mods.ToList();
         var totalCount = modList.Count;
         var completedCount = 0;
+        var failureCount = 0;
+        Exception? firstFailure = null;
 
         var tasks = modList.Select(async mod =>
         {
@@ -186,8 +188,13 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
             }
             catch (Exception ex)
             {
-                // Isolate per-mod failures: leave this mod unmatched rather than failing the whole batch.
+                // Isolate per-mod failures: leave this mod cleanly unmatched rather than failing the whole batch.
+                // An exception here is always abnormal - network/API errors are handled inside MatchModAsync and
+                // never throw - so remember it to surface a systemic failure once the batch completes.
                 logger.LogWarning(ex, "Failed to match mod: {ModName}", mod.LocalName);
+                mod.MarkUnmatched();
+                Interlocked.Increment(ref failureCount);
+                Interlocked.CompareExchange(ref firstFailure, ex, null);
             }
 
             var current = Interlocked.Increment(ref completedCount);
@@ -197,6 +204,17 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
         });
 
         var results = await Task.WhenAll(tasks);
+
+        // When every mod throws, matching is broken systemically (a bug or environment fault that hits them all).
+        // Surface it instead of silently reporting every mod as "not found on Forge".
+        if (totalCount > 0 && failureCount == totalCount)
+        {
+            throw new InvalidOperationException(
+                $"Failed to match any of the {totalCount} mods against the Forge API.",
+                firstFailure
+            );
+        }
+
         return results;
     }
 
