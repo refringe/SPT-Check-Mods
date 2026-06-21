@@ -203,9 +203,10 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
 
                 plugins.Add(new PluginDll(dllPath, plugin, assembly.GetName().Name, referencedNames));
             }
-            catch
+            catch (Exception ex)
             {
                 // Skip DLLs that can't be read
+                logger.LogDebug(ex, "Skipping unreadable plugin DLL: {DllPath}", dllPath);
             }
         }
 
@@ -733,9 +734,10 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Not a client mod
+            logger.LogDebug(ex, "Could not inspect DLL as a client mod: {DllPath}", dllPath);
         }
 
         return null;
@@ -751,9 +753,11 @@ public sealed class ModScannerService(IOptions<ModScannerOptions> options, ILogg
         {
             return ExtractServerModMetadata(dllPath, sptPath);
         }
-        catch
+        catch (Exception ex)
         {
-            return null; // Not a server mod
+            // Not a server mod
+            logger.LogDebug(ex, "Could not inspect DLL as a server mod: {DllPath}", dllPath);
+            return null;
         }
     }
 
