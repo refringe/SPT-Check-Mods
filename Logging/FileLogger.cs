@@ -91,6 +91,7 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
     private readonly LoggingOptions _options = options.Value;
     private readonly object _writeLock = new();
     private readonly string _logFilePath = LoggingOptions.CurrentLogFilePath;
+    private StreamWriter? _writer;
     private bool _disposed;
     private bool _initialized;
 
@@ -109,6 +110,12 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
         _initialized = true;
         EnsureLogDirectoryExists();
         RotateLogsIfNeeded();
+
+        // Keep a single shared, auto-flushing handle open for the session rather than reopening the file per line.
+        // FileShare.ReadWrite lets other processes (e.g. a second instance) read or append concurrently.
+        var stream = new FileStream(_logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+        _writer = new StreamWriter(stream) { AutoFlush = true };
+
         WriteStartupBanner();
     }
 
@@ -129,8 +136,7 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
             try
             {
                 EnsureInitialized();
-                RotateLogsIfNeeded();
-                File.AppendAllText(_logFilePath, message);
+                _writer?.Write(message);
             }
             catch
             {
@@ -222,6 +228,13 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
         }
 
         _disposed = true;
+
+        lock (_writeLock)
+        {
+            _writer?.Dispose();
+            _writer = null;
+        }
+
         _loggers.Clear();
     }
 }
