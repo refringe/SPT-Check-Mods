@@ -176,7 +176,19 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
 
         var tasks = modList.Select(async mod =>
         {
-            await MatchModAsync(mod, sptVersion, cancellationToken);
+            try
+            {
+                await MatchModAsync(mod, sptVersion, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Isolate per-mod failures: leave this mod unmatched rather than failing the whole batch.
+                logger.LogWarning(ex, "Failed to match mod: {ModName}", mod.LocalName);
+            }
 
             var current = Interlocked.Increment(ref completedCount);
             progressCallback?.Invoke(mod, current, totalCount);
