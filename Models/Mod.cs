@@ -137,11 +137,6 @@ public sealed class Mod
     public bool IsLocalSptIncompatible { get; private set; }
 
     /// <summary>
-    /// Download link for a compatible version when the current install is SPT-incompatible.
-    /// </summary>
-    public string? CompatibleVersionDownloadLink { get; private set; }
-
-    /// <summary>
     /// The compatible version string when a compatible version exists.
     /// </summary>
     public string? CompatibleVersionString { get; private set; }
@@ -279,13 +274,11 @@ public sealed class Mod
     /// </summary>
     /// <param name="reason">The reason for incompatibility.</param>
     /// <param name="compatibleVersion">The version string of a compatible version, if available.</param>
-    /// <param name="downloadLink">Download link for the compatible version, if available.</param>
-    public void SetLocalSptIncompatible(string reason, string? compatibleVersion = null, string? downloadLink = null)
+    public void SetLocalSptIncompatible(string reason, string? compatibleVersion = null)
     {
         IsLocalSptIncompatible = true;
         IncompatibilityReason = reason;
         CompatibleVersionString = compatibleVersion;
-        CompatibleVersionDownloadLink = downloadLink;
     }
 
     #endregion

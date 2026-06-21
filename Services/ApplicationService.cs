@@ -967,7 +967,6 @@ public sealed class ApplicationService(
 
                 // Find a compatible version to suggest
                 string? compatibleVersion = null;
-                string? downloadLink = null;
 
                 var compatibleApiVersion = mod.ApiVersions!.Where(v =>
                     {
@@ -1002,10 +1001,9 @@ public sealed class ApplicationService(
                 if (compatibleApiVersion is not null)
                 {
                     compatibleVersion = compatibleApiVersion.Version;
-                    downloadLink = compatibleApiVersion.Link;
                 }
 
-                mod.SetLocalSptIncompatible(reason, compatibleVersion, downloadLink);
+                mod.SetLocalSptIncompatible(reason, compatibleVersion);
             }
             catch
             {
