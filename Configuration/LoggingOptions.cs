@@ -28,6 +28,12 @@ public class LoggingOptions
     public int RetainedFileCount { get; set; } = 3;
 
     /// <summary>
+    /// The full path to the active log file. Defaults to <see cref="CurrentLogFilePath"/>; overridable (e.g. by tests)
+    /// to redirect logging to an isolated location.
+    /// </summary>
+    public string LogFilePath { get; set; } = CurrentLogFilePath;
+
+    /// <summary>
     /// Gets the path to the log directory (same location as API key file).
     /// </summary>
     public static string LogDirectory

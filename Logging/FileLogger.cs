@@ -90,7 +90,7 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
     private readonly ConcurrentDictionary<string, FileLogger> _loggers = new(StringComparer.OrdinalIgnoreCase);
     private readonly LoggingOptions _options = options.Value;
     private readonly object _writeLock = new();
-    private readonly string _logFilePath = LoggingOptions.CurrentLogFilePath;
+    private readonly string _logFilePath = options.Value.LogFilePath;
     private StreamWriter? _writer;
     private bool _disposed;
     private bool _initialized;
