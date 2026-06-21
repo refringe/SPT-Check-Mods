@@ -69,8 +69,9 @@ public class Program
             AnsiConsole.MarkupLine($"[grey]Check Mods v{VersionInfo.SemVer} (build {VersionInfo.GitHash})[/]");
             AnsiConsole.MarkupLine($"[grey]Log file: {LoggingOptions.CurrentLogFilePath}[/]");
 
-            // Wait for user input (if not manually cancelled)
-            if (!_wasCancelled)
+            // Wait for user input (if not manually cancelled and the console is interactive). When input is
+            // redirected (CI, piping) there is no interactive console, and Console.KeyAvailable/ReadKey would throw.
+            if (!_wasCancelled && !Console.IsInputRedirected)
             {
                 // Drain any keystrokes buffered during the run so ReadKey actually waits.
                 while (Console.KeyAvailable)
