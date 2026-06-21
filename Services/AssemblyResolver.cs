@@ -7,7 +7,7 @@ namespace CheckMods.Services;
 /// Custom assembly resolver that handles missing assemblies gracefully for BepInEx plugin scanning.
 /// </summary>
 /// <param name="dllPath">Path to the DLL being analyzed.</param>
-public class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
+public sealed class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
 {
     private readonly PathAssemblyResolver _pathResolver = new(BuildMinimalAssemblySearchPaths(dllPath));
 

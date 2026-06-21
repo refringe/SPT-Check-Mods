@@ -20,7 +20,7 @@ namespace CheckMods.Services;
 /// This service is NOT decorated with [Injectable] because it requires special registration via AddHttpClient
 /// for proper HttpClient lifecycle management. It is registered manually in ServiceCollectionExtensions.
 /// </remarks>
-public partial class ForgeApiService(
+public sealed partial class ForgeApiService(
     HttpClient httpClient,
     IRateLimitService rateLimitService,
     IMemoryCache cache,
