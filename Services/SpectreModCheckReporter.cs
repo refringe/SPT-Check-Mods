@@ -273,10 +273,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
         foreach (var mod in incompatibleMods)
         {
-            // Link mod name to Forge page if available
-            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
-                : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
+            var nameDisplay = FormatModLink(mod.DisplayName, mod.ApiUrl);
 
             AnsiConsole.MarkupLine($"  {nameDisplay}");
             AnsiConsole.MarkupLine($"    [yellow]- {mod.IncompatibilityReason?.EscapeMarkup()}[/]");
@@ -325,10 +322,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             var modType = mod.IsServerMod ? "Server" : "Client";
             var modName = !string.IsNullOrWhiteSpace(mod.LocalName) ? mod.LocalName : Path.GetFileName(mod.FilePath);
 
-            // Link mod name to Forge page if available
-            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                ? $"[link={mod.ApiUrl}]{modName.EscapeMarkup()}[/]"
-                : $"[white]{modName.EscapeMarkup()}[/]";
+            var nameDisplay = FormatModLink(modName, mod.ApiUrl);
 
             AnsiConsole.MarkupLine($"  [grey]{modType}:[/] {nameDisplay}");
             foreach (var warning in mod.LoadWarnings)
@@ -373,10 +367,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                 {
                     var modName = pair.SelectedMod.LocalName;
 
-                    // Link mod name to Forge page if available
-                    var nameDisplay = !string.IsNullOrWhiteSpace(pair.SelectedMod.ApiUrl)
-                        ? $"[link={pair.SelectedMod.ApiUrl}]{modName.EscapeMarkup()}[/]"
-                        : $"[white]{modName.EscapeMarkup()}[/]";
+                    var nameDisplay = FormatModLink(modName, pair.SelectedMod.ApiUrl);
 
                     AnsiConsole.MarkupLine($"  {nameDisplay}");
                     foreach (var note in pair.Notes)
@@ -790,10 +781,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
             var latestVersionDisplay = FormatVersionDisplay(mod);
 
-            // Link mod name to Forge page if available
-            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                ? $"[link={mod.ApiUrl}]{displayName.EscapeMarkup()}[/]"
-                : displayName.EscapeMarkup();
+            var nameDisplay = FormatModLink(displayName, mod.ApiUrl, colorPlainNameWhite: false);
 
             table.AddRow(
                 nameDisplay,
@@ -818,10 +806,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
             foreach (var mod in modsWithUpdates)
             {
-                // Link mod name to Forge page if available
-                var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                    ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
-                    : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
+                var nameDisplay = FormatModLink(mod.DisplayName, mod.ApiUrl);
 
                 AnsiConsole.MarkupLine($"  {nameDisplay}");
                 AnsiConsole.MarkupLine(
@@ -846,9 +831,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
             foreach (var mod in modsWithBlockedUpdates)
             {
-                var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                    ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
-                    : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
+                var nameDisplay = FormatModLink(mod.DisplayName, mod.ApiUrl);
 
                 AnsiConsole.MarkupLine($"  {nameDisplay}");
                 AnsiConsole.MarkupLine(
@@ -936,5 +919,27 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                 : author;
 
         return (displayName, displayAuthor);
+    }
+
+    /// <summary>
+    /// Renders a mod name as a clickable Forge link when an API URL is available, otherwise as plain text. The name
+    /// is markup-escaped internally, so callers pass the raw name.
+    /// </summary>
+    /// <param name="name">The raw mod name to display.</param>
+    /// <param name="apiUrl">The Forge mod page URL, or null/empty when none is known.</param>
+    /// <param name="colorPlainNameWhite">
+    /// When true (the default), the non-linked fallback is wrapped in white; table cells that rely on the default
+    /// cell color pass false.
+    /// </param>
+    private static string FormatModLink(string name, string? apiUrl, bool colorPlainNameWhite = true)
+    {
+        var escaped = name.EscapeMarkup();
+
+        if (!string.IsNullOrWhiteSpace(apiUrl))
+        {
+            return $"[link={apiUrl}]{escaped}[/]";
+        }
+
+        return colorPlainNameWhite ? $"[white]{escaped}[/]" : escaped;
     }
 }
