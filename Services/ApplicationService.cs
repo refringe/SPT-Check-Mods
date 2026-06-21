@@ -543,54 +543,73 @@ public sealed class ApplicationService(
 
         foreach (var mod in matchedMods)
         {
-            // Find the version that matches the installed local version
-            var installedApiVersion = mod.ApiVersions!.FirstOrDefault(v =>
-                v.Version.Equals(mod.LocalVersion, StringComparison.OrdinalIgnoreCase)
-            );
-
-            if (installedApiVersion == null)
+            try
             {
-                // Couldn't find the installed version in the API versions
-                continue;
+                CheckModSptCompatibility(mod, sptVersion);
             }
-
-            // Check if the installed version's SPT constraint is compatible with the installed SPT version
-            if (string.IsNullOrWhiteSpace(installedApiVersion.SptVersionConstraint))
+            catch (Exception ex)
             {
-                continue;
+                // Isolate per-mod failures: an exotic version range or unexpected API data shouldn't abort the whole
+                // run and dump a stack trace. Skip this mod and carry on with the rest.
+                logger.LogWarning(ex, "Failed to check SPT compatibility for mod: {ModName}", mod.DisplayName);
+                reporter.Warning($"Could not verify SPT compatibility for {mod.DisplayName}.");
             }
-
-            if (!SemanticVersioning.Range.TryParse(installedApiVersion.SptVersionConstraint, out var range))
-            {
-                // The constraint from Forge can't be parsed, so compatibility can't be evaluated. Surface it now:
-                // LoadWarnings are already rendered earlier in the run, so adding to them here would be invisible.
-                reporter.Warning(
-                    $"Could not verify SPT compatibility for {mod.DisplayName}: "
-                        + $"Forge reported an invalid version constraint ({installedApiVersion.SptVersionConstraint})."
-                );
-                continue;
-            }
-
-            if (range.IsSatisfied(sptVersion))
-            {
-                // The installed version is compatible - no issue
-                continue;
-            }
-
-            // The installed version is NOT compatible with the installed SPT version
-            var reason = $"Version {mod.LocalVersion} requires SPT {installedApiVersion.SptVersionConstraint}";
-
-            // Find the latest compatible version to suggest
-            var compatibleApiVersion = mod.ApiVersions!.Where(v =>
-                    SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion)
-                )
-                .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
-                .FirstOrDefault();
-
-            mod.SetLocalSptIncompatible(reason, compatibleApiVersion?.Version);
         }
 
         reporter.VersionCompatibilityResults(mods, sptVersion);
+    }
+
+    /// <summary>
+    /// Evaluates a single matched mod's installed version against the installed SPT version, flagging it when the
+    /// constraint can't be parsed or isn't satisfied.
+    /// </summary>
+    /// <param name="mod">The matched mod to evaluate.</param>
+    /// <param name="sptVersion">The installed SPT version.</param>
+    private void CheckModSptCompatibility(Mod mod, SemanticVersioning.Version sptVersion)
+    {
+        // Find the version that matches the installed local version
+        var installedApiVersion = mod.ApiVersions!.FirstOrDefault(v =>
+            v.Version.Equals(mod.LocalVersion, StringComparison.OrdinalIgnoreCase)
+        );
+
+        if (installedApiVersion == null)
+        {
+            // Couldn't find the installed version in the API versions
+            return;
+        }
+
+        // Check if the installed version's SPT constraint is compatible with the installed SPT version
+        if (string.IsNullOrWhiteSpace(installedApiVersion.SptVersionConstraint))
+        {
+            return;
+        }
+
+        if (!SemanticVersioning.Range.TryParse(installedApiVersion.SptVersionConstraint, out var range))
+        {
+            // The constraint from Forge can't be parsed, so compatibility can't be evaluated. Surface it now:
+            // LoadWarnings are already rendered earlier in the run, so adding to them here would be invisible.
+            reporter.Warning(
+                $"Could not verify SPT compatibility for {mod.DisplayName}: "
+                    + $"Forge reported an invalid version constraint ({installedApiVersion.SptVersionConstraint})."
+            );
+            return;
+        }
+
+        if (range.IsSatisfied(sptVersion))
+        {
+            // The installed version is compatible - no issue
+            return;
+        }
+
+        // The installed version is NOT compatible with the installed SPT version
+        var reason = $"Version {mod.LocalVersion} requires SPT {installedApiVersion.SptVersionConstraint}";
+
+        // Find the latest compatible version to suggest
+        var compatibleApiVersion = mod.ApiVersions!.Where(v => SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion))
+            .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
+            .FirstOrDefault();
+
+        mod.SetLocalSptIncompatible(reason, compatibleApiVersion?.Version);
     }
 
     /// <summary>
