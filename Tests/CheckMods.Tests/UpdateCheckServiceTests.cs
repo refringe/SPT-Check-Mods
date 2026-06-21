@@ -11,9 +11,9 @@ public sealed class UpdateCheckServiceTests
 {
     private const int ModId = 2471;
 
-    private static ModVersionInfo2 Version(int modId, string version, string? link = null)
+    private static ModUpdateVersion Version(int modId, string version, string? link = null)
     {
-        return new ModVersionInfo2(
+        return new ModUpdateVersion(
             Id: null,
             ModId: modId,
             Guid: "com.refringe.checkmods",
