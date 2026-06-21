@@ -445,7 +445,13 @@ public sealed partial class ForgeApiService(
             return new NotFound();
         }
 
-        // Combine results across chunks. Mods are batched so the request URL stays within length limits.
+        // Mods are batched so the request URL stays within length limits. Dispatch the chunks concurrently and let
+        // the shared rate limiter throttle them, rather than waiting for each round-trip before starting the next.
+        var chunkResults = await Task.WhenAll(
+            modList.Chunk(MaxModsPerUpdateRequest).Select(chunk => GetModUpdatesChunkAsync(chunk, sptVersion, cancellationToken))
+        );
+
+        // Combine results across chunks.
         var safeToUpdate = new List<SafeToUpdateMod>();
         var blocked = new List<BlockedUpdateMod>();
         var upToDate = new List<UpToDateMod>();
@@ -453,17 +459,14 @@ public sealed partial class ForgeApiService(
         var anyData = false;
         ApiError? firstError = null;
 
-        foreach (var chunk in modList.Chunk(MaxModsPerUpdateRequest))
+        foreach (var chunkResult in chunkResults)
         {
-            var chunkResult = await GetModUpdatesChunkAsync(chunk, sptVersion, cancellationToken);
-
-            // A failing chunk must not discard update data already gathered from earlier chunks. Remember the first
-            // error so it can be surfaced only when no chunk yields any data, and keep going so the mods in the
-            // remaining chunks are still reported on.
+            // A failing chunk must not discard update data gathered from the other chunks. Remember the first error
+            // so it can be surfaced only when no chunk yields any data.
             if (chunkResult.TryPickT2(out var error, out _))
             {
                 firstError ??= error;
-                logger.LogDebug("A mod-updates chunk failed ({Error}); continuing with remaining chunks", error.Message);
+                logger.LogDebug("A mod-updates chunk failed ({Error}); using data from the other chunks", error.Message);
                 continue;
             }
 
