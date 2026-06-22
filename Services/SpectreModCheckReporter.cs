@@ -673,11 +673,12 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             nameColor = "white";
         }
 
-        // Build the label with optional link
-        string label;
+        // Build the label with an optional Forge link: prefer the mod's own API URL, falling back to a mod-page URL
+        // constructed from the dependency info. WithLink renders the name unlinked when no usable URL is available.
+        string? linkUrl = null;
         if (!string.IsNullOrWhiteSpace(node.Mod.ApiUrl))
         {
-            label = $"[link={node.Mod.ApiUrl}][{nameColor}]{name}[/][/] [grey]v{version}[/]";
+            linkUrl = node.Mod.ApiUrl;
         }
         else if (
             node.DependencyInfo != null
@@ -685,13 +686,10 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             && !string.IsNullOrWhiteSpace(node.DependencyInfo.Slug)
         )
         {
-            var url = ForgeUrls.ModPage(node.DependencyInfo.Id, node.DependencyInfo.Slug);
-            label = $"[link={url}][{nameColor}]{name}[/][/] [grey]v{version}[/]";
+            linkUrl = ForgeUrls.ModPage(node.DependencyInfo.Id, node.DependencyInfo.Slug);
         }
-        else
-        {
-            label = $"[{nameColor}]{name}[/] [grey]v{version}[/]";
-        }
+
+        var label = $"{WithLink($"[{nameColor}]{name}[/]", linkUrl)} [grey]v{version}[/]";
 
         if (!string.IsNullOrWhiteSpace(statusIndicator))
         {
@@ -734,17 +732,13 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
         foreach (var dep in missingDeps)
         {
-            // Link mod name to Forge page
-            string nameDisplay;
-            if (dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug))
-            {
-                var url = ForgeUrls.ModPage(dep.ModId, dep.Slug);
-                nameDisplay = $"[link={url}]{dep.Name.EscapeMarkup()}[/]";
-            }
-            else
-            {
-                nameDisplay = $"[white]{dep.Name.EscapeMarkup()}[/]";
-            }
+            // Link mod name to Forge page when a usable URL is available, otherwise show it in plain white.
+            var url = dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug)
+                ? ForgeUrls.ModPage(dep.ModId, dep.Slug)
+                : null;
+            var nameDisplay = IsLinkUrlSafe(url)
+                ? $"[link={url}]{dep.Name.EscapeMarkup()}[/]"
+                : $"[white]{dep.Name.EscapeMarkup()}[/]";
 
             AnsiConsole.MarkupLine($"  {nameDisplay}");
             AnsiConsole.MarkupLine(
@@ -947,11 +941,30 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     {
         var escaped = name.EscapeMarkup();
 
-        if (!string.IsNullOrWhiteSpace(apiUrl))
+        if (IsLinkUrlSafe(apiUrl))
         {
             return $"[link={apiUrl}]{escaped}[/]";
         }
 
         return colorPlainNameWhite ? $"[white]{escaped}[/]" : escaped;
+    }
+
+    /// <summary>
+    /// Wraps already-formatted display markup in a Spectre [link] tag when the URL can be safely embedded, otherwise
+    /// returns the markup unlinked. Use this for the [link={url}] attribute form where the URL sits inside the tag.
+    /// </summary>
+    private static string WithLink(string displayMarkup, string? url)
+    {
+        return IsLinkUrlSafe(url) ? $"[link={url}]{displayMarkup}[/]" : displayMarkup;
+    }
+
+    /// <summary>
+    /// Returns true when a URL is safe to embed in a [link=...] tag attribute. A URL containing the markup delimiters
+    /// '[' or ']' would corrupt the tag and throw when Spectre renders it; EscapeMarkup can't help here because it
+    /// escapes content, not attribute values, so such URLs are dropped and the text is rendered without a link.
+    /// </summary>
+    internal static bool IsLinkUrlSafe(string? url)
+    {
+        return !string.IsNullOrWhiteSpace(url) && !url.Contains('[') && !url.Contains(']');
     }
 }
