@@ -138,4 +138,41 @@ public sealed class FileLoggerTests
             SafeDeleteDir(dir);
         }
     }
+
+    [Fact]
+    public void Suppresses_further_rolls_when_rotation_is_blocked()
+    {
+        var dir = CreateTempDir();
+        try
+        {
+            var logPath = Path.Combine(dir, "test.log");
+
+            // Occupy the rotation target with a directory. File.Exists is false for a directory so the shift logic
+            // skips it, but File.Move(active -> test.1.log) fails because the path is taken. This mimics a rotation
+            // that can't move the active file aside (e.g. the file held open by another process).
+            Directory.CreateDirectory(Path.Combine(dir, "test.1.log"));
+
+            var provider = CreateProvider(logPath, o => o.MaxFileSizeBytes = 200);
+            var logger = provider.CreateLogger("Cat");
+
+            for (var i = 0; i < 100; i++)
+            {
+                logger.LogInformation("Log entry {Index} with enough text to accumulate bytes quickly", i);
+            }
+
+            // The first over-cap roll failed to rotate, so further per-line rolls are suppressed rather than retried
+            // on every write.
+            Assert.True(provider.RotationSuppressed, "a blocked rotation should suppress further roll attempts");
+
+            // Release the active handle before reading the file back.
+            provider.Dispose();
+
+            // Logging keeps working: the latest entry is still written despite rotation being stuck.
+            Assert.Contains("Log entry 99", File.ReadAllText(logPath));
+        }
+        finally
+        {
+            SafeDeleteDir(dir);
+        }
+    }
 }

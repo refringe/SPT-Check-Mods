@@ -94,11 +94,19 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
     private StreamWriter? _writer;
     private bool _disposed;
     private bool _initialized;
+    private bool _rotationSuppressed;
 
     public LogLevel MinimumLogLevel
     {
         get { return _options.MinimumLogLevel; }
     }
+
+    /// <summary>
+    /// True once a mid-session roll left the active file still over the size cap, meaning rotation is blocked (e.g.
+    /// the file is held open by another process). Further automatic rolls are then suppressed to avoid per-line disk
+    /// churn. Exposed for tests.
+    /// </summary>
+    internal bool RotationSuppressed => _rotationSuppressed;
 
     private void EnsureInitialized()
     {
@@ -157,8 +165,9 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
                 _writer.Write(message);
 
                 // Enforce the size cap throughout the session, not just at startup: once the active file passes the
-                // limit, roll it over so a single long run can't grow the log unbounded.
-                if (_writer.BaseStream.Length >= _options.MaxFileSizeBytes)
+                // limit, roll it over so a single long run can't grow the log unbounded. Skip once rotation is known
+                // to be blocked (see RollActiveLog) so a stuck file doesn't trigger a roll attempt on every line.
+                if (!_rotationSuppressed && _writer.BaseStream.Length >= _options.MaxFileSizeBytes)
                 {
                     RollActiveLog();
                 }
@@ -184,6 +193,16 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
         // false, so the next write re-initializes instead of writing to a disposed handle.
         _initialized = false;
         OpenLogFile();
+
+        // A successful roll moves the full file aside and reopens an empty one. If the reopened handle is still at or
+        // over the cap, RotateLogsIfNeeded couldn't move the active file out of the way (e.g. another process holds it
+        // open, or the rotation target is blocked). Suppress further automatic rolls so each subsequent line doesn't
+        // re-enter this flush/dispose/reopen/move cycle and churn the disk; the log may exceed the cap for the rest of
+        // the session, which is the lesser evil over per-line rotation thrashing.
+        if (_writer is not null && _writer.BaseStream.Length >= _options.MaxFileSizeBytes)
+        {
+            _rotationSuppressed = true;
+        }
     }
 
     private void EnsureLogDirectoryExists()

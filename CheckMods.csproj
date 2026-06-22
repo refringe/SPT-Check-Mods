@@ -108,6 +108,9 @@
     />
   </Target>
   <ItemGroup>
+    <InternalsVisibleTo Include="CheckMods.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="FuzzySharp" Version="2.0.2" />
     <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.9" />
