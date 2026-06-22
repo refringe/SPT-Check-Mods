@@ -445,8 +445,15 @@ public sealed partial class ForgeApiService(
             return new NotFound();
         }
 
-        // Mods are batched so the request URL stays within length limits. Dispatch the chunks concurrently and let
-        // the shared rate limiter throttle them, rather than waiting for each round-trip before starting the next.
+        // Common case: the whole batch fits in one request, so call it directly and return its result unchanged,
+        // skipping the cross-chunk merge (which would otherwise allocate four lists and copy every entry across).
+        if (modList.Count <= MaxModsPerUpdateRequest)
+        {
+            return await GetModUpdatesChunkAsync(modList, sptVersion, cancellationToken);
+        }
+
+        // Larger batches are split so the request URL stays within length limits. Dispatch the chunks concurrently
+        // and let the shared rate limiter throttle them, rather than waiting for each round-trip before the next.
         var chunkResults = await Task.WhenAll(
             modList.Chunk(MaxModsPerUpdateRequest).Select(chunk => GetModUpdatesChunkAsync(chunk, sptVersion, cancellationToken))
         );
