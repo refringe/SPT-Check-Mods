@@ -786,14 +786,21 @@ public sealed class ApplicationService(
         try
         {
             var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var configFilePath = Path.Combine(appDataFolder, "SptCheckMods", "apikey.txt");
+            var configDirectory = Path.GetFullPath(Path.Combine(appDataFolder, "SptCheckMods"));
+            var configFilePath = Path.GetFullPath(Path.Combine(configDirectory, "apikey.txt"));
+
+            if (!configFilePath.StartsWith(configDirectory + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                return;
+            }
+
             if (!File.Exists(configFilePath))
             {
                 return;
             }
 
             File.Delete(configFilePath);
-            logger.LogInformation("Removed legacy API key file: {Path}", configFilePath);
+            logger.LogInformation("Removed legacy API key file.");
         }
         catch (Exception ex)
         {

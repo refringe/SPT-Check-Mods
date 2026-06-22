@@ -17,21 +17,13 @@ public sealed class IgnoredUpdateStoreTests : IDisposable
 
     public IgnoredUpdateStoreTests()
     {
-        _dir = Path.Combine(Path.GetTempPath(), "checkmods-tests-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_dir);
+        _dir = TempWorkspace.CreateDirectory("checkmods-tests");
         _path = Path.Combine(_dir, "ignored-updates.json");
     }
 
     public void Dispose()
     {
-        try
-        {
-            Directory.Delete(_dir, recursive: true);
-        }
-        catch
-        {
-            // Best-effort cleanup.
-        }
+        TempWorkspace.SafeDelete(_dir);
     }
 
     private IgnoredUpdateStore CreateStore()

@@ -14,25 +14,12 @@ public sealed class FileLoggerTests
 {
     private static string CreateTempDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "checkmods-filelogger-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        return dir;
+        return TempWorkspace.CreateDirectory("checkmods-filelogger-tests");
     }
 
     private static void SafeDeleteDir(string dir)
     {
-        try
-        {
-            Directory.Delete(dir, recursive: true);
-        }
-        catch (IOException)
-        {
-            // Best effort - a lingering handle shouldn't fail the test.
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Best effort.
-        }
+        TempWorkspace.SafeDelete(dir);
     }
 
     private static FileLoggerProvider CreateProvider(string logPath, Action<LoggingOptions>? configure = null)
