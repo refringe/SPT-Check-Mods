@@ -7,7 +7,7 @@ namespace CheckMods.Services;
 /// Custom assembly resolver that handles missing assemblies gracefully for BepInEx plugin scanning.
 /// </summary>
 /// <param name="dllPath">Path to the DLL being analyzed.</param>
-public class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
+public sealed class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
 {
     private readonly PathAssemblyResolver _pathResolver = new(BuildMinimalAssemblySearchPaths(dllPath));
 
@@ -59,8 +59,10 @@ public class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
     }
 
     /// <summary>
-    /// Finds the BepInEx core directory by walking up from the DLL path.
-    /// Handles both DLLs directly in plugins/ and DLLs in subdirectories like plugins/ModName/.
+    /// Finds the BepInEx core directory by walking up from the DLL path, looking for a sibling BepInEx/core folder at
+    /// each ancestor. This resolves the BepInEx assemblies regardless of where the DLL lives within the SPT install,
+    /// whether correctly placed under BepInEx/plugins or misplaced under SPT/user/mods, since both sit beside the
+    /// BepInEx directory at the SPT root.
     /// </summary>
     /// <param name="dllPath">Path to the DLL being analyzed.</param>
     /// <returns>Path to BepInEx/core directory, or null if not found.</returns>
@@ -68,23 +70,12 @@ public class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
     {
         var currentDir = Path.GetDirectoryName(dllPath);
 
-        // Walk up the directory tree looking for the "plugins" folder
         while (!string.IsNullOrEmpty(currentDir))
         {
-            var dirName = Path.GetFileName(currentDir);
-            if (string.Equals(dirName, "plugins", StringComparison.OrdinalIgnoreCase))
+            var coreDir = Path.Combine(currentDir, "BepInEx", "core");
+            if (Directory.Exists(coreDir))
             {
-                // Found plugins directory, BepInEx root is one level up
-                var bepInExRoot = Path.GetDirectoryName(currentDir);
-                if (!string.IsNullOrEmpty(bepInExRoot))
-                {
-                    var coreDir = Path.Combine(bepInExRoot, "core");
-                    if (Directory.Exists(coreDir))
-                    {
-                        return coreDir;
-                    }
-                }
-                break;
+                return coreDir;
             }
 
             currentDir = Path.GetDirectoryName(currentDir);

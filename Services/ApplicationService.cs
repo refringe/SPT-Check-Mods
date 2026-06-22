@@ -3,7 +3,6 @@ using CheckMods.Models;
 using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
-using Spectre.Console;
 using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
@@ -14,12 +13,16 @@ namespace CheckMods.Services;
 [Injectable(InjectionType.Transient)]
 public sealed class ApplicationService(
     IForgeApiService forgeApiService,
-    IServerModService serverModService,
+    ISptInstallationService sptInstallationService,
     IModScannerService modScannerService,
     IModReconciliationService modReconciliationService,
     IModMatchingService modMatchingService,
     IModEnrichmentService modEnrichmentService,
     IModDependencyService modDependencyService,
+    IUpdateCheckService updateCheckService,
+    IIgnoredUpdateStore ignoredUpdateStore,
+    IRemoteIgnoreFileClient remoteIgnoreFileClient,
+    IModCheckReporter reporter,
     ILogger<ApplicationService> logger
 ) : IApplicationService
 {
@@ -28,21 +31,15 @@ public sealed class ApplicationService(
     /// </summary>
     /// <param name="args">Command line arguments. The first argument can be the SPT installation path.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
-    public async Task RunAsync(string[] args, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Mod>> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Starting mod check workflow");
-        DisplayBanner();
+        reporter.Banner();
 
         try
         {
-            // API key setup
-            logger.LogDebug("Setting up API key");
-            var apiKey = await SetupApiKeyAsync(cancellationToken);
-            if (apiKey is null)
-            {
-                logger.LogWarning("API key setup failed, exiting");
-                return;
-            }
+            // Remove any legacy API key file from previous versions; the Forge API is now open and keyless.
+            RemoveLegacyApiKeyFile();
 
             // SPT path validation
             logger.LogDebug("Validating SPT path");
@@ -50,7 +47,7 @@ public sealed class ApplicationService(
             if (sptPath is null)
             {
                 logger.LogWarning("SPT path validation failed, exiting");
-                return;
+                return [];
             }
 
             logger.LogInformation("Using SPT path: {SptPath}", sptPath);
@@ -61,19 +58,47 @@ public sealed class ApplicationService(
             if (sptVersion is null)
             {
                 logger.LogWarning("SPT version validation failed, exiting");
-                return;
+                return [];
             }
 
             logger.LogInformation("SPT version validated: {SptVersion}", sptVersion);
 
+            // Check for Check Mods updates (Must run after the SPT update check)
+            logger.LogDebug("Checking for Check Mods updates");
+            await CheckForCheckModsUpdateAsync(sptVersion, cancellationToken);
+
+            // Offer to refresh the local ignore list from the author-maintained remote list (opt-in, default no).
+            logger.LogDebug("Offering remote ignore list refresh");
+            await MaybeFetchRemoteIgnoresAsync(cancellationToken);
+
+            reporter.Blank();
+            reporter.Heading("Loading mods...");
+
+            // Detect improperly installed mods
+            logger.LogDebug("Checking for improperly installed mods");
+            reporter.Status("Checking mod installation locations...");
+            var misplacedReport = modScannerService.DetectMisplacedMods(sptPath, cancellationToken);
+            if (misplacedReport.Any)
+            {
+                logger.LogWarning(
+                    "Found {WrongFolder} misplaced mods and {CrossInstalled} cross-installed directories; excluding them from the remaining checks and continuing",
+                    misplacedReport.WrongFolder.Count,
+                    misplacedReport.CrossInstalled.Count
+                );
+
+                // Surface the problem (still as an error) but keep running; the misplaced mods are filtered out of the
+                // scan below so they're excluded from every check from here on.
+                reporter.MisplacedMods(misplacedReport);
+            }
+
             // Load and reconcile local mods
             logger.LogDebug("Scanning and reconciling mods");
-            var mods = await ScanAndReconcileModsAsync(sptPath, sptVersion, cancellationToken);
+            var mods = await ScanAndReconcileModsAsync(sptPath, sptVersion, misplacedReport, cancellationToken);
             if (mods.Count == 0)
             {
                 logger.LogInformation("No mods remaining after reconciliation");
-                AnsiConsole.MarkupLine("[yellow]No mods remaining after reconciliation.[/]");
-                return;
+                reporter.Warning("No mods remaining after reconciliation.");
+                return [];
             }
 
             logger.LogInformation("Found {ModCount} mods after reconciliation", mods.Count);
@@ -82,13 +107,19 @@ public sealed class ApplicationService(
             logger.LogDebug("Matching mods with Forge API");
             await MatchModsWithApiAsync(mods, sptVersion, cancellationToken);
 
-            // Check SPT version compatibility for matched mods
-            logger.LogDebug("Checking mod version compatibility");
-            await CheckModVersionCompatibilityAsync(mods, sptVersion);
-
-            // Enrich matched mods with version data and display results
+            // Enrich matched mods with version data, then apply locally-stored update suppressions. This runs before the
+            // compatibility check on purpose: a mod whose update the user dismissed as a false positive is then also
+            // excluded from the SPT-compatibility warning. Both warnings stem from the same stale local version, and the
+            // user is asserting their installed files are really the (compatible) latest version.
             logger.LogDebug("Enriching mods with version data");
             await EnrichModsWithVersionDataAsync(mods, sptVersion, cancellationToken);
+
+            logger.LogDebug("Applying ignored updates");
+            ApplyIgnoredUpdates(mods);
+
+            // Check SPT version compatibility for matched mods (suppressed false positives are skipped)
+            logger.LogDebug("Checking mod version compatibility");
+            CheckModVersionCompatibility(mods, sptVersion);
 
             // Check mod dependencies
             logger.LogDebug("Checking mod dependencies");
@@ -96,91 +127,73 @@ public sealed class ApplicationService(
 
             // Display results
             logger.LogDebug("Displaying results");
-            ShowVersionUpdateTable(mods);
+            reporter.VersionTable(mods);
 
             logger.LogInformation("Mod check workflow completed successfully");
+            return mods;
         }
         catch (OperationCanceledException)
         {
             logger.LogInformation("Operation was cancelled");
-            AnsiConsole.MarkupLine("[yellow]Operation cancelled.[/]");
+            reporter.Warning("Operation cancelled.");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error during mod check workflow");
-            AnsiConsole.WriteException(ex, ExceptionFormats.ShortenPaths);
+            reporter.Exception(ex);
         }
+
+        return [];
     }
 
     /// <summary>
-    /// Funny taglines displayed randomly in the banner.
-    /// </summary>
-    private static readonly string[] _bannerTaglines =
-    [
-        "Cheeki breeki, your mods are peaky!",
-        "No FiR tag required.",
-        "Opachki! Your mods are showing.",
-        "Warning: May cause gear fear.",
-        "Fence would sell this for 3x the price.",
-        "Not responsible for any leg meta incidents.",
-        "Ref approved.",
-        "Scav karma not affected by usage.",
-        "No insurance fraud detected.",
-        "Jaeger would make this a daily quest.",
-        "Tested on scavs!.",
-        "More reliable than a PM pistol.",
-        "Killa can't spawn here. You're safe.",
-        "Side effects may include mod addiction.",
-        "Lighthouse rogues hate this one simple trick!",
-        "Your stash is safe. Your mods? Let's see...",
-        "Better odds than finding a GPU in raid.",
-        "Tagilla tested, Tagilla approved.",
-        "No extract campers were consulted.",
-        "Mechanic charges extra for this service.",
-        "Labs keycard not required.",
-        "Results may vary based on desync.",
-        "Powered by strong coffee.",
-    ];
-
-    /// <summary>
-    /// Displays the application banner and introductory information.
-    /// </summary>
-    private static void DisplayBanner()
-    {
-        var tagline = _bannerTaglines[Random.Shared.Next(_bannerTaglines.Length)];
-
-        AnsiConsole.Write(new FigletText("Check Mods").LeftJustified().Color(Color.Blue));
-        AnsiConsole.MarkupLine("[fuchsia]A tool to check for mod issues and updates.[/]");
-        AnsiConsole.MarkupLine($"[grey]{tagline}[/]");
-        AnsiConsole.MarkupLine("[link]https://forge.sp-tarkov.com[/]");
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Rule().RuleStyle("grey"));
-        AnsiConsole.WriteLine();
-    }
-
-    /// <summary>
-    /// Writes a horizontal rule separator to the console.
-    /// </summary>
-    private static void WriteRule()
-    {
-        AnsiConsole.Write(new Rule().RuleStyle("grey"));
-    }
-
-    /// <summary>
-    /// Sets up the API key by either loading from storage or prompting the user.
+    /// Offers to refresh the local ignore list from the author-maintained remote list. Opt-in with a default of "no",
+    /// and skipped entirely when input is non-interactive or no remote URL is configured. Merges without overwriting
+    /// existing local entries; any failure leaves the local list untouched.
     /// </summary>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>Valid API key or null if setup failed.</returns>
-    private async Task<string?> SetupApiKeyAsync(CancellationToken cancellationToken = default)
+    private async Task MaybeFetchRemoteIgnoresAsync(CancellationToken cancellationToken = default)
     {
-        var apiKey = await GetAndValidateApiKey(cancellationToken);
-        if (apiKey is null)
+        // Can't prompt without an interactive console (treated as "no"), and nothing to do without a configured URL.
+        if (Console.IsInputRedirected || !remoteIgnoreFileClient.IsConfigured)
         {
-            return null;
+            return;
         }
 
-        forgeApiService.SetApiKey(apiKey);
-        return apiKey;
+        reporter.Blank();
+        reporter.Heading("Community ignore list...");
+
+        if (reporter.PromptFetchRemoteIgnores())
+        {
+            var remote = await remoteIgnoreFileClient.FetchAsync(cancellationToken);
+            if (remote is null)
+            {
+                reporter.RemoteIgnoresUnavailable();
+            }
+            else
+            {
+                reporter.RemoteIgnoresMerged(ignoredUpdateStore.MergeWithoutOverwrite(remote));
+            }
+        }
+
+        reporter.Blank();
+        reporter.Rule();
+    }
+
+    /// <summary>
+    /// Flags any mod whose available update matches a stored suppression so it renders as ignored (treated as up to
+    /// date) rather than as an available update.
+    /// </summary>
+    /// <param name="mods">The reconciled, enriched mods to evaluate.</param>
+    private void ApplyIgnoredUpdates(List<Mod> mods)
+    {
+        foreach (var mod in mods)
+        {
+            if (mod.UpdateStatus == UpdateStatus.UpdateAvailable && ignoredUpdateStore.IsIgnored(mod))
+            {
+                mod.SetUpdateSuppressed(true);
+            }
+        }
     }
 
     /// <summary>
@@ -188,31 +201,31 @@ public sealed class ApplicationService(
     /// </summary>
     /// <param name="args">Command line arguments.</param>
     /// <returns>Validated SPT path or null if validation failed.</returns>
-    private static string? GetValidatedSptPath(string[] args)
+    private string? GetValidatedSptPath(string[] args)
     {
-        AnsiConsole.MarkupLine("[bold blue]Validating SPT installation...[/]");
+        reporter.Heading("Validating SPT installation...");
 
         if (args.Length == 0)
         {
             var currentPath = Directory.GetCurrentDirectory();
-            AnsiConsole.MarkupLine($"[grey]Using Path:[/] {currentPath.EscapeMarkup()}");
+            reporter.UsingPath(currentPath);
             return currentPath;
         }
 
         var safePath = SecurityHelper.GetSafePath(args[0]);
         if (safePath is null)
         {
-            AnsiConsole.MarkupLine("[red]Error: Invalid path provided.[/]");
+            reporter.Error("Error: Invalid path provided.");
             return null;
         }
 
         if (!Directory.Exists(safePath))
         {
-            AnsiConsole.MarkupLine($"[red]Error: Directory does not exist: {safePath.EscapeMarkup()}[/]");
+            reporter.DirectoryDoesNotExist(safePath);
             return null;
         }
 
-        AnsiConsole.MarkupLine($"[grey]Using Path:[/] {safePath.EscapeMarkup()}");
+        reporter.UsingPath(safePath);
         return safePath;
     }
 
@@ -227,20 +240,20 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        var sptVersion = await serverModService.GetAndValidateSptVersionAsync(sptPath, cancellationToken);
+        var sptVersion = await sptInstallationService.GetAndValidateSptVersionAsync(sptPath, cancellationToken);
         if (sptVersion is null)
         {
             return null;
         }
 
-        AnsiConsole.MarkupLine($"[green]Successfully validated SPT Version:[/] [bold]{sptVersion}[/]");
+        reporter.SptVersionValidated(sptVersion.ToString());
 
         // Check for SPT updates
         await CheckForSptUpdatesAsync(sptVersion, cancellationToken);
 
-        AnsiConsole.WriteLine();
-        WriteRule();
-        AnsiConsole.WriteLine();
+        reporter.Blank();
+        reporter.Rule();
+        reporter.Blank();
         return sptVersion;
     }
 
@@ -254,34 +267,52 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[grey]Checking for SPT updates...[/]");
+        reporter.Blank();
+        reporter.Status("Checking for SPT updates...");
 
-        var availableUpdates = await serverModService.CheckForSptUpdatesAsync(currentVersion, cancellationToken);
+        var availableUpdates = await sptInstallationService.CheckForSptUpdatesAsync(currentVersion, cancellationToken);
 
         if (availableUpdates.Count == 0)
         {
-            AnsiConsole.MarkupLine("[green]You are running the latest version of SPT![/]");
+            reporter.Success("You are running the latest version of SPT!");
             return;
         }
 
         // Show only the latest available update
-        var latestUpdate = availableUpdates[0];
-        var versionDisplay = $"[bold]{latestUpdate.Version.EscapeMarkup()}[/]";
+        reporter.SptUpdateAvailable(availableUpdates[0]);
+    }
 
-        // Add mod count if available
-        if (latestUpdate.ModCount > 0)
+    /// <summary>
+    /// Checks whether a newer version of Check Mods is available on the Forge and displays the result.
+    /// </summary>
+    /// <param name="sptVersion">The installed SPT version, used for compatibility filtering.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    private async Task CheckForCheckModsUpdateAsync(
+        SemanticVersioning.Version sptVersion,
+        CancellationToken cancellationToken = default
+    )
+    {
+        reporter.Heading("Checking for Check Mods updates...");
+
+        CheckModsUpdateResult result;
+        try
         {
-            versionDisplay += $" [grey]({latestUpdate.ModCount} mods)[/]";
+            result = await updateCheckService.CheckAsync(sptVersion, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Check Mods update check failed unexpectedly");
+            reporter.Status("Could not check for Check Mods updates.");
+            reporter.Blank();
+            reporter.Rule();
+            return;
         }
 
-        AnsiConsole.MarkupLine($"[yellow]SPT update available:[/] {versionDisplay}");
-
-        // Add link on new line if available
-        if (!string.IsNullOrWhiteSpace(latestUpdate.Link))
-        {
-            AnsiConsole.MarkupLine($"[grey]{latestUpdate.Link}[/]");
-        }
+        reporter.CheckModsUpdate(result, sptVersion);
     }
 
     /// <summary>
@@ -289,31 +320,35 @@ public sealed class ApplicationService(
     /// </summary>
     /// <param name="sptPath">Path to SPT installation.</param>
     /// <param name="sptVersion">SPT version for API lookups.</param>
+    /// <param name="misplacedReport">Incorrectly installed mods which should be excluded from further operations.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>List of reconciled mods.</returns>
     private async Task<List<Mod>> ScanAndReconcileModsAsync(
         string sptPath,
         SemanticVersioning.Version sptVersion,
+        MisplacedModReport misplacedReport,
         CancellationToken cancellationToken = default
     )
     {
-        AnsiConsole.MarkupLine("[bold blue]Loading mods...[/]");
-
         var (serverMods, clientMods) = await modScannerService.ScanAllModsAsync(sptPath, cancellationToken);
+
+        // Drop any mods flagged as misplaced so they're excluded from every check from here on. Detection runs before
+        // the scan, so a cross-installed intruder would otherwise be picked back up here and checked as a normal mod.
+        if (misplacedReport.Any)
+        {
+            serverMods = ExcludeMisplacedMods(serverMods, misplacedReport);
+            clientMods = ExcludeMisplacedMods(clientMods, misplacedReport);
+        }
 
         // Early exit if no mods found at all
         if (serverMods.Count == 0 && clientMods.Count == 0)
         {
             logger.LogInformation("No mods found in SPT installation");
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[yellow]No mods found.[/]");
-            AnsiConsole.MarkupLine("[grey]Server mods should be located in:[/] SPT/user/mods");
-            AnsiConsole.MarkupLine("[grey]Client mods should be located in:[/] BepInEx/plugins");
-            AnsiConsole.WriteLine();
+            reporter.NoModsFound();
             return [];
         }
 
-        AnsiConsole.MarkupLine($"[green]Loaded {serverMods.Count} server mods and {clientMods.Count} client mods.[/]");
+        reporter.Success($"Loaded {serverMods.Count} server mods and {clientMods.Count} client mods.");
 
         // Fetch API info for mods with warnings to get source code URLs
         var modsWithWarnings = serverMods.Concat(clientMods).Where(m => m.HasWarnings).ToList();
@@ -322,12 +357,12 @@ public sealed class ApplicationService(
             await FetchSourceCodeUrlsForModsAsync(modsWithWarnings, sptVersion, cancellationToken);
         }
 
-        DisplayLoadingWarnings(serverMods, clientMods);
+        reporter.LoadingWarnings(modsWithWarnings);
 
-        AnsiConsole.WriteLine();
-        WriteRule();
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[bold blue]Reconciling mod components...[/]");
+        reporter.Blank();
+        reporter.Rule();
+        reporter.Blank();
+        reporter.Heading("Reconciling mod components...");
 
         var result = modReconciliationService.ReconcileMods(serverMods, clientMods);
 
@@ -338,9 +373,46 @@ public sealed class ApplicationService(
             await FetchSourceCodeUrlsForPairedModsAsync(pairsWithNotes, sptVersion, cancellationToken);
         }
 
-        DisplayReconciliationResults(result);
+        reporter.ReconciliationResults(result);
 
         return result.Mods.ToList();
+    }
+
+    /// <summary>
+    /// Returns the mods with any misplaced entries removed: those whose DLL path was flagged as misplaced, plus any
+    /// inside a cross-installed directory whose intruder couldn't be identified (the whole folder is excluded).
+    /// </summary>
+    private static List<Mod> ExcludeMisplacedMods(List<Mod> mods, MisplacedModReport report)
+    {
+        var excludedFiles = new HashSet<string>(report.ExcludedFilePaths, StringComparer.OrdinalIgnoreCase);
+        var excludedDirectories = report.ExcludedDirectories;
+
+        return mods.Where(mod =>
+                !excludedFiles.Contains(mod.FilePath)
+                && !excludedDirectories.Any(directory => IsWithinDirectory(mod.FilePath, directory))
+            )
+            .ToList();
+    }
+
+    /// <summary>
+    /// Determines whether <paramref name="filePath"/> lives inside <paramref name="directory"/> (or is that directory
+    /// itself), comparing fully-resolved paths case-insensitively.
+    /// </summary>
+    private static bool IsWithinDirectory(string filePath, string directory)
+    {
+        var fullFile = Path.GetFullPath(filePath);
+        var fullDirectory = Path.GetFullPath(directory);
+
+        if (string.Equals(fullFile, fullDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var prefix = fullDirectory.EndsWith(Path.DirectorySeparatorChar)
+            ? fullDirectory
+            : fullDirectory + Path.DirectorySeparatorChar;
+
+        return fullFile.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -352,11 +424,9 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        foreach (var mod in mods)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await FetchSourceCodeUrlForModAsync(mod, sptVersion, cancellationToken);
-        }
+        // Each mod's lookup is independent, so dispatch them together and let the rate limiter throttle rather than
+        // waiting for each round-trip in turn. Cancellation is honored by the API calls inside each task.
+        await Task.WhenAll(mods.Select(mod => FetchSourceCodeUrlForModAsync(mod, sptVersion, cancellationToken)));
     }
 
     /// <summary>
@@ -369,58 +439,68 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        foreach (var pair in pairs)
+        // Each pair's lookup is independent, so dispatch them together and let the rate limiter throttle. Cancellation
+        // is honored by the API calls inside each task.
+        await Task.WhenAll(pairs.Select(pair => FetchSourceCodeUrlForPairAsync(pair, sptVersion, cancellationToken)));
+    }
+
+    /// <summary>
+    /// Fetches and applies Forge API info for a single reconciled pair, trying both the server and client GUIDs
+    /// before falling back to a fuzzy name search.
+    /// </summary>
+    private async Task FetchSourceCodeUrlForPairAsync(
+        ModPair pair,
+        SemanticVersioning.Version sptVersion,
+        CancellationToken cancellationToken
+    )
+    {
+        var selectedMod = pair.SelectedMod;
+
+        // Skip if already has API info
+        if (selectedMod.ApiSourceCodeUrl is not null || selectedMod.ApiUrl is not null)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var selectedMod = pair.SelectedMod;
-
-            // Skip if already has API info
-            if (selectedMod.ApiSourceCodeUrl is not null || selectedMod.ApiUrl is not null)
-            {
-                continue;
-            }
-
-            ModSearchResult? apiResult = null;
-
-            // Collect all unique GUIDs to try (server GUID, client GUID)
-            List<string> guidsToTry = [];
-            if (!string.IsNullOrWhiteSpace(pair.ServerMod.Guid))
-            {
-                guidsToTry.Add(pair.ServerMod.Guid);
-            }
-
-            if (
-                !string.IsNullOrWhiteSpace(pair.ClientMod.Guid)
-                && !guidsToTry.Contains(pair.ClientMod.Guid, StringComparer.OrdinalIgnoreCase)
-            )
-            {
-                guidsToTry.Add(pair.ClientMod.Guid);
-            }
-
-            // Try each GUID until we find a match
-            foreach (var guid in guidsToTry)
-            {
-                var guidResult = await forgeApiService.GetModByGuidAsync(guid, sptVersion, cancellationToken);
-                if (!guidResult.TryPickT0(out var match, out _))
-                {
-                    continue;
-                }
-
-                apiResult = match;
-                break;
-            }
-
-            // If not found by any GUID, try searching by name with fuzzy matching
-            apiResult ??= await SearchModByNameAsync(selectedMod, sptVersion, cancellationToken);
-
-            if (apiResult is null)
-            {
-                continue;
-            }
-
-            selectedMod.UpdateFromApiMatch(apiResult, MatchingConstants.ExactGuidConfidence, MatchMethod.ExactGuid);
+            return;
         }
+
+        ModSearchResult? apiResult = null;
+
+        // Collect all unique GUIDs to try (server GUID, client GUID)
+        List<string> guidsToTry = [];
+        if (!string.IsNullOrWhiteSpace(pair.ServerMod.Guid))
+        {
+            guidsToTry.Add(pair.ServerMod.Guid);
+        }
+
+        if (
+            !string.IsNullOrWhiteSpace(pair.ClientMod.Guid)
+            && !guidsToTry.Contains(pair.ClientMod.Guid, StringComparer.OrdinalIgnoreCase)
+        )
+        {
+            guidsToTry.Add(pair.ClientMod.Guid);
+        }
+
+        // Try each GUID until we find a match
+        foreach (var guid in guidsToTry)
+        {
+            var guidResult = await forgeApiService.GetModByGuidAsync(guid, sptVersion, cancellationToken);
+            if (!guidResult.TryPickT0(out var match, out _))
+            {
+                continue;
+            }
+
+            apiResult = match;
+            break;
+        }
+
+        // If not found by any GUID, try searching by name with fuzzy matching
+        apiResult ??= await SearchModByNameAsync(selectedMod, sptVersion, cancellationToken);
+
+        if (apiResult is null)
+        {
+            return;
+        }
+
+        selectedMod.UpdateFromApiMatch(apiResult);
     }
 
     /// <summary>
@@ -458,7 +538,7 @@ public sealed class ApplicationService(
             return;
         }
 
-        mod.UpdateFromApiMatch(apiResult, MatchingConstants.ExactGuidConfidence, MatchMethod.ExactGuid);
+        mod.UpdateFromApiMatch(apiResult);
     }
 
     /// <summary>
@@ -513,114 +593,6 @@ public sealed class ApplicationService(
     }
 
     /// <summary>
-    /// Displays warnings for mods with loading issues.
-    /// </summary>
-    private static void DisplayLoadingWarnings(List<Mod> serverMods, List<Mod> clientMods)
-    {
-        var modsWithWarnings = serverMods.Concat(clientMods).Where(m => m.HasWarnings).ToList();
-
-        if (modsWithWarnings.Count == 0)
-        {
-            return;
-        }
-
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Mod loading warnings:[/]");
-
-        foreach (var mod in modsWithWarnings)
-        {
-            var modType = mod.IsServerMod ? "Server" : "Client";
-            var modName = !string.IsNullOrWhiteSpace(mod.LocalName) ? mod.LocalName : Path.GetFileName(mod.FilePath);
-
-            // Link mod name to Forge page if available
-            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                ? $"[link={mod.ApiUrl}]{modName.EscapeMarkup()}[/]"
-                : $"[white]{modName.EscapeMarkup()}[/]";
-
-            AnsiConsole.MarkupLine($"  [grey]{modType}:[/] {nameDisplay}");
-            foreach (var warning in mod.LoadWarnings)
-            {
-                AnsiConsole.MarkupLine($"    [yellow]- {warning.EscapeMarkup()}[/]");
-            }
-
-            // Show source code URL if available, otherwise show Forge mod page
-            if (!string.IsNullOrWhiteSpace(mod.ApiSourceCodeUrl))
-            {
-                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiSourceCodeUrl}[/]");
-            }
-            else if (!string.IsNullOrWhiteSpace(mod.ApiUrl))
-            {
-                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiUrl}[/]");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Displays the results of mod reconciliation.
-    /// </summary>
-    private static void DisplayReconciliationResults(ModReconciliationResult result)
-    {
-        var serverCount = result.ReconciledPairs.Count + result.UnmatchedServerMods.Count;
-        var clientCount = result.ReconciledPairs.Count + result.UnmatchedClientMods.Count;
-        AnsiConsole.MarkupLine($"[grey]Comparing {serverCount} server mods with {clientCount} client mods...[/]");
-
-        if (result.ReconciledPairs.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[grey]No matching server/client mod pairs found.[/]");
-        }
-        else
-        {
-            AnsiConsole.MarkupLine($"[green]Matched {result.ReconciledPairs.Count} server/client mod pairs.[/]");
-
-            var pairsWithNotes = result.ReconciledPairs.Where(p => p.Notes.Count > 0).ToList();
-            if (pairsWithNotes.Count > 0)
-            {
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[yellow]Reconciliation warnings:[/]");
-
-                foreach (var pair in pairsWithNotes)
-                {
-                    var modName = pair.SelectedMod.LocalName;
-
-                    // Link mod name to Forge page if available
-                    var nameDisplay = !string.IsNullOrWhiteSpace(pair.SelectedMod.ApiUrl)
-                        ? $"[link={pair.SelectedMod.ApiUrl}]{modName.EscapeMarkup()}[/]"
-                        : $"[white]{modName.EscapeMarkup()}[/]";
-
-                    AnsiConsole.MarkupLine($"  {nameDisplay}");
-                    foreach (var note in pair.Notes)
-                    {
-                        AnsiConsole.MarkupLine($"    [yellow]- {note.EscapeMarkup()}[/]");
-                    }
-
-                    // Show source code URL if available, otherwise show Forge mod page
-                    if (!string.IsNullOrWhiteSpace(pair.SelectedMod.ApiSourceCodeUrl))
-                    {
-                        AnsiConsole.MarkupLine(
-                            $"      [grey]Please report:[/] [link]{pair.SelectedMod.ApiSourceCodeUrl}[/]"
-                        );
-                    }
-                    else if (!string.IsNullOrWhiteSpace(pair.SelectedMod.ApiUrl))
-                    {
-                        AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{pair.SelectedMod.ApiUrl}[/]");
-                    }
-                }
-
-                AnsiConsole.WriteLine();
-            }
-        }
-
-        AnsiConsole.MarkupLine(
-            $"[grey]Final mod count: {result.Mods.Count} "
-                + $"(matched pairs: {result.ReconciledPairs.Count}, "
-                + $"server-only: {result.UnmatchedServerMods.Count}, "
-                + $"client-only: {result.UnmatchedClientMods.Count})[/]"
-        );
-        AnsiConsole.WriteLine();
-        WriteRule();
-    }
-
-    /// <summary>
     /// Matches mods with the Forge API.
     /// </summary>
     /// <param name="mods">Mods to match.</param>
@@ -632,71 +604,27 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[bold blue]Verifying Forge records for {mods.Count} mods...[/]");
+        reporter.Blank();
+        reporter.Heading($"Verifying Forge records for {mods.Count} mods...");
 
-        await AnsiConsole
-            .Progress()
-            .Columns(
-                new SpinnerColumn(Spinner.Known.Dots) { Style = Style.Parse("blue") },
-                new TaskDescriptionColumn(),
-                new ProgressBarColumn(),
-                new PercentageColumn()
-            )
-            .StartAsync(async ctx =>
-            {
-                var progressTask = ctx.AddTask("[grey]Querying Forge API[/]", maxValue: mods.Count);
-
-                await modMatchingService.MatchModsAsync(
+        await reporter.RunForgeQueryProgressAsync(
+            mods.Count,
+            setValue =>
+                modMatchingService.MatchModsAsync(
                     mods,
                     sptVersion,
-                    (_, current, _) =>
-                    {
-                        progressTask.Value = current;
-                    },
+                    (_, current, _) => setValue(current),
                     cancellationToken
-                );
+                )
+        );
 
-                progressTask.StopTask();
-            });
-
-        AnsiConsole.MarkupLine("[green]Forge verification complete![/]");
+        reporter.Success("Forge verification complete!");
+        reporter.Blank();
 
         // Display warnings for mods that couldn't be verified
-        DisplayUnverifiedModWarnings(mods);
+        reporter.UnverifiedMods(mods);
 
-        WriteRule();
-    }
-
-    /// <summary>
-    /// Displays warnings for mods that could not be verified against the Forge API.
-    /// </summary>
-    /// <param name="mods">Mods to check for verification status.</param>
-    private static void DisplayUnverifiedModWarnings(List<Mod> mods)
-    {
-        var unverifiedMods = mods.Where(m => m.Status == ModStatus.NoMatch).ToList();
-
-        if (unverifiedMods.Count == 0)
-        {
-            return;
-        }
-
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Unverified mods:[/]");
-
-        foreach (var mod in unverifiedMods)
-        {
-            var modDisplayName = mod.DisplayName.EscapeMarkup();
-            if (!string.IsNullOrWhiteSpace(mod.DisplayAuthor))
-            {
-                modDisplayName += $" by {mod.DisplayAuthor.EscapeMarkup()}";
-            }
-
-            AnsiConsole.MarkupLine($"  [white]{modDisplayName}[/]");
-            AnsiConsole.MarkupLine($"    [yellow]- Could not find matching record on Forge[/]");
-        }
-
-        AnsiConsole.WriteLine();
+        reporter.Rule();
     }
 
     /// <summary>
@@ -726,144 +654,89 @@ public sealed class ApplicationService(
     /// </summary>
     /// <param name="mods">Mods to check.</param>
     /// <param name="sptVersion">The installed SPT version.</param>
-    private Task CheckModVersionCompatibilityAsync(List<Mod> mods, SemanticVersioning.Version sptVersion)
+    private void CheckModVersionCompatibility(List<Mod> mods, SemanticVersioning.Version sptVersion)
     {
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[bold blue]Checking mod version compatibility...[/]");
+        reporter.Blank();
+        reporter.Heading("Checking mod version compatibility...");
 
-        // Only check mods that are matched with the API and have versions stored
-        var matchedMods = mods.Where(m => m.IsMatched && m.ApiVersions is { Count: > 0 }).ToList();
+        // Only check mods that are matched with the API and have versions stored. Skip mods whose update was dismissed
+        // as a false positive: the user is asserting their installed files are really the (compatible) latest version,
+        // so the stale-local-version incompatibility is a false positive too.
+        var matchedMods = mods.Where(m => m.IsMatched && m.ApiVersions is { Count: > 0 } && !m.UpdateSuppressed)
+            .ToList();
 
         foreach (var mod in matchedMods)
         {
-            // Find the version that matches the installed local version
-            var installedApiVersion = mod.ApiVersions!.FirstOrDefault(v =>
-                v.Version.Equals(mod.LocalVersion, StringComparison.OrdinalIgnoreCase)
-            );
-
-            if (installedApiVersion == null)
-            {
-                // Couldn't find the installed version in the API versions
-                continue;
-            }
-
-            // Check if the installed version's SPT constraint is compatible with the installed SPT version
-            if (string.IsNullOrWhiteSpace(installedApiVersion.SptVersionConstraint))
-            {
-                continue;
-            }
-
             try
             {
-                var range = new SemanticVersioning.Range(installedApiVersion.SptVersionConstraint);
-                if (range.IsSatisfied(sptVersion))
-                {
-                    // The installed version is compatible - no issue
-                    continue;
-                }
-
-                // The installed version is NOT compatible with the installed SPT version
-                var reason = $"Version {mod.LocalVersion} requires SPT {installedApiVersion.SptVersionConstraint}";
-
-                // Find a compatible version to suggest
-                string? compatibleVersion = null;
-                string? downloadLink = null;
-
-                var compatibleApiVersion = mod.ApiVersions!.Where(v =>
-                    {
-                        if (string.IsNullOrWhiteSpace(v.SptVersionConstraint))
-                        {
-                            return false;
-                        }
-
-                        try
-                        {
-                            var versionRange = new SemanticVersioning.Range(v.SptVersionConstraint);
-                            return versionRange.IsSatisfied(sptVersion);
-                        }
-                        catch
-                        {
-                            return false;
-                        }
-                    })
-                    .OrderByDescending(v =>
-                    {
-                        try
-                        {
-                            return new SemanticVersioning.Version(v.Version);
-                        }
-                        catch
-                        {
-                            return new SemanticVersioning.Version(0, 0, 0);
-                        }
-                    })
-                    .FirstOrDefault();
-
-                if (compatibleApiVersion is not null)
-                {
-                    compatibleVersion = compatibleApiVersion.Version;
-                    downloadLink = compatibleApiVersion.Link;
-                }
-
-                mod.SetLocalSptIncompatible(reason, compatibleVersion, downloadLink);
+                CheckModSptCompatibility(mod, sptVersion);
             }
-            catch
+            catch (Exception ex)
             {
-                // Invalid version constraint format from API - add a warning
-                mod.LoadWarnings.Add(
-                    $"Invalid SPT version constraint from Forge: {installedApiVersion.SptVersionConstraint}"
-                );
+                // Isolate per-mod failures: an exotic version range or unexpected API data shouldn't abort the whole
+                // run and dump a stack trace. Skip this mod and carry on with the rest.
+                logger.LogWarning(ex, "Failed to check SPT compatibility for mod: {ModName}", mod.DisplayName);
+                reporter.Warning($"Could not verify SPT compatibility for {mod.DisplayName}.");
             }
         }
 
-        // Display results
-        var incompatibleMods = mods.Where(m => m.IsLocalSptIncompatible).ToList();
+        reporter.VersionCompatibilityResults(mods, sptVersion);
+    }
 
-        if (incompatibleMods.Count == 0)
+    /// <summary>
+    /// Evaluates a single matched mod's installed version against the installed SPT version, flagging it when the
+    /// constraint can't be parsed or isn't satisfied.
+    /// </summary>
+    /// <param name="mod">The matched mod to evaluate.</param>
+    /// <param name="sptVersion">The installed SPT version.</param>
+    private void CheckModSptCompatibility(Mod mod, SemanticVersioning.Version sptVersion)
+    {
+        // Find the version that matches the installed local version. ModVersion.Version is declared non-nullable but
+        // is bound from Forge JSON, so a missing "version" field deserializes to null; use the static string.Equals
+        // to compare null-safely rather than dereferencing it.
+        var installedApiVersion = mod.ApiVersions!.FirstOrDefault(v =>
+            string.Equals(v.Version, mod.LocalVersion, StringComparison.OrdinalIgnoreCase)
+        );
+
+        if (installedApiVersion == null)
         {
-            AnsiConsole.MarkupLine("[green]All mod versions are compatible![/]");
-            AnsiConsole.WriteLine();
-            WriteRule();
-            return Task.CompletedTask;
+            // Couldn't find the installed version in the API versions
+            return;
         }
 
-        AnsiConsole.MarkupLine($"[yellow]Found {incompatibleMods.Count} incompatible mod(s).[/]");
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Incompatible mods:[/]");
-
-        foreach (var mod in incompatibleMods)
+        // Check if the installed version's SPT constraint is compatible with the installed SPT version
+        if (string.IsNullOrWhiteSpace(installedApiVersion.SptVersionConstraint))
         {
-            // Link mod name to Forge page if available
-            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
-                : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
+            return;
+        }
 
-            AnsiConsole.MarkupLine($"  {nameDisplay}");
-            AnsiConsole.MarkupLine($"    [yellow]- {mod.IncompatibilityReason?.EscapeMarkup()}[/]");
-
-            if (string.IsNullOrWhiteSpace(mod.CompatibleVersionString))
-            {
-                AnsiConsole.MarkupLine($"      [red]No compatible version available for SPT {sptVersion}[/]");
-                continue;
-            }
-
-            AnsiConsole.MarkupLine(
-                $"      [grey]Latest compatible version:[/] [green]{mod.CompatibleVersionString.EscapeMarkup()}[/]"
+        if (!SemanticVersioning.Range.TryParse(installedApiVersion.SptVersionConstraint, out var range))
+        {
+            // The constraint from Forge can't be parsed, so compatibility can't be evaluated. Surface it now:
+            // LoadWarnings are already rendered earlier in the run, so adding to them here would be invisible.
+            reporter.Warning(
+                $"Could not verify SPT compatibility for {mod.DisplayName}: Forge reported an invalid version constraint ({installedApiVersion.SptVersionConstraint})."
             );
-
-            // Use Forge download link format
-            if (mod.ApiModId.HasValue && !string.IsNullOrWhiteSpace(mod.ApiSlug))
-            {
-                var forgeDownloadUrl =
-                    $"https://forge.sp-tarkov.com/mod/download/{mod.ApiModId}/{mod.ApiSlug}/{mod.CompatibleVersionString}";
-                AnsiConsole.MarkupLine($"      [grey]Download:[/] [link]{forgeDownloadUrl}[/]");
-            }
+            return;
         }
 
-        AnsiConsole.WriteLine();
-        WriteRule();
+        if (range.IsSatisfied(sptVersion))
+        {
+            // The installed version is compatible - no issue
+            return;
+        }
 
-        return Task.CompletedTask;
+        // The installed version is NOT compatible with the installed SPT version
+        var reason = $"Version {mod.LocalVersion} requires SPT {installedApiVersion.SptVersionConstraint}";
+
+        // Find the latest compatible version to suggest
+        var compatibleApiVersion = mod.ApiVersions!.Where(v =>
+                SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion)
+            )
+            .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
+            .FirstOrDefault();
+
+        mod.SetLocalSptIncompatible(reason, compatibleApiVersion?.Version);
     }
 
     /// <summary>
@@ -878,7 +751,7 @@ public sealed class ApplicationService(
             return;
         }
 
-        AnsiConsole.WriteLine();
+        reporter.Blank();
 
         // Build set of installed mod GUIDs
         var installedGuids = mods.Where(m => !string.IsNullOrWhiteSpace(m.Guid))
@@ -888,577 +761,43 @@ public sealed class ApplicationService(
         // Count matched mods for progress
         var matchedCount = mods.Count(m => m.IsMatched && m.ApiModId.HasValue);
 
-        AnsiConsole.MarkupLine($"[bold blue]Checking mod dependencies for {matchedCount} mods...[/]");
+        reporter.Heading($"Checking mod dependencies for {matchedCount} mods...");
 
-        DependencyAnalysisResult result = null!;
-
-        await AnsiConsole
-            .Progress()
-            .Columns(
-                new SpinnerColumn(Spinner.Known.Dots) { Style = Style.Parse("blue") },
-                new TaskDescriptionColumn(),
-                new ProgressBarColumn(),
-                new PercentageColumn()
-            )
-            .StartAsync(async ctx =>
-            {
-                var progressTask = ctx.AddTask("[grey]Querying Forge API[/]", maxValue: matchedCount);
-
-                result = await modDependencyService.AnalyzeDependenciesAsync(
+        var result = await reporter.RunForgeQueryProgressAsync(
+            matchedCount,
+            setValue =>
+                modDependencyService.AnalyzeDependenciesAsync(
                     mods,
                     installedGuids,
-                    (current, _) =>
-                    {
-                        progressTask.Value = current;
-                    },
+                    (current, _) => setValue(current),
                     cancellationToken
-                );
-
-                progressTask.StopTask();
-            });
-
-        if (result.RootMods.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[grey]No dependency information available.[/]");
-            AnsiConsole.WriteLine();
-            WriteRule();
-            return;
-        }
-
-        AnsiConsole.MarkupLine("[green]Dependency analysis complete.[/]");
-        AnsiConsole.WriteLine();
-
-        // Display the dependency tree
-        DisplayDependencyTree(result);
-
-        // Display conflicts (warnings section)
-        if (result.Conflicts.Count > 0)
-        {
-            DisplayDependencyConflicts(result.Conflicts);
-        }
-
-        // Display missing dependencies (download list section)
-        if (result.MissingDependencies.Count > 0)
-        {
-            DisplayMissingDependencies(result.MissingDependencies);
-        }
-
-        if (!result.HasIssues)
-        {
-            AnsiConsole.MarkupLine("[green]All dependencies are satisfied![/]");
-        }
-
-        AnsiConsole.WriteLine();
-        WriteRule();
-    }
-
-    /// <summary>
-    /// Displays the dependency tree using Spectre.Console Tree component.
-    /// </summary>
-    /// <param name="result">The dependency analysis result.</param>
-    private static void DisplayDependencyTree(DependencyAnalysisResult result)
-    {
-        var tree = new Tree("[bold white]Mod Dependencies[/]");
-
-        // Sort mods alphabetically and add each with their dependencies as children
-        var sortedMods = result.RootMods.OrderBy(n => n.Mod.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
-
-        foreach (var node in sortedMods)
-        {
-            var label = FormatDependencyNodeLabel(node);
-            var treeNode = tree.AddNode(label);
-
-            // Add dependencies as children recursively
-            if (node.Children.Count > 0)
-            {
-                AddDependencyChildrenToTree(treeNode, node.Children);
-            }
-        }
-
-        AnsiConsole.Write(tree);
-        AnsiConsole.WriteLine();
-    }
-
-    /// <summary>
-    /// Recursively adds dependency children to a tree node.
-    /// </summary>
-    /// <param name="parent">The parent tree node.</param>
-    /// <param name="children">The child dependency nodes to add.</param>
-    private static void AddDependencyChildrenToTree(TreeNode parent, List<DependencyNode> children)
-    {
-        foreach (var child in children.OrderBy(c => c.Mod.DisplayName, StringComparer.OrdinalIgnoreCase))
-        {
-            var label = FormatDependencyNodeLabel(child);
-            var childTreeNode = parent.AddNode(label);
-
-            // Recursively add nested dependencies
-            if (child.Children.Count > 0)
-            {
-                AddDependencyChildrenToTree(childTreeNode, child.Children);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Formats the label for a dependency tree node.
-    /// </summary>
-    /// <param name="node">The dependency node.</param>
-    /// <returns>Formatted markup string for the node label.</returns>
-    private static string FormatDependencyNodeLabel(DependencyNode node)
-    {
-        var name = node.Mod.DisplayName.EscapeMarkup();
-        var version = node.Mod.LocalVersion.EscapeMarkup();
-
-        // Determine status color and indicator
-        string statusIndicator;
-        string nameColor;
-
-        if (!node.IsInstalled)
-        {
-            statusIndicator = "[red](missing)[/]";
-            nameColor = "red";
-        }
-        else if (node.DependencyInfo?.Conflict == true)
-        {
-            statusIndicator = "[yellow](conflict)[/]";
-            nameColor = "yellow";
-        }
-        else
-        {
-            statusIndicator = "";
-            nameColor = "white";
-        }
-
-        // Build the label with optional link
-        string label;
-        if (!string.IsNullOrWhiteSpace(node.Mod.ApiUrl))
-        {
-            label = $"[link={node.Mod.ApiUrl}][{nameColor}]{name}[/][/] [grey]v{version}[/]";
-        }
-        else if (node.DependencyInfo != null && node.DependencyInfo.Id > 0)
-        {
-            var url = $"https://forge.sp-tarkov.com/mod/{node.DependencyInfo.Id}/{node.DependencyInfo.Slug}";
-            label = $"[link={url}][{nameColor}]{name}[/][/] [grey]v{version}[/]";
-        }
-        else
-        {
-            label = $"[{nameColor}]{name}[/] [grey]v{version}[/]";
-        }
-
-        if (!string.IsNullOrWhiteSpace(statusIndicator))
-        {
-            label += $" {statusIndicator}";
-        }
-
-        return label;
-    }
-
-    /// <summary>
-    /// Displays dependency conflicts in the warning style.
-    /// </summary>
-    /// <param name="conflicts">List of conflicts to display.</param>
-    private static void DisplayDependencyConflicts(List<DependencyConflict> conflicts)
-    {
-        AnsiConsole.MarkupLine("[yellow]Dependency conflicts:[/]");
-
-        foreach (var conflict in conflicts)
-        {
-            var nameDisplay = $"[white]{conflict.ModName.EscapeMarkup()}[/]";
-
-            AnsiConsole.MarkupLine($"  {nameDisplay}");
-            AnsiConsole.MarkupLine($"    [yellow]- {conflict.Description.EscapeMarkup()}[/]");
-
-            if (conflict.DependencyInfo.Id > 0)
-            {
-                var url =
-                    $"https://forge.sp-tarkov.com/mod/{conflict.DependencyInfo.Id}/{conflict.DependencyInfo.Slug}";
-                AnsiConsole.MarkupLine($"      [grey]View on Forge:[/] [link]{url}[/]");
-            }
-        }
-
-        AnsiConsole.WriteLine();
-    }
-
-    /// <summary>
-    /// Displays missing dependencies in the download list style.
-    /// </summary>
-    /// <param name="missingDeps">List of missing dependencies to display.</param>
-    private static void DisplayMissingDependencies(List<MissingDependency> missingDeps)
-    {
-        AnsiConsole.MarkupLine("[red]Missing dependencies:[/]");
-
-        foreach (var dep in missingDeps)
-        {
-            // Link mod name to Forge page
-            string nameDisplay;
-            if (dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug))
-            {
-                var url = $"https://forge.sp-tarkov.com/mod/{dep.ModId}/{dep.Slug}";
-                nameDisplay = $"[link={url}]{dep.Name.EscapeMarkup()}[/]";
-            }
-            else
-            {
-                nameDisplay = $"[white]{dep.Name.EscapeMarkup()}[/]";
-            }
-
-            AnsiConsole.MarkupLine($"  {nameDisplay}");
-            AnsiConsole.MarkupLine(
-                $"    [grey]Recommended version:[/] [green]{dep.RecommendedVersion.EscapeMarkup()}[/]"
-            );
-
-            if (!string.IsNullOrWhiteSpace(dep.DownloadLink))
-            {
-                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{dep.DownloadLink}[/]");
-            }
-        }
-
-        AnsiConsole.WriteLine();
-    }
-
-    /// <summary>
-    /// Displays a table showing version information for all verified mods.
-    /// </summary>
-    /// <param name="mods">Processed mods.</param>
-    private static void ShowVersionUpdateTable(List<Mod> mods)
-    {
-        // Group by API mod ID to avoid duplicates, select the one with the highest version
-        var verifiedMods = mods.Where(m => m.IsMatched && m.LatestVersion is not null)
-            .GroupBy(m => m.ApiModId!.Value)
-            .Select(g => g.OrderByDescending(m => GetVersionForComparison(m.LocalVersion)).First())
-            .ToList();
-
-        if (verifiedMods.Count == 0)
-        {
-            return;
-        }
-
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[bold blue]Checking for mod updates...[/]");
-        AnsiConsole.MarkupLine(
-            "[white]This tool depends on mod authors to use and update valid version numbers. If you notice a version number in the Current Version column that is incorrect, please contact the author of the mod to have it updated.[/]"
-        );
-        AnsiConsole.WriteLine();
-
-        var table = new Table()
-            .Title("[blue]Mod Version Summary[/]")
-            .BorderColor(Color.Grey)
-            .AddColumn("[white]Name[/]")
-            .AddColumn("[white]Author[/]")
-            .AddColumn("[white]Current Version[/]")
-            .AddColumn("[white]Latest Version[/]");
-
-        foreach (var mod in verifiedMods)
-        {
-            var (displayName, displayAuthor) = FormatModDisplayStrings(mod.DisplayName, mod.DisplayAuthor);
-
-            var latestVersionDisplay = FormatVersionDisplay(mod);
-
-            // Link mod name to Forge page if available
-            var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                ? $"[link={mod.ApiUrl}]{displayName.EscapeMarkup()}[/]"
-                : displayName.EscapeMarkup();
-
-            table.AddRow(
-                nameDisplay,
-                displayAuthor.EscapeMarkup(),
-                mod.LocalVersion.EscapeMarkup(),
-                latestVersionDisplay
-            );
-        }
-
-        AnsiConsole.Write(table);
-
-        AnsiConsole.MarkupLine(
-            "[grey]Version colors: [green]Up to date[/] | [red]Update available[/] | [darkorange]Update blocked[/] | [blue]Newer than latest[/][/]"
+                )
         );
 
-        // Display mods with available updates
-        var modsWithUpdates = verifiedMods.Where(m => m.UpdateStatus == UpdateStatus.UpdateAvailable).ToList();
-        if (modsWithUpdates.Count > 0)
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[red]Updates available:[/]");
-
-            foreach (var mod in modsWithUpdates)
-            {
-                // Link mod name to Forge page if available
-                var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                    ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
-                    : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
-
-                AnsiConsole.MarkupLine($"  {nameDisplay}");
-                AnsiConsole.MarkupLine(
-                    $"    [grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [green]{mod.LatestVersion!.EscapeMarkup()}[/]"
-                );
-
-                if (string.IsNullOrWhiteSpace(mod.DownloadLink))
-                {
-                    continue;
-                }
-
-                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{mod.DownloadLink}[/]");
-            }
-        }
-
-        // Display mods with blocked updates
-        var modsWithBlockedUpdates = verifiedMods.Where(m => m.UpdateStatus == UpdateStatus.UpdateBlocked).ToList();
-        if (modsWithBlockedUpdates.Count > 0)
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[darkorange]Updates blocked:[/]");
-
-            foreach (var mod in modsWithBlockedUpdates)
-            {
-                var nameDisplay = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                    ? $"[link={mod.ApiUrl}]{mod.DisplayName.EscapeMarkup()}[/]"
-                    : $"[white]{mod.DisplayName.EscapeMarkup()}[/]";
-
-                AnsiConsole.MarkupLine($"  {nameDisplay}");
-                AnsiConsole.MarkupLine(
-                    $"    [grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [darkorange]{mod.LatestVersion!.EscapeMarkup()}[/]"
-                );
-
-                if (!string.IsNullOrWhiteSpace(mod.BlockReason))
-                {
-                    AnsiConsole.MarkupLine($"    [grey]Reason:[/] {FormatBlockReason(mod.BlockReason).EscapeMarkup()}");
-                }
-
-                if (mod.BlockingMods is { Count: > 0 })
-                {
-                    foreach (var blocker in mod.BlockingMods)
-                    {
-                        AnsiConsole.MarkupLine(
-                            $"    [grey]Blocked by:[/] {blocker.Name.EscapeMarkup()} [grey]({blocker.Constraint.EscapeMarkup()})[/]"
-                        );
-                    }
-                }
-            }
-        }
-
-        AnsiConsole.WriteLine();
-        WriteRule();
-        AnsiConsole.WriteLine();
-
-        AnsiConsole.Write(new FigletText("FIN").LeftJustified().Color(Color.Fuchsia));
-        AnsiConsole.MarkupLine("[fuchsia]Scroll up to read details about your mods![/]");
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[grey]Pro tip:    Mod names are clickable.[/]");
-        AnsiConsole.MarkupLine("[grey]Expert tip: Read the mod page before installing or updating mods.[/]");
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(
-            "[white]Find an issue [italic]with this tool[/]? Find Refringe on Discord, or [link=https://github.com/refringe/SPT-Check-Mods/issues/new]submit a bug report[/].[/]"
-        );
+        reporter.DependencyResults(result);
     }
 
     /// <summary>
-    /// Formats the version display with appropriate color coding.
+    /// Removes the legacy API key file written by previous versions. The Forge API is now open and read-only,
+    /// so no API key is stored. Best-effort: any failure is logged and ignored.
     /// </summary>
-    private static string FormatVersionDisplay(Mod mod)
+    private void RemoveLegacyApiKeyFile()
     {
-        if (mod.LatestVersion is null)
-        {
-            return "[grey]No versions found[/]";
-        }
-
-        return mod.UpdateStatus switch
-        {
-            UpdateStatus.UpToDate => $"[green]{mod.LatestVersion.EscapeMarkup()}[/]",
-            UpdateStatus.UpdateAvailable => $"[red]{mod.LatestVersion.EscapeMarkup()}[/]",
-            UpdateStatus.UpdateBlocked => $"[darkorange]{mod.LatestVersion.EscapeMarkup()}[/]",
-            UpdateStatus.NewerInstalled => $"[blue]{mod.LatestVersion.EscapeMarkup()}[/]",
-            UpdateStatus.NoVersionsFound => "[grey]No versions found[/]",
-            _ => mod.LatestVersion.EscapeMarkup(),
-        };
-    }
-
-    /// <summary>
-    /// Formats a raw block reason string from the API into a human-readable description.
-    /// </summary>
-    private static string FormatBlockReason(string reason)
-    {
-        return reason switch
-        {
-            "dependency_constraint_violation" => "A dependency has a version constraint that prevents this update",
-            "chain_dependency_conflict" => "A dependency chain conflict prevents this update",
-            _ => reason.Replace('_', ' '),
-        };
-    }
-
-    /// <summary>
-    /// Formats mod name and author strings for display with proper truncation.
-    /// </summary>
-    private static (string displayName, string displayAuthor) FormatModDisplayStrings(string modName, string author)
-    {
-        var displayName =
-            modName.Length > MatchingConstants.MaxDisplayNameLength
-                ? modName[..(MatchingConstants.MaxDisplayNameLength - 3)] + "..."
-                : modName;
-        var displayAuthor =
-            author.Length > MatchingConstants.MaxDisplayAuthorLength
-                ? author[..(MatchingConstants.MaxDisplayAuthorLength - 3)] + "..."
-                : author;
-
-        return (displayName, displayAuthor);
-    }
-
-    /// <summary>
-    /// Parses a version string for comparison purposes.
-    /// </summary>
-    private static SemanticVersioning.Version GetVersionForComparison(string versionString)
-    {
-        if (string.IsNullOrWhiteSpace(versionString))
-        {
-            return new SemanticVersioning.Version(0, 0, 0);
-        }
-
         try
         {
-            return new SemanticVersioning.Version(versionString);
-        }
-        catch
-        {
-            return new SemanticVersioning.Version(0, 0, 0);
-        }
-    }
-
-    /// <summary>
-    /// Retrieves and validates the Forge API key from storage or prompts the user for a new one.
-    /// Stores valid keys in %APPDATA%/SptCheckMods/apikey.txt for future use.
-    /// </summary>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>Valid API key or null if the user cancels.</returns>
-    private async Task<string?> GetAndValidateApiKey(CancellationToken cancellationToken = default)
-    {
-        var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var configFolder = SecurityHelper.GetSafePath(Path.Combine(appDataFolder, "SptCheckMods"));
-        if (configFolder is null)
-        {
-            AnsiConsole.MarkupLine("[red]Error: Could not determine a safe configuration folder path.[/]");
-            return null;
-        }
-
-        Directory.CreateDirectory(configFolder);
-        var configFilePath = SecurityHelper.GetSafePath(Path.Combine(configFolder, "apikey.txt"), configFolder);
-        if (configFilePath is null)
-        {
-            AnsiConsole.MarkupLine("[red]Error: Could not determine a safe configuration file path.[/]");
-            return null;
-        }
-
-        if (!File.Exists(configFilePath))
-        {
-            return await PromptForNewApiKeyAsync(configFilePath, cancellationToken);
-        }
-
-        var savedKey = (await File.ReadAllTextAsync(configFilePath, cancellationToken)).Trim();
-        if (string.IsNullOrWhiteSpace(savedKey))
-        {
-            return await PromptForNewApiKeyAsync(configFilePath, cancellationToken);
-        }
-
-        savedKey = SecurityHelper.SanitizeInput(savedKey);
-        AnsiConsole.MarkupLine("[bold blue]Validating Forge API key...[/]");
-        AnsiConsole.MarkupLine("Found saved API key. Validating...");
-
-        var validationResult = await forgeApiService.ValidateApiKeyAsync(savedKey, cancellationToken);
-
-        var outcome = validationResult.Match(
-            _ =>
+            var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var configFilePath = Path.Combine(appDataFolder, "SptCheckMods", "apikey.txt");
+            if (!File.Exists(configFilePath))
             {
-                AnsiConsole.MarkupLine("[green]Saved API key is valid.[/]");
-                AnsiConsole.WriteLine();
-                WriteRule();
-                AnsiConsole.WriteLine();
-                return (string?)savedKey;
-            },
-            invalidKey =>
-            {
-                if (invalidKey.ShouldDeleteKey)
-                {
-                    AnsiConsole.MarkupLine("[red]The saved API key is invalid or has expired.[/]");
-                    File.Delete(configFilePath);
-                }
-
-                return null;
-            },
-            _ =>
-            {
-                // Transient error - use saved key anyway
-                AnsiConsole.MarkupLine(
-                    "[yellow]Could not validate API key (API may be unavailable). Using saved key.[/]"
-                );
-                AnsiConsole.WriteLine();
-                WriteRule();
-                AnsiConsole.WriteLine();
-                return (string?)savedKey;
-            }
-        );
-
-        if (outcome is not null)
-        {
-            return outcome;
-        }
-
-        return await PromptForNewApiKeyAsync(configFilePath, cancellationToken);
-    }
-
-    /// <summary>
-    /// Prompts the user to enter a new API key and validates it.
-    /// </summary>
-    /// <param name="configFilePath">Path to save the API key.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>Valid API key or null if user cancels.</returns>
-    private async Task<string?> PromptForNewApiKeyAsync(string configFilePath, CancellationToken cancellationToken)
-    {
-        AnsiConsole.MarkupLine("[yellow]Forge API key not found or was invalid.[/]");
-        AnsiConsole.MarkupLine("Please generate an API key from your Forge account:");
-        AnsiConsole.MarkupLine("[blue][link]https://forge.sp-tarkov.com/user/api-tokens[/][/]");
-
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var promptTask = Task.Run(
-                () =>
-                    AnsiConsole.Prompt(
-                        new TextPrompt<string>("Enter your [green]API key[/]:").PromptStyle("green").Secret()
-                    ),
-                cancellationToken
-            );
-            var newKey = await promptTask.WaitAsync(cancellationToken);
-
-            if (string.IsNullOrWhiteSpace(newKey))
-            {
-                continue;
+                return;
             }
 
-            newKey = SecurityHelper.SanitizeInput(newKey);
-
-            AnsiConsole.Markup("Validating entered key... ");
-
-            var newKeyResult = await forgeApiService.ValidateApiKeyAsync(newKey, cancellationToken);
-
-            var isKeyValid = newKeyResult.Match(
-                isValid => isValid,
-                _ => false, // InvalidApiKey
-                _ => false // ApiError
-            );
-
-            if (!isKeyValid)
-            {
-                AnsiConsole.MarkupLine(
-                    "[red]Failed. The entered key is invalid or lacks 'read' permissions. Please try again.[/]"
-                );
-                continue;
-            }
-
-            AnsiConsole.MarkupLine("[green]OK[/]");
-            await File.WriteAllTextAsync(configFilePath, newKey, cancellationToken);
-            AnsiConsole.MarkupLine($"[green]API key saved successfully to:[/] [grey]{configFilePath}[/]");
-            AnsiConsole.WriteLine();
-            WriteRule();
-            AnsiConsole.WriteLine();
-            return newKey;
+            File.Delete(configFilePath);
+            logger.LogInformation("Removed legacy API key file: {Path}", configFilePath);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to remove legacy API key file");
         }
     }
 }

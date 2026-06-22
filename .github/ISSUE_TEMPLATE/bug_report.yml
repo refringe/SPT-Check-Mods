@@ -7,7 +7,7 @@ body:
       value: |
         Thank you for reporting a bug! Please fill out the sections below so we can reproduce and fix the issue.
 
-        **Note:** If you're reporting incorrect mod version data or a mod mismatch, that is a data issue maintained by the mod author, not a bug in Check Mods. Please see [Mod Mismatch](https://github.com/refringe/SPT-Check-Mods/blob/main/.github/MOD_MISMATCH.md) for more information.
+        **Note:** If Check Mods keeps showing an "update available" for a mod you've confirmed is already up to date, that's a version-data mismatch on the Forge, not a bug. You can suggest that version be ignored for everyone using the [Ignored Update Suggestion](https://github.com/refringe/SPT-Check-Mods/issues/new?template=report-ignored-updates.yml) form.
 
   - type: textarea
     id: description

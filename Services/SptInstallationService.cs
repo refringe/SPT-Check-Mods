@@ -1,7 +1,7 @@
 using CheckMods.Models;
 using CheckMods.Services.Interfaces;
+using CheckMods.Utils;
 using Microsoft.Extensions.Logging;
-using Spectre.Console;
 using SPTarkov.DI.Annotations;
 
 namespace CheckMods.Services;
@@ -10,11 +10,12 @@ namespace CheckMods.Services;
 /// Service responsible for SPT installation validation.
 /// </summary>
 [Injectable(InjectionType.Transient)]
-public sealed class ServerModService(
+public sealed class SptInstallationService(
     IForgeApiService forgeApiService,
     IModScannerService scannerService,
-    ILogger<ServerModService> logger
-) : IServerModService
+    IModCheckReporter reporter,
+    ILogger<SptInstallationService> logger
+) : ISptInstallationService
 {
     /// <inheritdoc />
     public async Task<SemanticVersioning.Version?> GetAndValidateSptVersionAsync(
@@ -28,8 +29,8 @@ public sealed class ServerModService(
         if (!File.Exists(coreDllPath))
         {
             logger.LogError("SPT core DLL not found: {CoreDllPath}", coreDllPath);
-            AnsiConsole.MarkupLine(
-                "[red]Error: Could not find SPT installation. Run this file in your root SPT directory, or provide the SPT path as an argument.[/]"
+            reporter.Error(
+                "Error: Could not find SPT installation. Run this file in your root SPT directory, or provide the SPT path as an argument."
             );
             return null;
         }
@@ -39,15 +40,13 @@ public sealed class ServerModService(
         if (string.IsNullOrWhiteSpace(localSptVersionStr))
         {
             logger.LogError("Could not extract SPT version from core DLL");
-            AnsiConsole.MarkupLine("[red]Error: SPT version not found in SPTarkov.Server.Core.dll.[/]");
+            reporter.Error("Error: SPT version not found in SPTarkov.Server.Core.dll.");
             return null;
         }
 
         logger.LogDebug("Found local SPT version: {SptVersion}", localSptVersionStr);
 
-        AnsiConsole.Markup(
-            $"Found local SPT version [bold blue]{localSptVersionStr}[/]. Validating with Forge API... "
-        );
+        reporter.ValidatingSptVersion(localSptVersionStr);
 
         var validationResult = await forgeApiService.ValidateSptVersionAsync(localSptVersionStr, cancellationToken);
 
@@ -62,15 +61,25 @@ public sealed class ServerModService(
             // Provide more specific error messages based on the result type
             validationResult.Switch(
                 _ => { }, // Success - handled above
-                _ => AnsiConsole.MarkupLine("[red]Failed. SPT version not recognized by Forge API.[/]"),
-                apiError => AnsiConsole.MarkupLine($"[red]Failed. API error: {apiError.Message.EscapeMarkup()}[/]")
+                _ => reporter.Error("Failed. SPT version not recognized by Forge API."),
+                apiError => reporter.Error($"Failed. API error: {apiError.Message}")
             );
 
             return null;
         }
 
-        AnsiConsole.MarkupLine("[green]OK[/]");
-        return new SemanticVersioning.Version(localSptVersionStr);
+        // Forge accepted the version string, but parse it without throwing in case its format differs from what the
+        // SemanticVersioning library's strict constructor accepts.
+        var localSptVersion = SemVer.TryParse(localSptVersionStr);
+        if (localSptVersion is null)
+        {
+            logger.LogError("Could not parse SPT version '{SptVersion}'", localSptVersionStr);
+            reporter.Error($"Failed. Could not parse SPT version '{localSptVersionStr}'.");
+            return null;
+        }
+
+        reporter.Success("OK");
+        return localSptVersion;
     }
 
     /// <inheritdoc />
@@ -86,32 +95,13 @@ public sealed class ServerModService(
         return versionsResult.Match(
             versions =>
             {
-                // Filter to versions newer than the current version
+                // Filter to versions newer than the current version, skipping any that can't be parsed. Parse each
+                // version string once and carry the result through the filter and sort.
                 var newerVersions = versions
-                    .Where(v =>
-                    {
-                        try
-                        {
-                            var semVer = new SemanticVersioning.Version(v.Version);
-                            return semVer > currentVersion;
-                        }
-                        catch
-                        {
-                            // Skip versions that can't be parsed
-                            return false;
-                        }
-                    })
-                    .OrderByDescending(v =>
-                    {
-                        try
-                        {
-                            return new SemanticVersioning.Version(v.Version);
-                        }
-                        catch
-                        {
-                            return new SemanticVersioning.Version(0, 0, 0);
-                        }
-                    })
+                    .Select(v => (Raw: v, Parsed: SemVer.TryParse(v.Version)))
+                    .Where(x => x.Parsed is not null && x.Parsed! > currentVersion)
+                    .OrderByDescending(x => x.Parsed)
+                    .Select(x => x.Raw)
                     .ToList();
 
                 logger.LogDebug("Found {Count} newer SPT versions", newerVersions.Count);

@@ -15,6 +15,12 @@ namespace CheckMods.Services;
 public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger<ModMatchingService> logger)
     : IModMatchingService
 {
+    /// <summary>
+    /// Minimum number of mods that must all fail before an all-failed batch is treated as a systemic fault. Below
+    /// this, "every mod failed" is too easily satisfied by one or two unlucky mods to justify aborting the run.
+    /// </summary>
+    private const int MinimumModsForSystemicFailure = 3;
+
     /// <inheritdoc />
     public async Task<Mod> MatchModAsync(
         Mod mod,
@@ -32,7 +38,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
             if (guidResult.TryPickT0(out var guidMatch, out _))
             {
                 logger.LogDebug("Mod matched by GUID: {ModName} -> {ApiName}", mod.LocalName, guidMatch.Name);
-                mod.UpdateFromApiMatch(guidMatch, MatchingConstants.ExactGuidConfidence, MatchMethod.ExactGuid);
+                mod.UpdateFromApiMatch(guidMatch);
                 return mod;
             }
         }
@@ -46,11 +52,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
 
             if (altGuidResult.TryPickT0(out var altGuidMatch, out _))
             {
-                mod.UpdateFromApiMatch(
-                    altGuidMatch,
-                    MatchingConstants.ExactGuidConfidence - MatchingConstants.AlternateGuidConfidenceReduction,
-                    MatchMethod.ExactGuid
-                );
+                mod.UpdateFromApiMatch(altGuidMatch);
                 return mod;
             }
         }
@@ -84,12 +86,12 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
                 continue;
             }
 
-            mod.UpdateFromApiMatch(bestMatch.Value.Result, bestMatch.Value.Confidence, bestMatch.Value.Method);
+            mod.UpdateFromApiMatch(bestMatch);
             return mod;
         }
 
         logger.LogDebug("No match found for mod: {ModName}", mod.LocalName);
-        mod.Status = ModStatus.NoMatch;
+        mod.MarkUnmatched();
         return mod;
     }
 
@@ -177,10 +179,29 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
         var modList = mods.ToList();
         var totalCount = modList.Count;
         var completedCount = 0;
+        var failureCount = 0;
+        Exception? firstFailure = null;
 
         var tasks = modList.Select(async mod =>
         {
-            await MatchModAsync(mod, sptVersion, cancellationToken);
+            try
+            {
+                await MatchModAsync(mod, sptVersion, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Isolate per-mod failures: leave this mod cleanly unmatched rather than failing the whole batch.
+                // An exception here is always abnormal - network/API errors are handled inside MatchModAsync and
+                // never throw - so remember it to surface a systemic failure once the batch completes.
+                logger.LogWarning(ex, "Failed to match mod: {ModName}", mod.LocalName);
+                mod.MarkUnmatched();
+                Interlocked.Increment(ref failureCount);
+                Interlocked.CompareExchange(ref firstFailure, ex, null);
+            }
 
             var current = Interlocked.Increment(ref completedCount);
             progressCallback?.Invoke(mod, current, totalCount);
@@ -189,23 +210,33 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
         });
 
         var results = await Task.WhenAll(tasks);
+
+        // When every mod throws, matching is likely broken systemically (a bug or environment fault that hits them
+        // all). Surface it instead of silently reporting every mod as "not found on Forge" - but only once enough
+        // mods are involved that an all-failed batch is meaningful. For one or two mods, "every mod failed" is just
+        // as easily an isolated bad mod, so leave them cleanly unmatched and let the run continue.
+        if (totalCount >= MinimumModsForSystemicFailure && failureCount == totalCount)
+        {
+            throw new InvalidOperationException(
+                $"Failed to match any of the {totalCount} mods against the Forge API.",
+                firstFailure
+            );
+        }
+
         return results;
     }
 
     /// <summary>
     /// Finds the best matching API result for a given mod using multiple comparison strategies.
     /// </summary>
-    private static (ModSearchResult Result, int Confidence, MatchMethod Method)? FindBestMatch(
-        Mod mod,
-        List<ModSearchResult> searchResults
-    )
+    private static ModSearchResult? FindBestMatch(Mod mod, List<ModSearchResult> searchResults)
     {
         // 1. Try exact normalized name match
         foreach (var result in searchResults)
         {
             if (ModNameNormalizer.IsExactMatch(mod.LocalName, result.Name))
             {
-                return (result, MatchingConstants.ExactNameConfidence, MatchMethod.ExactName);
+                return result;
             }
         }
 
@@ -217,7 +248,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
             {
                 if (ModNameNormalizer.IsExactMatch(nameWithoutSuffix, result.Name, removeComponentSuffixes: true))
                 {
-                    return (result, MatchingConstants.ExactNameConfidence - 2, MatchMethod.ExactName);
+                    return result;
                 }
             }
         }
@@ -230,7 +261,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
                 // Compare normalized slug to normalized local name
                 if (ModNameNormalizer.IsExactMatch(mod.LocalName, result.Slug, removeComponentSuffixes: true))
                 {
-                    return (result, MatchingConstants.ExactNameConfidence - 3, MatchMethod.ExactName);
+                    return result;
                 }
 
                 // Also compare GUID name part to slug
@@ -239,7 +270,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
                     var guidName = ModNameNormalizer.ExtractNameFromGuid(mod.Guid);
                     if (ModNameNormalizer.IsExactMatch(guidName, result.Slug, removeComponentSuffixes: true))
                     {
-                        return (result, MatchingConstants.ExactNameConfidence - 5, MatchMethod.ExactName);
+                        return result;
                     }
                 }
             }
@@ -259,7 +290,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
                     && ModNameNormalizer.IsExactMatch(mod.LocalName, result.Name, removeComponentSuffixes: true)
                 )
                 {
-                    return (result, MatchingConstants.ExactNameConfidence, MatchMethod.ExactName);
+                    return result;
                 }
             }
         }
@@ -279,14 +310,6 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
             .OrderByDescending(x => x.Score)
             .FirstOrDefault();
 
-        if (bestFuzzyMatch is null)
-        {
-            return null;
-        }
-
-        // Scale confidence based on fuzzy score
-        var confidence = (int)(bestFuzzyMatch.Score * MatchingConstants.FuzzyNameConfidence / 100.0);
-
-        return (bestFuzzyMatch.Result, confidence, MatchMethod.FuzzyName);
+        return bestFuzzyMatch?.Result;
     }
 }

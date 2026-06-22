@@ -5,7 +5,7 @@ namespace CheckMods.Services.Interfaces;
 /// <summary>
 /// Service responsible for SPT installation validation.
 /// </summary>
-public interface IServerModService
+public interface ISptInstallationService
 {
     /// <summary>
     /// Reads and validates the SPT version from the installation.

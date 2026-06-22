@@ -8,11 +8,6 @@ namespace CheckMods.Configuration;
 public class LoggingOptions
 {
     /// <summary>
-    /// The configuration section name for binding from appsettings.
-    /// </summary>
-    public const string SectionName = "Logging";
-
-    /// <summary>
     /// Whether file logging is enabled. Default is true.
     /// </summary>
     public bool EnableFileLogging { get; set; } = true;
@@ -31,6 +26,12 @@ public class LoggingOptions
     /// Number of log files to retain. Default is 3.
     /// </summary>
     public int RetainedFileCount { get; set; } = 3;
+
+    /// <summary>
+    /// The full path to the active log file. Defaults to <see cref="CurrentLogFilePath"/>; overridable (e.g. by tests)
+    /// to redirect logging to an isolated location.
+    /// </summary>
+    public string LogFilePath { get; set; } = CurrentLogFilePath;
 
     /// <summary>
     /// Gets the path to the log directory (same location as API key file).

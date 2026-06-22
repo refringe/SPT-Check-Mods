@@ -3,14 +3,6 @@ using System.Text.Json.Serialization;
 namespace CheckMods.Models;
 
 /// <summary>
-/// Response from the Forge API authentication abilities endpoint.
-/// </summary>
-public record AuthAbilitiesResponse(
-    [property: JsonPropertyName("success")] bool Success,
-    [property: JsonPropertyName("data")] List<string>? Data
-);
-
-/// <summary>
 /// Response from the Forge API mod search endpoint.
 /// </summary>
 public record ModSearchApiResponse(
@@ -107,9 +99,10 @@ public record ModUpdatesData(
 );
 
 /// <summary>
-/// Version information containing version string and metadata.
+/// A version reference (current, recommended, latest, or latest-compatible) returned within the batch updates and
+/// incompatibility responses.
 /// </summary>
-public record ModVersionInfo2(
+public record ModUpdateVersion(
     [property: JsonPropertyName("id")] int? Id,
     [property: JsonPropertyName("mod_id")] int ModId,
     [property: JsonPropertyName("guid")] string? Guid,
@@ -124,8 +117,8 @@ public record ModVersionInfo2(
 /// A mod that has an update available and is safe to update.
 /// </summary>
 public record SafeToUpdateMod(
-    [property: JsonPropertyName("current_version")] ModVersionInfo2? CurrentVersion,
-    [property: JsonPropertyName("recommended_version")] ModVersionInfo2? RecommendedVersion,
+    [property: JsonPropertyName("current_version")] ModUpdateVersion? CurrentVersion,
+    [property: JsonPropertyName("recommended_version")] ModUpdateVersion? RecommendedVersion,
     [property: JsonPropertyName("update_reason")] string? UpdateReason
 )
 {
@@ -142,8 +135,8 @@ public record SafeToUpdateMod(
 /// A mod that has an update available but is blocked by dependency constraints.
 /// </summary>
 public record BlockedUpdateMod(
-    [property: JsonPropertyName("current_version")] ModVersionInfo2? CurrentVersion,
-    [property: JsonPropertyName("latest_version")] ModVersionInfo2? LatestVersion,
+    [property: JsonPropertyName("current_version")] ModUpdateVersion? CurrentVersion,
+    [property: JsonPropertyName("latest_version")] ModUpdateVersion? LatestVersion,
     [property: JsonPropertyName("block_reason")] string? BlockReason,
     [property: JsonPropertyName("blocking_mods")] List<BlockingModInfo>? BlockingMods
 )
@@ -191,7 +184,7 @@ public record IncompatibleMod(
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("version")] string Version,
     [property: JsonPropertyName("reason")] string Reason,
-    [property: JsonPropertyName("latest_compatible_version")] ModVersionInfo2? LatestCompatibleVersion
+    [property: JsonPropertyName("latest_compatible_version")] ModUpdateVersion? LatestCompatibleVersion
 );
 
 #endregion

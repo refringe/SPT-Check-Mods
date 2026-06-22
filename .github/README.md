@@ -15,7 +15,6 @@ A .NET 9 console application that validates Single Player Tarkov (SPT) mod compa
 ## Requirements
 
 - Valid SPT installation
-- [Forge API key](https://forge.sp-tarkov.com/user/api-tokens) with read permissions
 
 ## Installation
 
@@ -40,15 +39,12 @@ dotnet run
 dotnet run /path/to/spt
 ```
 
-### First Run
-On first run, you'll be prompted to enter your Forge API key. The key is securely stored for future use.
-
 ## Architecture
 
 SPT Check Mods uses a pipeline-based service architecture with dependency injection:
 
 - **ApplicationService**: Main orchestrator that coordinates the entire workflow
-- **ServerModService**: Validates SPT installation and extracts SPT version from `SPTarkov.Server.Core.dll`
+- **SptInstallationService**: Validates SPT installation and extracts SPT version from `SPTarkov.Server.Core.dll`
 - **ModScannerService**: Scans both server (`SPT/user/mods`) and client (`BepInEx/plugins`) mods
 - **ModReconciliationService**: Matches server/client components of the same mod
 - **ModMatchingService**: Matches local mods with the Forge API using GUID and fuzzy name matching
@@ -58,9 +54,6 @@ SPT Check Mods uses a pipeline-based service architecture with dependency inject
 - **RateLimitService**: Prevents API throttling
 
 ## Configuration
-
-### API Key Storage
-The Forge API key is stored in: `%APPDATA%\SptCheckMods\apikey.txt`
 
 ### Log Files
 Application logs are stored in: `%APPDATA%\SptCheckMods\logs\checkmod.log`

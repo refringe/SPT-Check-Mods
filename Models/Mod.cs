@@ -88,21 +88,6 @@ public sealed class Mod
     public string? ApiUrl { get; private set; }
 
     /// <summary>
-    /// A short description or teaser for the mod.
-    /// </summary>
-    public string? ApiTeaser { get; private set; }
-
-    /// <summary>
-    /// URL to the mod's thumbnail image.
-    /// </summary>
-    public string? ApiThumbnail { get; private set; }
-
-    /// <summary>
-    /// Total download count for the mod.
-    /// </summary>
-    public int? ApiDownloads { get; private set; }
-
-    /// <summary>
     /// URL to the mod's source code repository.
     /// </summary>
     public string? ApiSourceCodeUrl { get; private set; }
@@ -120,11 +105,6 @@ public sealed class Mod
     /// The latest SPT-compatible version available on Forge.
     /// </summary>
     public string? LatestVersion { get; private set; }
-
-    /// <summary>
-    /// When the latest version was published.
-    /// </summary>
-    public DateTime? LatestVersionDate { get; private set; }
 
     /// <summary>
     /// The update status compared to the latest available version.
@@ -157,14 +137,15 @@ public sealed class Mod
     public bool IsLocalSptIncompatible { get; private set; }
 
     /// <summary>
-    /// Download link for a compatible version when the current install is SPT-incompatible.
-    /// </summary>
-    public string? CompatibleVersionDownloadLink { get; private set; }
-
-    /// <summary>
     /// The compatible version string when a compatible version exists.
     /// </summary>
     public string? CompatibleVersionString { get; private set; }
+
+    /// <summary>
+    /// Whether this mod's available update has been dismissed as a false positive and should be shown as ignored
+    /// (treated as up to date) rather than as an available update.
+    /// </summary>
+    public bool UpdateSuppressed { get; private set; }
 
     #endregion
 
@@ -173,22 +154,7 @@ public sealed class Mod
     /// <summary>
     /// The current processing/verification status of the mod.
     /// </summary>
-    public ModStatus Status { get; set; } = ModStatus.NoMatch;
-
-    /// <summary>
-    /// The confidence score (0-100) of the API match.
-    /// </summary>
-    public int MatchConfidence { get; private set; }
-
-    /// <summary>
-    /// The method used to match this mod with the API.
-    /// </summary>
-    public MatchMethod MatchMethod { get; private set; } = MatchMethod.None;
-
-    /// <summary>
-    /// Whether the user has confirmed a low-confidence match.
-    /// </summary>
-    public bool IsConfirmed { get; set; }
+    public ModStatus Status { get; private set; } = ModStatus.NoMatch;
 
     /// <summary>
     /// Warnings encountered during scanning/loading.
@@ -216,14 +182,6 @@ public sealed class Mod
     }
 
     /// <summary>
-    /// The installed version for display purposes.
-    /// </summary>
-    public string DisplayVersion
-    {
-        get { return LocalVersion; }
-    }
-
-    /// <summary>
     /// Whether the mod has any loading warnings.
     /// </summary>
     public bool HasWarnings
@@ -247,25 +205,25 @@ public sealed class Mod
     /// Updates the mod with API match data from a search result.
     /// </summary>
     /// <param name="apiResult">The API search result to populate from.</param>
-    /// <param name="confidence">The confidence score of the match (0-100).</param>
-    /// <param name="method">The method used to find this match.</param>
-    public void UpdateFromApiMatch(ModSearchResult apiResult, int confidence, MatchMethod method)
+    public void UpdateFromApiMatch(ModSearchResult apiResult)
     {
         ApiModId = apiResult.Id;
         ApiName = apiResult.Name;
         ApiAuthor = apiResult.Owner;
         ApiSlug = apiResult.Slug;
         ApiUrl = apiResult.DetailUrl;
-        ApiTeaser = apiResult.Teaser;
-        ApiThumbnail = apiResult.Thumbnail;
-        ApiDownloads = apiResult.Downloads;
         ApiSourceCodeUrl = apiResult.SourceCodeUrl;
         ApiVersions = apiResult.Versions?.ToList().AsReadOnly();
 
-        MatchConfidence = confidence;
-        MatchMethod = method;
         Status = ModStatus.Verified;
-        IsConfirmed = confidence >= 100;
+    }
+
+    /// <summary>
+    /// Marks the mod as having no Forge API match.
+    /// </summary>
+    public void MarkUnmatched()
+    {
+        Status = ModStatus.NoMatch;
     }
 
     /// <summary>
@@ -316,43 +274,20 @@ public sealed class Mod
     /// </summary>
     /// <param name="reason">The reason for incompatibility.</param>
     /// <param name="compatibleVersion">The version string of a compatible version, if available.</param>
-    /// <param name="downloadLink">Download link for the compatible version, if available.</param>
-    public void SetLocalSptIncompatible(string reason, string? compatibleVersion = null, string? downloadLink = null)
+    public void SetLocalSptIncompatible(string reason, string? compatibleVersion = null)
     {
         IsLocalSptIncompatible = true;
         IncompatibilityReason = reason;
         CompatibleVersionString = compatibleVersion;
-        CompatibleVersionDownloadLink = downloadLink;
     }
 
     /// <summary>
-    /// Clears API match data (used when user rejects a low-confidence match).
+    /// Sets whether this mod's available update is suppressed (dismissed as a false positive).
     /// </summary>
-    public void ClearApiMatch()
+    /// <param name="suppressed">True to treat the available update as ignored; false to show it normally.</param>
+    public void SetUpdateSuppressed(bool suppressed)
     {
-        ApiModId = null;
-        ApiName = null;
-        ApiAuthor = null;
-        ApiSlug = null;
-        ApiUrl = null;
-        ApiTeaser = null;
-        ApiThumbnail = null;
-        ApiDownloads = null;
-        ApiSourceCodeUrl = null;
-        ApiVersions = null;
-
-        MatchConfidence = 0;
-        MatchMethod = MatchMethod.None;
-        Status = ModStatus.NoMatch;
-        IsConfirmed = false;
-
-        LatestVersion = null;
-        LatestVersionDate = null;
-        UpdateStatus = UpdateStatus.Unknown;
-        DownloadLink = null;
-        BlockingMods = null;
-        BlockReason = null;
-        IncompatibilityReason = null;
+        UpdateSuppressed = suppressed;
     }
 
     #endregion

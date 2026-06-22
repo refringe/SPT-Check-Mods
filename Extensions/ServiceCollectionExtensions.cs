@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Reflection;
 using CheckMods.Configuration;
 using CheckMods.Logging;
@@ -5,6 +6,7 @@ using CheckMods.Services;
 using CheckMods.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SPTarkov.DI;
 
 namespace CheckMods.Extensions;
@@ -26,6 +28,11 @@ public static class ServiceCollectionExtensions
         services.Configure<RateLimitOptions>(_ => { });
         services.Configure<ModScannerOptions>(_ => { });
         services.Configure<LoggingOptions>(_ => { });
+        services.Configure<UpdateCheckOptions>(_ => { });
+        services.Configure<IgnoredUpdateOptions>(_ => { });
+
+        // In-memory cache used by ForgeApiService to dedupe identical API requests within a run.
+        services.AddMemoryCache();
 
         // Register logging infrastructure
         services.AddLogging(builder =>
@@ -42,9 +49,37 @@ public static class ServiceCollectionExtensions
         diHandler.AddInjectableTypesFromAssembly(Assembly.GetExecutingAssembly());
         diHandler.InjectAll();
 
-        // Register ForgeApiService as HttpClient after SPTarkov.DI registration
-        // AddHttpClient provides proper HttpClient lifecycle management
-        services.AddHttpClient<IForgeApiService, ForgeApiService>();
+        // Register ForgeApiService as a typed HttpClient after SPTarkov.DI registration.
+        // AddHttpClient provides proper HttpClient lifecycle management. A descriptive User-Agent identifies this
+        // tool to the Forge API, and a request timeout makes hung requests retryable rather than blocking forever.
+        services.AddHttpClient<IForgeApiService, ForgeApiService>(
+            (serviceProvider, client) =>
+            {
+                var rateLimitOptions = serviceProvider.GetRequiredService<IOptions<RateLimitOptions>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(rateLimitOptions.RequestTimeoutSeconds);
+
+                var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
+                client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SPT-Check-Mods", version));
+                client.DefaultRequestHeaders.UserAgent.Add(
+                    new ProductInfoHeaderValue("(+https://github.com/refringe/SPT-Check-Mods)")
+                );
+            }
+        );
+
+        // Register the remote ignore-list client as a typed HttpClient for proper lifecycle management.
+        services.AddHttpClient<IRemoteIgnoreFileClient, RemoteIgnoreFileClient>(
+            (serviceProvider, client) =>
+            {
+                var ignoredOptions = serviceProvider.GetRequiredService<IOptions<IgnoredUpdateOptions>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(ignoredOptions.RemoteTimeoutSeconds);
+
+                var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
+                client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SPT-Check-Mods", version));
+                client.DefaultRequestHeaders.UserAgent.Add(
+                    new ProductInfoHeaderValue("(+https://github.com/refringe/SPT-Check-Mods)")
+                );
+            }
+        );
 
         return services;
     }

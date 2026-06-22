@@ -76,11 +76,6 @@ public class DependencyNode
     /// Whether this dependency is installed locally.
     /// </summary>
     public bool IsInstalled { get; init; } = true;
-
-    /// <summary>
-    /// Whether this mod is a dependency of other mods (vs a standalone/root mod).
-    /// </summary>
-    public bool IsDependency { get; init; }
 }
 
 /// <summary>
@@ -143,9 +138,4 @@ public class MissingDependency
     /// Download link for the dependency.
     /// </summary>
     public string? DownloadLink { get; init; }
-
-    /// <summary>
-    /// Names of mods that require this dependency.
-    /// </summary>
-    public List<string> RequiredBy { get; init; } = [];
 }

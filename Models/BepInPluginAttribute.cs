@@ -7,20 +7,20 @@ namespace CheckMods.Models;
 /// <param name="guid">The unique identifier for the plugin.</param>
 /// <param name="name">The display name of the plugin.</param>
 /// <param name="version">The version of the plugin.</param>
-public class BepInPluginAttribute(string guid, string name, string version)
+public sealed class BepInPluginAttribute(string guid, string name, string version)
 {
     /// <summary>
     /// The unique identifier for the plugin.
     /// </summary>
-    public string Guid { get; set; } = guid;
+    public string Guid { get; init; } = guid;
 
     /// <summary>
     /// The display name of the plugin.
     /// </summary>
-    public string Name { get; set; } = name;
+    public string Name { get; init; } = name;
 
     /// <summary>
     /// The version of the plugin.
     /// </summary>
-    public string Version { get; set; } = version;
+    public string Version { get; init; } = version;
 }

@@ -7,8 +7,8 @@ using SPTarkov.DI.Annotations;
 namespace CheckMods.Services;
 
 /// <summary>
-/// Service responsible for reconciling server and client mod components.
-/// Matches components of the same mod and selects the best version when duplicates exist.
+/// Service responsible for reconciling server and client mod components. Matches components of the same mod and selects
+/// the best version when duplicates exist.
 /// </summary>
 [Injectable(InjectionType.Transient)]
 public sealed class ModReconciliationService(ILogger<ModReconciliationService> logger) : IModReconciliationService
@@ -26,9 +26,65 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
         var matchedServerIndices = new HashSet<int>();
         var matchedClientIndices = new HashSet<int>();
 
-        // Try to match each client mod with a server mod
+        // Exact GUID pairs first, so a real component claims its counterpart before a weaker name match can steal it.
+        MatchComponents(
+            serverMods,
+            clientMods,
+            matchedServerIndices,
+            matchedClientIndices,
+            reconciledPairs,
+            GuidsMatch
+        );
+
+        // Pair the rest by name.
+        MatchComponents(serverMods, clientMods, matchedServerIndices, matchedClientIndices, reconciledPairs, ModsMatch);
+
+        var unmatchedServerMods = serverMods.Where((_, idx) => !matchedServerIndices.Contains(idx)).ToList();
+        var unmatchedClientMods = clientMods.Where((_, idx) => !matchedClientIndices.Contains(idx)).ToList();
+
+        // Build full mod list.
+        var allMods = reconciledPairs
+            .Select(p => p.SelectedMod)
+            .Concat(unmatchedServerMods)
+            .Concat(unmatchedClientMods)
+            .ToList();
+
+        logger.LogDebug(
+            "Reconciliation complete. Pairs: {PairCount}, Unmatched server: {UnmatchedServer}, Unmatched client: {UnmatchedClient}",
+            reconciledPairs.Count,
+            unmatchedServerMods.Count,
+            unmatchedClientMods.Count
+        );
+
+        return new ModReconciliationResult
+        {
+            Mods = allMods,
+            ReconciledPairs = reconciledPairs,
+            UnmatchedServerMods = unmatchedServerMods,
+            UnmatchedClientMods = unmatchedClientMods,
+        };
+    }
+
+    /// <summary>
+    /// Mod matching. Each unmatched client claims the first unmatched server where <paramref name="isMatch"/> holds.
+    /// Matched indices are shared so later passes skip them.
+    /// </summary>
+    private static void MatchComponents(
+        List<Mod> serverMods,
+        List<Mod> clientMods,
+        HashSet<int> matchedServerIndices,
+        HashSet<int> matchedClientIndices,
+        List<ModPair> reconciledPairs,
+        Func<Mod, Mod, bool> isMatch
+    )
+    {
         for (var clientIdx = 0; clientIdx < clientMods.Count; clientIdx++)
         {
+            if (matchedClientIndices.Contains(clientIdx))
+            {
+                continue;
+            }
+
             var clientMod = clientMods[clientIdx];
 
             for (var serverIdx = 0; serverIdx < serverMods.Count; serverIdx++)
@@ -40,7 +96,7 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
 
                 var serverMod = serverMods[serverIdx];
 
-                if (!ModsMatch(serverMod, clientMod))
+                if (!isMatch(serverMod, clientMod))
                 {
                     continue;
                 }
@@ -65,33 +121,16 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
                 break;
             }
         }
+    }
 
-        // Collect unmatched mods
-        var unmatchedServerMods = serverMods.Where((_, idx) => !matchedServerIndices.Contains(idx)).ToList();
-
-        var unmatchedClientMods = clientMods.Where((_, idx) => !matchedClientIndices.Contains(idx)).ToList();
-
-        // Build final mod list: reconciled pairs (selected mod) + unmatched mods
-        var allMods = reconciledPairs
-            .Select(p => p.SelectedMod)
-            .Concat(unmatchedServerMods)
-            .Concat(unmatchedClientMods)
-            .ToList();
-
-        logger.LogDebug(
-            "Reconciliation complete. Pairs: {PairCount}, Unmatched server: {UnmatchedServer}, Unmatched client: {UnmatchedClient}",
-            reconciledPairs.Count,
-            unmatchedServerMods.Count,
-            unmatchedClientMods.Count
-        );
-
-        return new ModReconciliationResult
-        {
-            Mods = allMods,
-            ReconciledPairs = reconciledPairs,
-            UnmatchedServerMods = unmatchedServerMods,
-            UnmatchedClientMods = unmatchedClientMods,
-        };
+    /// <summary>
+    /// Determines whether two parts carry the same non-empty, case-insensitive GUID.
+    /// </summary>
+    private static bool GuidsMatch(Mod serverMod, Mod clientMod)
+    {
+        return !string.IsNullOrWhiteSpace(serverMod.Guid)
+            && !string.IsNullOrWhiteSpace(clientMod.Guid)
+            && string.Equals(serverMod.Guid, clientMod.Guid, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -99,12 +138,8 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
     /// </summary>
     private static bool ModsMatch(Mod serverMod, Mod clientMod)
     {
-        // Direct GUID match (case-insensitive)
-        if (
-            !string.IsNullOrWhiteSpace(serverMod.Guid)
-            && !string.IsNullOrWhiteSpace(clientMod.Guid)
-            && string.Equals(serverMod.Guid, clientMod.Guid, StringComparison.OrdinalIgnoreCase)
-        )
+        // Case-insensitive GUID match
+        if (GuidsMatch(serverMod, clientMod))
         {
             return true;
         }
@@ -115,7 +150,7 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
             return true;
         }
 
-        // Try matching GUID name component against mod name
+        // Try matching a GUID name component against a mod name
         var serverGuidName = ModNameNormalizer.ExtractNameFromGuid(serverMod.Guid);
         var clientGuidName = ModNameNormalizer.ExtractNameFromGuid(clientMod.Guid);
 
@@ -154,8 +189,8 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
         }
 
         // Compare versions
-        var serverVersion = ParseVersion(serverMod.LocalVersion);
-        var clientVersion = ParseVersion(clientMod.LocalVersion);
+        var serverVersion = SemVer.TryParse(serverMod.LocalVersion);
+        var clientVersion = SemVer.TryParse(clientMod.LocalVersion);
 
         if (serverVersion is not null && clientVersion is not null)
         {
@@ -188,25 +223,5 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
 
         // Versions are equal or both invalid - prefer server mod (has SPT version info)
         return (serverMod, notes);
-    }
-
-    /// <summary>
-    /// Parses a version string, returning null if invalid.
-    /// </summary>
-    private static SemanticVersioning.Version? ParseVersion(string version)
-    {
-        if (string.IsNullOrWhiteSpace(version))
-        {
-            return null;
-        }
-
-        try
-        {
-            return new SemanticVersioning.Version(version);
-        }
-        catch
-        {
-            return null;
-        }
     }
 }
