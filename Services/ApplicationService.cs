@@ -575,9 +575,11 @@ public sealed class ApplicationService(
     /// <param name="sptVersion">The installed SPT version.</param>
     private void CheckModSptCompatibility(Mod mod, SemanticVersioning.Version sptVersion)
     {
-        // Find the version that matches the installed local version
+        // Find the version that matches the installed local version. ModVersion.Version is declared non-nullable but
+        // is bound from Forge JSON, so a missing "version" field deserializes to null; use the static string.Equals
+        // to compare null-safely rather than dereferencing it.
         var installedApiVersion = mod.ApiVersions!.FirstOrDefault(v =>
-            v.Version.Equals(mod.LocalVersion, StringComparison.OrdinalIgnoreCase)
+            string.Equals(v.Version, mod.LocalVersion, StringComparison.OrdinalIgnoreCase)
         );
 
         if (installedApiVersion == null)
