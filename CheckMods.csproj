@@ -17,7 +17,7 @@
     Baseline semver for local/dev builds. Releases override this via -p:BuildVersion (from the git tag). Bump this when
     preparing a new release so local builds report the in-progress version.
     -->
-    <VersionPrefix>1.0.1</VersionPrefix>
+    <VersionPrefix>1.2.0</VersionPrefix>
     <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
   </PropertyGroup>
   <Target Name="GetGitHash" BeforeTargets="GetAssemblyAttributes;Publish">
