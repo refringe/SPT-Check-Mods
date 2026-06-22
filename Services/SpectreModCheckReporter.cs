@@ -207,7 +207,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         // Add link on new line if available
         if (!string.IsNullOrWhiteSpace(latest.Link))
         {
-            AnsiConsole.MarkupLine($"[grey]{latest.Link}[/]");
+            AnsiConsole.MarkupLine($"[grey]{latest.Link.EscapeMarkup()}[/]");
         }
     }
 
@@ -222,7 +222,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                 );
                 if (!string.IsNullOrWhiteSpace(result.DownloadLink))
                 {
-                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink}[/]");
+                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink.EscapeMarkup()}[/]");
                 }
                 break;
 
@@ -244,7 +244,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                 );
                 if (!string.IsNullOrWhiteSpace(result.DownloadLink))
                 {
-                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink}[/]");
+                    AnsiConsole.MarkupLine($"[grey]Download:[/] [link]{result.DownloadLink.EscapeMarkup()}[/]");
                 }
 
                 break;
@@ -306,7 +306,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             if (mod.ApiModId.HasValue && !string.IsNullOrWhiteSpace(mod.ApiSlug))
             {
                 var forgeDownloadUrl = ForgeUrls.Download(mod.ApiModId.Value, mod.ApiSlug, mod.CompatibleVersionString);
-                AnsiConsole.MarkupLine($"      [grey]Download:[/] [link]{forgeDownloadUrl}[/]");
+                AnsiConsole.MarkupLine($"      [grey]Download:[/] [link]{forgeDownloadUrl.EscapeMarkup()}[/]");
             }
         }
 
@@ -347,11 +347,11 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             // Show source code URL if available, otherwise show Forge mod page
             if (!string.IsNullOrWhiteSpace(mod.ApiSourceCodeUrl))
             {
-                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiSourceCodeUrl}[/]");
+                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiSourceCodeUrl.EscapeMarkup()}[/]");
             }
             else if (!string.IsNullOrWhiteSpace(mod.ApiUrl))
             {
-                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiUrl}[/]");
+                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiUrl.EscapeMarkup()}[/]");
             }
         }
     }
@@ -410,13 +410,13 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                         if (!string.IsNullOrWhiteSpace(reportUrl))
                         {
                             AnsiConsole.MarkupLine(
-                                $"      [grey]If this is wrong, report it here:[/] [link]{reportUrl}[/]"
+                                $"      [grey]If this is wrong, report it here:[/] [link]{reportUrl.EscapeMarkup()}[/]"
                             );
                         }
                     }
                     else if (!string.IsNullOrWhiteSpace(reportUrl))
                     {
-                        AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{reportUrl}[/]");
+                        AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{reportUrl.EscapeMarkup()}[/]");
                     }
                 }
 
@@ -718,7 +718,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             if (conflict.DependencyInfo.Id > 0 && !string.IsNullOrWhiteSpace(conflict.DependencyInfo.Slug))
             {
                 var url = ForgeUrls.ModPage(conflict.DependencyInfo.Id, conflict.DependencyInfo.Slug);
-                AnsiConsole.MarkupLine($"      [grey]View on Forge:[/] [link]{url}[/]");
+                AnsiConsole.MarkupLine($"      [grey]View on Forge:[/] [link]{url.EscapeMarkup()}[/]");
             }
         }
 
@@ -753,7 +753,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
             if (!string.IsNullOrWhiteSpace(dep.DownloadLink))
             {
-                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{dep.DownloadLink}[/]");
+                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{dep.DownloadLink.EscapeMarkup()}[/]");
             }
         }
 
@@ -832,7 +832,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                     continue;
                 }
 
-                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{mod.DownloadLink}[/]");
+                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{mod.DownloadLink.EscapeMarkup()}[/]");
             }
         }
 
