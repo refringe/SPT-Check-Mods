@@ -95,10 +95,13 @@ public sealed class SptInstallationService(
         return versionsResult.Match(
             versions =>
             {
-                // Filter to versions newer than the current version, skipping any that can't be parsed.
+                // Filter to versions newer than the current version, skipping any that can't be parsed. Parse each
+                // version string once and carry the result through the filter and sort.
                 var newerVersions = versions
-                    .Where(v => SemVer.TryParse(v.Version) is { } semVer && semVer > currentVersion)
-                    .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
+                    .Select(v => (Raw: v, Parsed: SemVer.TryParse(v.Version)))
+                    .Where(x => x.Parsed is not null && x.Parsed! > currentVersion)
+                    .OrderByDescending(x => x.Parsed)
+                    .Select(x => x.Raw)
                     .ToList();
 
                 logger.LogDebug("Found {Count} newer SPT versions", newerVersions.Count);
