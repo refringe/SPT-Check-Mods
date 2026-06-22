@@ -15,6 +15,12 @@ namespace CheckMods.Services;
 public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger<ModMatchingService> logger)
     : IModMatchingService
 {
+    /// <summary>
+    /// Minimum number of mods that must all fail before an all-failed batch is treated as a systemic fault. Below
+    /// this, "every mod failed" is too easily satisfied by one or two unlucky mods to justify aborting the run.
+    /// </summary>
+    private const int MinimumModsForSystemicFailure = 3;
+
     /// <inheritdoc />
     public async Task<Mod> MatchModAsync(
         Mod mod,
@@ -205,9 +211,11 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
 
         var results = await Task.WhenAll(tasks);
 
-        // When every mod throws, matching is broken systemically (a bug or environment fault that hits them all).
-        // Surface it instead of silently reporting every mod as "not found on Forge".
-        if (totalCount > 0 && failureCount == totalCount)
+        // When every mod throws, matching is likely broken systemically (a bug or environment fault that hits them
+        // all). Surface it instead of silently reporting every mod as "not found on Forge" - but only once enough
+        // mods are involved that an all-failed batch is meaningful. For one or two mods, "every mod failed" is just
+        // as easily an isolated bad mod, so leave them cleanly unmatched and let the run continue.
+        if (totalCount >= MinimumModsForSystemicFailure && failureCount == totalCount)
         {
             throw new InvalidOperationException(
                 $"Failed to match any of the {totalCount} mods against the Forge API.",

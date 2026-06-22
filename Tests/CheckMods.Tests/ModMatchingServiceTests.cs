@@ -121,6 +121,33 @@ public sealed class ModMatchingServiceTests
     }
 
     [Fact]
+    public async Task Does_not_throw_when_a_lone_mod_fails()
+    {
+        // A single-mod install where matching that one mod throws must not be treated as a systemic failure: the
+        // per-mod isolation should leave it unmatched and the run should continue.
+        var api = new FakeForgeApiService { OnGetModByGuid = _ => throw new InvalidOperationException("boom") };
+        var mod = ClientMod("com.a.lonely");
+
+        var results = await CreateService(api).MatchModsAsync([mod], SptVersion);
+
+        Assert.Single(results);
+        Assert.False(mod.IsMatched);
+        Assert.Equal(ModStatus.NoMatch, mod.Status);
+    }
+
+    [Fact]
+    public async Task Does_not_throw_when_a_two_mod_install_all_fails()
+    {
+        var api = new FakeForgeApiService { OnGetModByGuid = _ => throw new InvalidOperationException("boom") };
+        var mods = new[] { ClientMod("com.a.one"), ClientMod("com.a.two") };
+
+        var results = await CreateService(api).MatchModsAsync(mods, SptVersion);
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, m => Assert.False(m.IsMatched));
+    }
+
+    [Fact]
     public async Task Isolates_a_single_failure_and_matches_the_rest()
     {
         var api = new FakeForgeApiService
