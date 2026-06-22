@@ -141,6 +141,12 @@ public sealed class Mod
     /// </summary>
     public string? CompatibleVersionString { get; private set; }
 
+    /// <summary>
+    /// Whether this mod's available update has been dismissed as a false positive and should be shown as ignored
+    /// (treated as up to date) rather than as an available update.
+    /// </summary>
+    public bool UpdateSuppressed { get; private set; }
+
     #endregion
 
     #region Processing State
@@ -273,6 +279,15 @@ public sealed class Mod
         IsLocalSptIncompatible = true;
         IncompatibilityReason = reason;
         CompatibleVersionString = compatibleVersion;
+    }
+
+    /// <summary>
+    /// Sets whether this mod's available update is suppressed (dismissed as a false positive).
+    /// </summary>
+    /// <param name="suppressed">True to treat the available update as ignored; false to show it normally.</param>
+    public void SetUpdateSuppressed(bool suppressed)
+    {
+        UpdateSuppressed = suppressed;
     }
 
     #endregion

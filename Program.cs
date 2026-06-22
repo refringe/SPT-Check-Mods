@@ -1,5 +1,6 @@
 using CheckMods.Configuration;
 using CheckMods.Extensions;
+using CheckMods.Models;
 using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,12 +34,18 @@ public class Program
         _cts = new CancellationTokenSource();
         Console.CancelKeyPress += OnCancelKeyPress;
 
+        // Resolved inside the try but used in the finally to drive the end-of-run interaction, so the provider is
+        // disposed at the very end of the finally rather than scoped to the try.
+        ServiceProvider? serviceProvider = null;
+        IIgnoredUpdateWorkflow? ignoredUpdateWorkflow = null;
+        IReadOnlyList<Mod>? mods = null;
+
         try
         {
             // Set up dependency injection container
             var services = new ServiceCollection();
             services.AddCheckModsServices();
-            await using var serviceProvider = services.BuildServiceProvider();
+            serviceProvider = services.BuildServiceProvider();
 
             // Get a logger for Program
             logger = serviceProvider.GetRequiredService<ILogger<Program>>();
@@ -50,7 +57,9 @@ public class Program
 
             // Run the main application logic
             var applicationService = serviceProvider.GetRequiredService<IApplicationService>();
-            await applicationService.RunAsync(args, _cts.Token);
+            ignoredUpdateWorkflow = serviceProvider.GetRequiredService<IIgnoredUpdateWorkflow>();
+
+            mods = await applicationService.RunAsync(args, _cts.Token);
 
             logger.LogInformation("CheckMods application completed successfully");
         }
@@ -78,18 +87,31 @@ public class Program
             AnsiConsole.MarkupLine($"[grey]Check Mods v{VersionInfo.SemVer} (build {VersionInfo.GitHash})[/]");
             AnsiConsole.MarkupLine($"[grey]Log file: {logFilePath}[/]");
 
-            // Wait for user input (if not manually cancelled and the console is interactive). When input is
-            // redirected (CI, piping) there is no interactive console, and Console.KeyAvailable/ReadKey would throw.
+            // Drive the end-of-run interaction (if not manually cancelled and the console is interactive). When input
+            // is redirected (CI, piping) there is no interactive console, and Console.KeyAvailable/ReadKey would throw.
+            // The workflow owns the exit gate: it offers to manage ignored updates, then waits for the exit keypress.
             if (!_wasCancelled && !Console.IsInputRedirected)
             {
-                // Drain any keystrokes buffered during the run so ReadKey actually waits.
-                while (Console.KeyAvailable)
+                if (ignoredUpdateWorkflow is not null)
                 {
-                    Console.ReadKey(intercept: true);
+                    await ignoredUpdateWorkflow.RunAsync(mods);
                 }
+                else
+                {
+                    // Fallback when DI setup failed before the workflow was resolved.
+                    while (Console.KeyAvailable)
+                    {
+                        Console.ReadKey(intercept: true);
+                    }
 
-                AnsiConsole.MarkupLine("[grey]Press any key to exit...[/]");
-                Console.ReadKey();
+                    AnsiConsole.MarkupLine("[grey]Press any key to exit...[/]");
+                    Console.ReadKey();
+                }
+            }
+
+            if (serviceProvider is not null)
+            {
+                await serviceProvider.DisposeAsync();
             }
         }
     }

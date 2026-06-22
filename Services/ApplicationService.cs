@@ -20,6 +20,8 @@ public sealed class ApplicationService(
     IModEnrichmentService modEnrichmentService,
     IModDependencyService modDependencyService,
     IUpdateCheckService updateCheckService,
+    IIgnoredUpdateStore ignoredUpdateStore,
+    IRemoteIgnoreFileClient remoteIgnoreFileClient,
     IModCheckReporter reporter,
     ILogger<ApplicationService> logger
 ) : IApplicationService
@@ -29,7 +31,7 @@ public sealed class ApplicationService(
     /// </summary>
     /// <param name="args">Command line arguments. The first argument can be the SPT installation path.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
-    public async Task RunAsync(string[] args, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Mod>> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Starting mod check workflow");
         reporter.Banner();
@@ -45,7 +47,7 @@ public sealed class ApplicationService(
             if (sptPath is null)
             {
                 logger.LogWarning("SPT path validation failed, exiting");
-                return;
+                return [];
             }
 
             logger.LogInformation("Using SPT path: {SptPath}", sptPath);
@@ -56,7 +58,7 @@ public sealed class ApplicationService(
             if (sptVersion is null)
             {
                 logger.LogWarning("SPT version validation failed, exiting");
-                return;
+                return [];
             }
 
             logger.LogInformation("SPT version validated: {SptVersion}", sptVersion);
@@ -65,6 +67,11 @@ public sealed class ApplicationService(
             logger.LogDebug("Checking for Check Mods updates");
             await CheckForCheckModsUpdateAsync(sptVersion, cancellationToken);
 
+            // Offer to refresh the local ignore list from the author-maintained remote list (opt-in, default no).
+            logger.LogDebug("Offering remote ignore list refresh");
+            await MaybeFetchRemoteIgnoresAsync(cancellationToken);
+
+            reporter.Blank();
             reporter.Heading("Loading mods...");
 
             // Detect improperly installed mods
@@ -91,7 +98,7 @@ public sealed class ApplicationService(
             {
                 logger.LogInformation("No mods remaining after reconciliation");
                 reporter.Warning("No mods remaining after reconciliation.");
-                return;
+                return [];
             }
 
             logger.LogInformation("Found {ModCount} mods after reconciliation", mods.Count);
@@ -100,13 +107,19 @@ public sealed class ApplicationService(
             logger.LogDebug("Matching mods with Forge API");
             await MatchModsWithApiAsync(mods, sptVersion, cancellationToken);
 
-            // Check SPT version compatibility for matched mods
-            logger.LogDebug("Checking mod version compatibility");
-            CheckModVersionCompatibility(mods, sptVersion);
-
-            // Enrich matched mods with version data and display results
+            // Enrich matched mods with version data, then apply locally-stored update suppressions. This runs before the
+            // compatibility check on purpose: a mod whose update the user dismissed as a false positive is then also
+            // excluded from the SPT-compatibility warning. Both warnings stem from the same stale local version, and the
+            // user is asserting their installed files are really the (compatible) latest version.
             logger.LogDebug("Enriching mods with version data");
             await EnrichModsWithVersionDataAsync(mods, sptVersion, cancellationToken);
+
+            logger.LogDebug("Applying ignored updates");
+            ApplyIgnoredUpdates(mods);
+
+            // Check SPT version compatibility for matched mods (suppressed false positives are skipped)
+            logger.LogDebug("Checking mod version compatibility");
+            CheckModVersionCompatibility(mods, sptVersion);
 
             // Check mod dependencies
             logger.LogDebug("Checking mod dependencies");
@@ -117,6 +130,7 @@ public sealed class ApplicationService(
             reporter.VersionTable(mods);
 
             logger.LogInformation("Mod check workflow completed successfully");
+            return mods;
         }
         catch (OperationCanceledException)
         {
@@ -127,6 +141,58 @@ public sealed class ApplicationService(
         {
             logger.LogError(ex, "Error during mod check workflow");
             reporter.Exception(ex);
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// Offers to refresh the local ignore list from the author-maintained remote list. Opt-in with a default of "no",
+    /// and skipped entirely when input is non-interactive or no remote URL is configured. Merges without overwriting
+    /// existing local entries; any failure leaves the local list untouched.
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    private async Task MaybeFetchRemoteIgnoresAsync(CancellationToken cancellationToken = default)
+    {
+        // Can't prompt without an interactive console (treated as "no"), and nothing to do without a configured URL.
+        if (Console.IsInputRedirected || !remoteIgnoreFileClient.IsConfigured)
+        {
+            return;
+        }
+
+        reporter.Blank();
+        reporter.Heading("Community ignore list...");
+
+        if (reporter.PromptFetchRemoteIgnores())
+        {
+            var remote = await remoteIgnoreFileClient.FetchAsync(cancellationToken);
+            if (remote is null)
+            {
+                reporter.RemoteIgnoresUnavailable();
+            }
+            else
+            {
+                reporter.RemoteIgnoresMerged(ignoredUpdateStore.MergeWithoutOverwrite(remote));
+            }
+        }
+
+        reporter.Blank();
+        reporter.Rule();
+    }
+
+    /// <summary>
+    /// Flags any mod whose available update matches a stored suppression so it renders as ignored (treated as up to
+    /// date) rather than as an available update.
+    /// </summary>
+    /// <param name="mods">The reconciled, enriched mods to evaluate.</param>
+    private void ApplyIgnoredUpdates(List<Mod> mods)
+    {
+        foreach (var mod in mods)
+        {
+            if (mod.UpdateStatus == UpdateStatus.UpdateAvailable && ignoredUpdateStore.IsIgnored(mod))
+            {
+                mod.SetUpdateSuppressed(true);
+            }
         }
     }
 
@@ -553,6 +619,7 @@ public sealed class ApplicationService(
         );
 
         reporter.Success("Forge verification complete!");
+        reporter.Blank();
 
         // Display warnings for mods that couldn't be verified
         reporter.UnverifiedMods(mods);
@@ -592,8 +659,11 @@ public sealed class ApplicationService(
         reporter.Blank();
         reporter.Heading("Checking mod version compatibility...");
 
-        // Only check mods that are matched with the API and have versions stored
-        var matchedMods = mods.Where(m => m.IsMatched && m.ApiVersions is { Count: > 0 }).ToList();
+        // Only check mods that are matched with the API and have versions stored. Skip mods whose update was dismissed
+        // as a false positive: the user is asserting their installed files are really the (compatible) latest version,
+        // so the stale-local-version incompatibility is a false positive too.
+        var matchedMods = mods.Where(m => m.IsMatched && m.ApiVersions is { Count: > 0 } && !m.UpdateSuppressed)
+            .ToList();
 
         foreach (var mod in matchedMods)
         {

@@ -40,6 +40,7 @@ public sealed class ModScannerService(
 
         var modDirs = Directory.GetDirectories(modsDir);
         logger.LogDebug("Found {DirCount} mod directories", modDirs.Length);
+        reporter.Blank();
         reporter.Status($"Scanning {modDirs.Length} mod directories for server mods...");
 
         foreach (var modDir in modDirs)

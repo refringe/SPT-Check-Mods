@@ -94,4 +94,34 @@ public interface IModCheckReporter
 
     /// <summary>Displays the final version summary table and update/blocked lists.</summary>
     void VersionTable(List<Mod> mods);
+
+    /// <summary>Asks whether to fetch the author-maintained remote ignore list. Defaults to no.</summary>
+    bool PromptFetchRemoteIgnores();
+
+    /// <summary>Reports the outcome of merging the remote ignore list (number of new entries added).</summary>
+    void RemoteIgnoresMerged(int added);
+
+    /// <summary>Reports that the remote ignore list couldn't be fetched and the local list is unchanged.</summary>
+    void RemoteIgnoresUnavailable();
+
+    /// <summary>Prompts for the manage-ignored-updates gate. Returns true if the user chose to manage.</summary>
+    bool PromptManageIgnoredUpdates();
+
+    /// <summary>
+    /// Shows a checklist of update candidates (those in <paramref name="preIgnoredApiModIds"/> pre-checked) and returns
+    /// the mods the user chose to ignore.
+    /// </summary>
+    IReadOnlyList<Mod> SelectUpdatesToIgnore(IReadOnlyList<Mod> candidates, ISet<int> preIgnoredApiModIds);
+
+    /// <summary>Drains buffered keystrokes, prints the exit prompt, and waits for a keypress.</summary>
+    void PressAnyKeyToExit();
+
+    /// <summary>Asks whether to report the just-confirmed ignores as a GitHub issue. Defaults to no.</summary>
+    bool PromptReportIgnores();
+
+    /// <summary>
+    /// Reports the outcome of opening the ignore-suggestion issue: whether the browser opened, the link (for manual
+    /// use), and whether the entries were pre-filled.
+    /// </summary>
+    void IgnoreReportOpened(string url, bool browserOpened, bool prefilled);
 }

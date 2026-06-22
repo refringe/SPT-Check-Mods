@@ -798,11 +798,13 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         AnsiConsole.Write(table);
 
         AnsiConsole.MarkupLine(
-            "[grey]Version colors: [green]Up to date[/] | [red]Update available[/] | [darkorange]Update blocked[/] | [blue]Newer than latest[/][/]"
+            "[grey]Version colors: [green]Up to date[/] | [red]Update available[/] | [darkorange]Update blocked[/] | [blue]Newer than latest[/] | [grey]Ignored[/][/]"
         );
 
-        // Display mods with available updates
-        var modsWithUpdates = verifiedMods.Where(m => m.UpdateStatus == UpdateStatus.UpdateAvailable).ToList();
+        // Display mods with available updates (excluding ones the user has dismissed as false positives)
+        var modsWithUpdates = verifiedMods
+            .Where(m => m.UpdateStatus == UpdateStatus.UpdateAvailable && !m.UpdateSuppressed)
+            .ToList();
         if (modsWithUpdates.Count > 0)
         {
             AnsiConsole.WriteLine();
@@ -872,16 +874,143 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         AnsiConsole.MarkupLine(
             "[white]Find an issue [italic]with this tool[/]? Find Refringe on Discord, or [link=https://github.com/refringe/SPT-Check-Mods/issues/new]submit a bug report[/].[/]"
         );
+        AnsiConsole.WriteLine();
+    }
+
+    /// <inheritdoc />
+    public bool PromptFetchRemoteIgnores()
+    {
+        return AnsiConsole.Prompt(
+            new ConfirmationPrompt("Fetch the latest community ignore list from the Forge?") { DefaultValue = false }
+        );
+    }
+
+    /// <inheritdoc />
+    public void RemoteIgnoresMerged(int added)
+    {
+        AnsiConsole.MarkupLine(
+            added > 0
+                ? $"[green]Added {added} ignored version(s) from the community list.[/]"
+                : "[grey]Your ignore list is already up to date.[/]"
+        );
+    }
+
+    /// <inheritdoc />
+    public void RemoteIgnoresUnavailable()
+    {
+        AnsiConsole.MarkupLine("[red]Couldn't fetch the community ignore list; your local entries are unchanged.[/]");
+    }
+
+    /// <inheritdoc />
+    public bool PromptManageIgnoredUpdates()
+    {
+        DrainBufferedKeys();
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[grey]Press [[I]] to manage ignored updates, or any other key to exit...[/]");
+        var key = Console.ReadKey(intercept: true);
+        return key.Key == ConsoleKey.I;
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<Mod> SelectUpdatesToIgnore(IReadOnlyList<Mod> candidates, ISet<int> preIgnoredApiModIds)
+    {
+        AnsiConsole.WriteLine();
+
+        var prompt = new MultiSelectionPrompt<Mod>()
+            .Title("Select the updates to [grey]ignore[/] (checked = treated as up to date):")
+            .NotRequired()
+            .PageSize(15)
+            .MoreChoicesText("[grey](Move up and down to see more mods.)[/]")
+            .InstructionsText("[grey](Space to toggle, enter to confirm. Checked entries are ignored.)[/]")
+            .UseConverter(FormatIgnoreChoice);
+
+        foreach (var mod in candidates)
+        {
+            var item = prompt.AddChoice(mod);
+            if (mod.ApiModId.HasValue && preIgnoredApiModIds.Contains(mod.ApiModId.Value))
+            {
+                item.Select();
+            }
+        }
+
+        return AnsiConsole.Prompt(prompt);
+    }
+
+    /// <inheritdoc />
+    public void PressAnyKeyToExit()
+    {
+        DrainBufferedKeys();
+        AnsiConsole.MarkupLine("[grey]Press any key to exit...[/]");
+        Console.ReadKey();
+    }
+
+    /// <inheritdoc />
+    public bool PromptReportIgnores()
+    {
+        return AnsiConsole.Prompt(
+            new ConfirmationPrompt("Report these ignored versions so other users benefit?") { DefaultValue = false }
+        );
+    }
+
+    /// <inheritdoc />
+    public void IgnoreReportOpened(string url, bool browserOpened, bool prefilled)
+    {
+        if (browserOpened)
+        {
+            AnsiConsole.MarkupLine("[green]Opening your browser to file the report. Thank you for contributing![/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine(
+                "[yellow]Couldn't open your browser automatically. Use this link to file the report:[/]"
+            );
+            AnsiConsole.MarkupLine($"[grey]{url.EscapeMarkup()}[/]");
+        }
+
+        if (!prefilled)
+        {
+            AnsiConsole.MarkupLine(
+                "[grey]Your list was too large to pre-fill; paste the contents of your ignored-updates.json into the issue.[/]"
+            );
+        }
+    }
+
+    /// <summary>
+    /// Formats a single mod as a multi-select choice: name plus the local-to-latest version transition.
+    /// </summary>
+    private static string FormatIgnoreChoice(Mod mod)
+    {
+        var name = mod.DisplayName.EscapeMarkup();
+        var local = mod.LocalVersion.EscapeMarkup();
+        var latest = (mod.LatestVersion ?? "?").EscapeMarkup();
+        return $"{name}  [grey]{local} -> {latest}[/]";
+    }
+
+    /// <summary>
+    /// Discards any keystrokes buffered during the run so a following ReadKey actually waits for fresh input.
+    /// </summary>
+    private static void DrainBufferedKeys()
+    {
+        while (Console.KeyAvailable)
+        {
+            Console.ReadKey(intercept: true);
+        }
     }
 
     /// <summary>
     /// Formats the version display with appropriate color coding.
     /// </summary>
-    private static string FormatVersionDisplay(Mod mod)
+    internal static string FormatVersionDisplay(Mod mod)
     {
         // VersionTable only passes mods whose LatestVersion is resolved (it filters on LatestVersion is not null), so
         // it is non-null here.
         var latestVersion = mod.LatestVersion!;
+
+        // A dismissed false positive renders as a dim, ignored row rather than as an available update.
+        if (mod.UpdateSuppressed)
+        {
+            return $"[grey]{latestVersion.EscapeMarkup()} (ignored)[/]";
+        }
 
         return mod.UpdateStatus switch
         {

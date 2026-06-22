@@ -1,0 +1,49 @@
+name: Ignored Update Suggestion
+description: Suggest mod versions that should be ignored (false-positive update prompts) for everyone.
+labels: ["ignore-suggestion"]
+title: "[Ignore Suggestion]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Some mods are published to the Forge with a new version number, but the files they distribute still report the
+        old version. Check Mods then shows an "update available" that never goes away. If you've confirmed you already
+        have the latest files, you can suggest that version be ignored for everyone.
+
+        **If you used the in-app "report" option, the list below is already filled in for you — just review and submit.**
+
+  - type: textarea
+    id: ignored_versions
+    attributes:
+      label: Ignored Versions
+      description: The mod versions to ignore, as JSON. Auto-filled by Check Mods; only edit this if you know what you're doing.
+      placeholder: |
+        ```json
+        [
+          {
+            "apiModId": 1234,
+            "name": "Some Mod",
+            "guid": "com.author.somemod",
+            "localVersion": "1.2.3",
+            "ignoredLatestVersion": "1.2.4"
+          }
+        ]
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Anything else worth noting — for example, how you confirmed the distributed files are identical.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I downloaded the latest version from the Forge and confirmed the files are the same despite the version mismatch.
+        - label: I understand this is a data suggestion for other users, not a bug in Check Mods.
