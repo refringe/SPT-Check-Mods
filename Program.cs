@@ -4,6 +4,7 @@ using CheckMods.Services.Interfaces;
 using CheckMods.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Spectre.Console;
 
 namespace CheckMods;
@@ -24,6 +25,10 @@ public class Program
     {
         ILogger<Program>? logger = null;
 
+        // Path reported to the user at the end of the run. Resolved from the configured LoggingOptions once DI is up
+        // so it tracks where the logger actually writes; falls back to the default if setup fails before then.
+        var logFilePath = LoggingOptions.CurrentLogFilePath;
+
         _wasCancelled = false;
         _cts = new CancellationTokenSource();
         Console.CancelKeyPress += OnCancelKeyPress;
@@ -38,6 +43,10 @@ public class Program
             // Get a logger for Program
             logger = serviceProvider.GetRequiredService<ILogger<Program>>();
             logger.LogInformation("CheckMods application starting. Args: {Args}", string.Join(", ", args));
+
+            // Capture the active log path from the same options the logger uses, so the closing banner points at the
+            // real file rather than the static default.
+            logFilePath = serviceProvider.GetRequiredService<IOptions<LoggingOptions>>().Value.LogFilePath;
 
             // Run the main application logic
             var applicationService = serviceProvider.GetRequiredService<IApplicationService>();
@@ -67,7 +76,7 @@ public class Program
 
             // Display version, build hash, and log file location
             AnsiConsole.MarkupLine($"[grey]Check Mods v{VersionInfo.SemVer} (build {VersionInfo.GitHash})[/]");
-            AnsiConsole.MarkupLine($"[grey]Log file: {LoggingOptions.CurrentLogFilePath}[/]");
+            AnsiConsole.MarkupLine($"[grey]Log file: {logFilePath}[/]");
 
             // Wait for user input (if not manually cancelled and the console is interactive). When input is
             // redirected (CI, piping) there is no interactive console, and Console.KeyAvailable/ReadKey would throw.
