@@ -10,8 +10,9 @@ namespace CheckMods.Tests;
 
 /// <summary>
 /// Tests for <see cref="ForgeApiService.GetModUpdatesAsync"/>, which batches the mods/updates request into chunks and
-/// merges the results. Focuses on the partial-result accumulation: a failing chunk must not discard data already
-/// gathered from the other chunks. Backed by a stub <see cref="HttpMessageHandler"/> and a pass-through rate limiter.
+/// merges the results. The request is atomic: successful chunks are merged, but any chunk error fails the whole call
+/// rather than silently dropping the failed chunk's mods. Backed by a stub <see cref="HttpMessageHandler"/> and a
+/// pass-through rate limiter.
 /// </summary>
 public sealed class ForgeApiServiceTests
 {
@@ -106,19 +107,19 @@ public sealed class ForgeApiServiceTests
     }
 
     [Fact]
-    public async Task Keeps_partial_data_when_one_chunk_fails()
+    public async Task Surfaces_an_error_when_any_chunk_fails()
     {
-        // Chunk 2 errors while chunk 1 succeeds. The successful chunk's data must survive and no error is surfaced.
+        // Chunk 2 errors while chunk 1 succeeds. Returning only chunk 1's data would silently hide updates for the
+        // failed chunk's mods, so the whole call must fail instead.
         var service = CreateService(req => IsSecondChunk(req) ? ServerError() : Ok(UpToDateJson(1001)));
 
         var result = await service.GetModUpdatesAsync(TwoChunkMods(), SptVersion);
 
-        Assert.True(result.IsT0); // ModUpdatesData, not ApiError
-        Assert.Contains(result.AsT0.UpToDate!, m => m.ModId == 1001);
+        Assert.True(result.IsT2); // ApiError
     }
 
     [Fact]
-    public async Task Surfaces_an_error_only_when_every_chunk_fails()
+    public async Task Surfaces_an_error_when_every_chunk_fails()
     {
         var service = CreateService(_ => ServerError());
 

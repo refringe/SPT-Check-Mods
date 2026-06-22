@@ -457,17 +457,15 @@ public sealed partial class ForgeApiService(
         var upToDate = new List<UpToDateMod>();
         var incompatible = new List<IncompatibleMod>();
         var anyData = false;
-        ApiError? firstError = null;
 
         foreach (var chunkResult in chunkResults)
         {
-            // A failing chunk must not discard update data gathered from the other chunks. Remember the first error
-            // so it can be surfaced only when no chunk yields any data.
+            // The request is atomic: surfacing only the merged successes would silently hide updates for every mod in
+            // a failed chunk, so a single chunk error fails the whole call.
             if (chunkResult.TryPickT2(out var error, out _))
             {
-                firstError ??= error;
-                logger.LogDebug("A mod-updates chunk failed ({Error}); using data from the other chunks", error.Message);
-                continue;
+                logger.LogDebug("A mod-updates chunk failed ({Error}); failing the batch update request", error.Message);
+                return error;
             }
 
             if (!chunkResult.TryPickT0(out var data, out _))
@@ -499,8 +497,8 @@ public sealed partial class ForgeApiService(
 
         if (!anyData)
         {
-            // Nothing succeeded: surface the error if a chunk failed, otherwise report a clean miss.
-            return firstError is not null ? firstError.Value : new NotFound();
+            // Every chunk succeeded but none carried data: report a clean miss.
+            return new NotFound();
         }
 
         return new ModUpdatesData(safeToUpdate, blocked, upToDate, incompatible);
