@@ -74,20 +74,19 @@ public sealed class ApplicationService(
             if (misplacedReport.Any)
             {
                 logger.LogWarning(
-                    "Found {WrongFolder} misplaced mods and {CrossInstalled} cross-installed directories; halting",
+                    "Found {WrongFolder} misplaced mods and {CrossInstalled} cross-installed directories; excluding them from the remaining checks and continuing",
                     misplacedReport.WrongFolder.Count,
                     misplacedReport.CrossInstalled.Count
                 );
-                reporter.MisplacedMods(misplacedReport);
 
-                // Full stop
-                Environment.ExitCode = 1;
-                return;
+                // Surface the problem (still as an error) but keep running; the misplaced mods are filtered out of the
+                // scan below so they're excluded from every check from here on.
+                reporter.MisplacedMods(misplacedReport);
             }
 
             // Load and reconcile local mods
             logger.LogDebug("Scanning and reconciling mods");
-            var mods = await ScanAndReconcileModsAsync(sptPath, sptVersion, cancellationToken);
+            var mods = await ScanAndReconcileModsAsync(sptPath, sptVersion, misplacedReport, cancellationToken);
             if (mods.Count == 0)
             {
                 logger.LogInformation("No mods remaining after reconciliation");
@@ -255,15 +254,25 @@ public sealed class ApplicationService(
     /// </summary>
     /// <param name="sptPath">Path to SPT installation.</param>
     /// <param name="sptVersion">SPT version for API lookups.</param>
+    /// <param name="misplacedReport">Incorrectly installed mods which should be excluded from further operations.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>List of reconciled mods.</returns>
     private async Task<List<Mod>> ScanAndReconcileModsAsync(
         string sptPath,
         SemanticVersioning.Version sptVersion,
+        MisplacedModReport misplacedReport,
         CancellationToken cancellationToken = default
     )
     {
         var (serverMods, clientMods) = await modScannerService.ScanAllModsAsync(sptPath, cancellationToken);
+
+        // Drop any mods flagged as misplaced so they're excluded from every check from here on. Detection runs before
+        // the scan, so a cross-installed intruder would otherwise be picked back up here and checked as a normal mod.
+        if (misplacedReport.Any)
+        {
+            serverMods = ExcludeMisplacedMods(serverMods, misplacedReport);
+            clientMods = ExcludeMisplacedMods(clientMods, misplacedReport);
+        }
 
         // Early exit if no mods found at all
         if (serverMods.Count == 0 && clientMods.Count == 0)
@@ -301,6 +310,43 @@ public sealed class ApplicationService(
         reporter.ReconciliationResults(result);
 
         return result.Mods.ToList();
+    }
+
+    /// <summary>
+    /// Returns the mods with any misplaced entries removed: those whose DLL path was flagged as misplaced, plus any
+    /// inside a cross-installed directory whose intruder couldn't be identified (the whole folder is excluded).
+    /// </summary>
+    private static List<Mod> ExcludeMisplacedMods(List<Mod> mods, MisplacedModReport report)
+    {
+        var excludedFiles = new HashSet<string>(report.ExcludedFilePaths, StringComparer.OrdinalIgnoreCase);
+        var excludedDirectories = report.ExcludedDirectories;
+
+        return mods.Where(mod =>
+                !excludedFiles.Contains(mod.FilePath)
+                && !excludedDirectories.Any(directory => IsWithinDirectory(mod.FilePath, directory))
+            )
+            .ToList();
+    }
+
+    /// <summary>
+    /// Determines whether <paramref name="filePath"/> lives inside <paramref name="directory"/> (or is that directory
+    /// itself), comparing fully-resolved paths case-insensitively.
+    /// </summary>
+    private static bool IsWithinDirectory(string filePath, string directory)
+    {
+        var fullFile = Path.GetFullPath(filePath);
+        var fullDirectory = Path.GetFullPath(directory);
+
+        if (string.Equals(fullFile, fullDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var prefix = fullDirectory.EndsWith(Path.DirectorySeparatorChar)
+            ? fullDirectory
+            : fullDirectory + Path.DirectorySeparatorChar;
+
+        return fullFile.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -599,8 +645,7 @@ public sealed class ApplicationService(
             // The constraint from Forge can't be parsed, so compatibility can't be evaluated. Surface it now:
             // LoadWarnings are already rendered earlier in the run, so adding to them here would be invisible.
             reporter.Warning(
-                $"Could not verify SPT compatibility for {mod.DisplayName}: "
-                    + $"Forge reported an invalid version constraint ({installedApiVersion.SptVersionConstraint})."
+                $"Could not verify SPT compatibility for {mod.DisplayName}: Forge reported an invalid version constraint ({installedApiVersion.SptVersionConstraint})."
             );
             return;
         }
@@ -615,7 +660,9 @@ public sealed class ApplicationService(
         var reason = $"Version {mod.LocalVersion} requires SPT {installedApiVersion.SptVersionConstraint}";
 
         // Find the latest compatible version to suggest
-        var compatibleApiVersion = mod.ApiVersions!.Where(v => SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion))
+        var compatibleApiVersion = mod.ApiVersions!.Where(v =>
+                SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion)
+            )
             .OrderByDescending(v => SemVer.ParseOrZero(v.Version))
             .FirstOrDefault();
 

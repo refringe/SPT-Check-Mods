@@ -117,7 +117,9 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     /// <inheritdoc />
     public void PluginsDirectoryNotFound(string path)
     {
-        AnsiConsole.MarkupLine($"[orange1]Warning:[/] BepInEx plugins directory not found: [grey]{path.EscapeMarkup()}[/]");
+        AnsiConsole.MarkupLine(
+            $"[orange1]Warning:[/] BepInEx plugins directory not found: [grey]{path.EscapeMarkup()}[/]"
+        );
     }
 
     /// <inheritdoc />
@@ -425,10 +427,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         }
 
         AnsiConsole.MarkupLine(
-            $"[grey]Final mod count: {result.Mods.Count} "
-                + $"(matched pairs: {result.ReconciledPairs.Count}, "
-                + $"server-only: {result.UnmatchedServerMods.Count}, "
-                + $"client-only: {result.UnmatchedClientMods.Count})[/]"
+            $"[grey]Final mod count: {result.Mods.Count} (matched pairs: {result.ReconciledPairs.Count}, server-only: {result.UnmatchedServerMods.Count}, client-only: {result.UnmatchedClientMods.Count})[/]"
         );
         AnsiConsole.WriteLine();
         Rule();
@@ -442,7 +441,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[red bold]Improperly installed mods detected.[/]");
         AnsiConsole.MarkupLine(
-            "[grey]The following mods are possibly installed incorrectly. Review the mod page for install instructions, move them to the correct location, and run this tool again.[/]"
+            "[grey]It appears that the following mods are installed incorrectly. Review the mod pages for install instructions and ensure they are correctly installed.[/]"
         );
         AnsiConsole.WriteLine();
 
@@ -479,8 +478,9 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         }
 
         AnsiConsole.MarkupLine(
-            "[red]Halting. You need to resolve the mod installation issues before this tool can continue.[/]"
+            "[red]These mods are being skipped for the rest of this check. Move them to the correct location and run this tool again to have them included.[/]"
         );
+        AnsiConsole.MarkupLine("[grey]If this incorrect, please create a Github issue and provide logs.[/]");
         AnsiConsole.WriteLine();
         Rule();
     }
@@ -555,10 +555,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine(
-            "  [grey]These weren't matched to a Forge listing. That's expected for a mod that isn't "
-                + "published on Forge, or for a plugin bundled inside another mod you already have "
-                + "installed. No action is needed unless you expected one of these to be its own mod "
-                + "on Forge.[/]"
+            "  [grey]These weren't matched to a Forge listing. That's expected for a mod that isn't published on Forge, or for a plugin bundled inside another mod you already have installed. No action is needed unless you expected one of these to be its own mod on Forge.[/]"
         );
         AnsiConsole.WriteLine();
     }
@@ -733,9 +730,8 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         foreach (var dep in missingDeps)
         {
             // Link mod name to Forge page when a usable URL is available, otherwise show it in plain white.
-            var url = dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug)
-                ? ForgeUrls.ModPage(dep.ModId, dep.Slug)
-                : null;
+            var url =
+                dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug) ? ForgeUrls.ModPage(dep.ModId, dep.Slug) : null;
             var nameDisplay = IsLinkUrlSafe(url)
                 ? $"[link={url}]{dep.Name.EscapeMarkup()}[/]"
                 : $"[white]{dep.Name.EscapeMarkup()}[/]";

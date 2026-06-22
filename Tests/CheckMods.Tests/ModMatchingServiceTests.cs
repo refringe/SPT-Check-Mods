@@ -112,8 +112,8 @@ public sealed class ModMatchingServiceTests
         var api = new FakeForgeApiService { OnGetModByGuid = _ => throw boom };
         var mods = new[] { ClientMod("com.a.one"), ClientMod("com.a.two"), ClientMod("com.a.three") };
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => CreateService(api).MatchModsAsync(mods, SptVersion)
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            CreateService(api).MatchModsAsync(mods, SptVersion)
         );
 
         // The systemic failure wraps the underlying exception rather than swallowing it.
@@ -192,7 +192,10 @@ public sealed class ModMatchingServiceTests
     [Fact]
     public async Task Returns_empty_for_no_mods()
     {
-        var api = new FakeForgeApiService { OnGetModByGuid = _ => throw new InvalidOperationException("should not run") };
+        var api = new FakeForgeApiService
+        {
+            OnGetModByGuid = _ => throw new InvalidOperationException("should not run"),
+        };
 
         var results = await CreateService(api).MatchModsAsync([], SptVersion);
 

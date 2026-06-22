@@ -455,7 +455,9 @@ public sealed partial class ForgeApiService(
         // Larger batches are split so the request URL stays within length limits. Dispatch the chunks concurrently
         // and let the shared rate limiter throttle them, rather than waiting for each round-trip before the next.
         var chunkResults = await Task.WhenAll(
-            modList.Chunk(MaxModsPerUpdateRequest).Select(chunk => GetModUpdatesChunkAsync(chunk, sptVersion, cancellationToken))
+            modList
+                .Chunk(MaxModsPerUpdateRequest)
+                .Select(chunk => GetModUpdatesChunkAsync(chunk, sptVersion, cancellationToken))
         );
 
         // Combine results across chunks.
@@ -471,7 +473,10 @@ public sealed partial class ForgeApiService(
             // a failed chunk, so a single chunk error fails the whole call.
             if (chunkResult.TryPickT2(out var error, out _))
             {
-                logger.LogDebug("A mod-updates chunk failed ({Error}); failing the batch update request", error.Message);
+                logger.LogDebug(
+                    "A mod-updates chunk failed ({Error}); failing the batch update request",
+                    error.Message
+                );
                 return error;
             }
 

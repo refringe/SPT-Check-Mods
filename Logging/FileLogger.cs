@@ -106,7 +106,10 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
     /// the file is held open by another process). Further automatic rolls are then suppressed to avoid per-line disk
     /// churn. Exposed for tests.
     /// </summary>
-    internal bool RotationSuppressed => _rotationSuppressed;
+    internal bool RotationSuppressed
+    {
+        get { return _rotationSuppressed; }
+    }
 
     private void EnsureInitialized()
     {

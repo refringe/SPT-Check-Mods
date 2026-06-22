@@ -83,7 +83,7 @@ public interface IModCheckReporter
     /// <summary>Displays the results of mod reconciliation.</summary>
     void ReconciliationResults(ModReconciliationResult result);
 
-    /// <summary>Displays mods installed in the wrong location, shown right before the workflow halts.</summary>
+    /// <summary>Displays mods installed in the wrong location, shown before they're excluded from the remaining checks.</summary>
     void MisplacedMods(MisplacedModReport report);
 
     /// <summary>Lists mods with no Forge match (informational).</summary>

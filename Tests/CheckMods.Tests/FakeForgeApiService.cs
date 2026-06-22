@@ -32,8 +32,9 @@ internal sealed class FakeForgeApiService : IForgeApiService
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        OneOf<ModSearchResult, NotFound, NoCompatibleVersion, ApiError> result =
-            OnGetModByGuid is not null ? OnGetModByGuid(modGuid) : new NotFound();
+        OneOf<ModSearchResult, NotFound, NoCompatibleVersion, ApiError> result = OnGetModByGuid is not null
+            ? OnGetModByGuid(modGuid)
+            : new NotFound();
         return Task.FromResult(result);
     }
 
@@ -44,8 +45,9 @@ internal sealed class FakeForgeApiService : IForgeApiService
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        OneOf<List<ModSearchResult>, ApiError> result =
-            OnSearch is not null ? OnSearch(modName) : new List<ModSearchResult>();
+        OneOf<List<ModSearchResult>, ApiError> result = OnSearch is not null
+            ? OnSearch(modName)
+            : new List<ModSearchResult>();
         return Task.FromResult(result);
     }
 

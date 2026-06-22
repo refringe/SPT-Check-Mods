@@ -74,8 +74,10 @@ public sealed class ModDependencyServiceTests
     {
         var api = new FakeForgeApiService
         {
-            OnGetModDependencies = _ =>
-                new List<ModDependency> { Dep("com.author.dep", "Dependency", id: 500, slug: "dependency", version: "2.0.0") },
+            OnGetModDependencies = _ => new List<ModDependency>
+            {
+                Dep("com.author.dep", "Dependency", id: 500, slug: "dependency", version: "2.0.0"),
+            },
         };
 
         var result = await CreateService(api)
@@ -122,8 +124,10 @@ public sealed class ModDependencyServiceTests
     {
         var api = new FakeForgeApiService
         {
-            OnGetModDependencies = _ =>
-                new List<ModDependency> { Dep("com.author.conf", "Conflicting", id: 500, conflict: true) },
+            OnGetModDependencies = _ => new List<ModDependency>
+            {
+                Dep("com.author.conf", "Conflicting", id: 500, conflict: true),
+            },
         };
 
         var result = await CreateService(api)
@@ -143,8 +147,7 @@ public sealed class ModDependencyServiceTests
         var a = Dep("com.a", "A", nested: [b]);
         var api = new FakeForgeApiService { OnGetModDependencies = _ => new List<ModDependency> { a } };
 
-        var result = await CreateService(api)
-            .AnalyzeDependenciesAsync([MatchedMod("com.main", "Main", 100)], []);
+        var result = await CreateService(api).AnalyzeDependenciesAsync([MatchedMod("com.main", "Main", 100)], []);
 
         var root = Assert.Single(result.RootMods);
         var nodeA = Assert.Single(root.Children);
@@ -163,7 +166,8 @@ public sealed class ModDependencyServiceTests
         var calls = new List<(int Fetched, int Total)>();
         var api = new FakeForgeApiService { OnGetModDependencies = _ => new List<ModDependency>() };
 
-        await CreateService(api).AnalyzeDependenciesAsync([m1, m2], [], (fetched, total) => calls.Add((fetched, total)));
+        await CreateService(api)
+            .AnalyzeDependenciesAsync([m1, m2], [], (fetched, total) => calls.Add((fetched, total)));
 
         Assert.Equal((1, 1), Assert.Single(calls));
     }
@@ -173,8 +177,7 @@ public sealed class ModDependencyServiceTests
     {
         var api = new FakeForgeApiService { OnGetModDependencies = _ => new ApiError("boom") };
 
-        var result = await CreateService(api)
-            .AnalyzeDependenciesAsync([MatchedMod("com.main", "Main", 100)], []);
+        var result = await CreateService(api).AnalyzeDependenciesAsync([MatchedMod("com.main", "Main", 100)], []);
 
         var root = Assert.Single(result.RootMods);
         Assert.Empty(root.Children);

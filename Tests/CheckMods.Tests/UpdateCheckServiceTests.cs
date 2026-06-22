@@ -215,7 +215,12 @@ public sealed class UpdateCheckServiceTests
         {
             OnGetModUpdates = () => new NotFound(),
             OnGetModById = _ =>
-                ModWithVersions("https://detail", ApiModVersion("1.0.0"), ApiModVersion("2.0.0-beta.1"), ApiModVersion("1.2.0")),
+                ModWithVersions(
+                    "https://detail",
+                    ApiModVersion("1.0.0"),
+                    ApiModVersion("2.0.0-beta.1"),
+                    ApiModVersion("1.2.0")
+                ),
         };
 
         var result = await CreateService(api).CheckAsync(SptVersion);
