@@ -1,11 +1,12 @@
 using CheckMods.Models;
 using CheckMods.Services;
+using CheckMods.Utils;
 
 namespace CheckMods.Tests;
 
 /// <summary>
-/// Tests for <see cref="IgnoredUpdateWorkflow.BuildNewSet"/>: the rewrite logic that preserves ignores for mods not
-/// evaluated this run while overwriting the decisions the user could actually see.
+/// Tests for <see cref="IgnoredUpdateWorkflow"/>: the ignore-set rewrite logic (<see cref="IgnoredUpdateWorkflow.BuildNewSet"/>)
+/// and the update-page URL building used by the "open update pages" menu action.
 /// </summary>
 public sealed class IgnoredUpdateWorkflowTests
 {
@@ -17,6 +18,70 @@ public sealed class IgnoredUpdateWorkflowTests
     )
     {
         return new IgnoredUpdate(id, local, latest, Name: $"Mod {id}", Source: source);
+    }
+
+    private static Mod MatchedMod(int id, string slug, string? detailUrl)
+    {
+        var mod = new Mod
+        {
+            Guid = $"com.author.mod{id}",
+            FilePath = $"mods/Mod{id}.dll",
+            IsServerMod = true,
+            LocalName = $"Mod {id}",
+            LocalAuthor = "Author",
+            LocalVersion = "1.0.0",
+        };
+
+        mod.UpdateFromApiMatch(
+            new ModSearchResult(
+                Id: id,
+                HubId: null,
+                Name: $"Mod {id}",
+                Slug: slug,
+                Teaser: null,
+                Thumbnail: null,
+                Downloads: 0,
+                SourceCodeLinks: null,
+                DetailUrl: detailUrl,
+                Owner: null,
+                Versions: null
+            )
+        );
+
+        return mod;
+    }
+
+    [Fact]
+    public void BuildUpdatePageUrls_prefers_the_api_detail_url()
+    {
+        var mod = MatchedMod(2471, "cool-mod", "https://forge.sp-tarkov.com/mod/2471/cool-mod");
+
+        var urls = IgnoredUpdateWorkflow.BuildUpdatePageUrls([mod]);
+
+        Assert.Equal(new[] { "https://forge.sp-tarkov.com/mod/2471/cool-mod" }, urls);
+    }
+
+    [Fact]
+    public void BuildUpdatePageUrls_falls_back_to_a_mod_page_built_from_id_and_slug()
+    {
+        // No detail URL from the API, but the Forge id and slug are enough to build the page link.
+        var mod = MatchedMod(2471, "cool-mod", detailUrl: null);
+
+        var urls = IgnoredUpdateWorkflow.BuildUpdatePageUrls([mod]);
+
+        Assert.Equal(new[] { ForgeUrls.ModPage(2471, "cool-mod") }, urls);
+    }
+
+    [Fact]
+    public void BuildUpdatePageUrls_dedups_components_that_share_a_page()
+    {
+        // Paired server/client components resolve to the same Forge mod page and should open a single tab.
+        var server = MatchedMod(2471, "cool-mod", "https://forge.sp-tarkov.com/mod/2471/cool-mod");
+        var client = MatchedMod(2471, "cool-mod", "https://forge.sp-tarkov.com/mod/2471/cool-mod");
+
+        var urls = IgnoredUpdateWorkflow.BuildUpdatePageUrls([server, client]);
+
+        Assert.Single(urls);
     }
 
     [Fact]

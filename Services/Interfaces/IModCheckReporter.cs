@@ -104,8 +104,12 @@ public interface IModCheckReporter
     /// <summary>Reports that the remote ignore list couldn't be fetched and the local list is unchanged.</summary>
     void RemoteIgnoresUnavailable();
 
-    /// <summary>Prompts for the manage-ignored-updates gate. Returns true if the user chose to manage.</summary>
-    bool PromptManageIgnoredUpdates();
+    /// <summary>
+    /// Shows the end-of-run menu and returns the chosen action. The "open update pages" entry is offered only when
+    /// <paramref name="openableUpdateCount"/> is greater than zero; the "manage ignored updates" entry only when
+    /// <paramref name="canManageIgnoredUpdates"/> is true. "Close" is always available.
+    /// </summary>
+    EndOfRunChoice PromptEndOfRun(int openableUpdateCount, bool canManageIgnoredUpdates);
 
     /// <summary>
     /// Shows a checklist of update candidates (those in <paramref name="preIgnoredApiModIds"/> pre-checked) and returns
@@ -113,8 +117,8 @@ public interface IModCheckReporter
     /// </summary>
     IReadOnlyList<Mod> SelectUpdatesToIgnore(IReadOnlyList<Mod> candidates, ISet<int> preIgnoredApiModIds);
 
-    /// <summary>Drains buffered keystrokes, prints the exit prompt, and waits for a keypress.</summary>
-    void PressAnyKeyToExit();
+    /// <summary>Reports the outcome of opening update pages in the browser (how many of the total opened).</summary>
+    void UpdatePagesOpened(int opened, int total);
 
     /// <summary>Asks whether to report the just-confirmed ignores as a GitHub issue. Defaults to no.</summary>
     bool PromptReportIgnores();

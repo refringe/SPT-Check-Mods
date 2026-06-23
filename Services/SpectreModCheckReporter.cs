@@ -902,13 +902,29 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <inheritdoc />
-    public bool PromptManageIgnoredUpdates()
+    public EndOfRunChoice PromptEndOfRun(int openableUpdateCount, bool canManageIgnoredUpdates)
     {
         DrainBufferedKeys();
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[grey]Press [[I]] to manage ignored updates, or any other key to exit...[/]");
-        var key = Console.ReadKey(intercept: true);
-        return key.Key == ConsoleKey.I;
+
+        var prompt = new SelectionPrompt<EndOfRunChoice>()
+            .Title("[grey]What would you like to do?[/]")
+            .HighlightStyle(Style.Parse("blue"))
+            .UseConverter(choice => FormatEndOfRunChoice(choice, openableUpdateCount));
+
+        if (openableUpdateCount > 0)
+        {
+            prompt.AddChoice(EndOfRunChoice.OpenUpdatePages);
+        }
+
+        if (canManageIgnoredUpdates)
+        {
+            prompt.AddChoice(EndOfRunChoice.ManageIgnoredUpdates);
+        }
+
+        prompt.AddChoice(EndOfRunChoice.Exit);
+
+        return AnsiConsole.Prompt(prompt);
     }
 
     /// <inheritdoc />
@@ -937,11 +953,27 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <inheritdoc />
-    public void PressAnyKeyToExit()
+    public void UpdatePagesOpened(int opened, int total)
     {
-        DrainBufferedKeys();
-        AnsiConsole.MarkupLine("[grey]Press any key to exit...[/]");
-        Console.ReadKey();
+        if (total == 0)
+        {
+            return;
+        }
+
+        if (opened == total)
+        {
+            Success($"Opened {opened} mod page{Plural(opened)} in your browser.");
+        }
+        else if (opened == 0)
+        {
+            Error("Couldn't open your browser. The mod pages are listed as clickable links in the summary above.");
+        }
+        else
+        {
+            Warning(
+                $"Opened {opened} of {total} mod pages; couldn't open the rest. The remaining pages are listed as clickable links above."
+            );
+        }
     }
 
     /// <inheritdoc />
@@ -973,6 +1005,29 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                 "[grey]Your list was too large to pre-fill; paste the contents of your ignored-updates.json into the issue.[/]"
             );
         }
+    }
+
+    /// <summary>
+    /// Formats an end-of-run menu entry. The open-pages entry carries the count of pages it will open.
+    /// </summary>
+    private static string FormatEndOfRunChoice(EndOfRunChoice choice, int openableUpdateCount)
+    {
+        return choice switch
+        {
+            EndOfRunChoice.OpenUpdatePages =>
+                $"Open {openableUpdateCount} mod page{Plural(openableUpdateCount)} with updates in your browser",
+            EndOfRunChoice.ManageIgnoredUpdates => "Manage ignored updates",
+            EndOfRunChoice.Exit => "Close Check Mods",
+            _ => choice.ToString(),
+        };
+    }
+
+    /// <summary>
+    /// Returns the plural suffix "s" for any count other than one.
+    /// </summary>
+    private static string Plural(int count)
+    {
+        return count == 1 ? string.Empty : "s";
     }
 
     /// <summary>
