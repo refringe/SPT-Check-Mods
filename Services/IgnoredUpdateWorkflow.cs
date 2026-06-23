@@ -84,11 +84,10 @@ public sealed class IgnoredUpdateWorkflow(
 
         foreach (var mod in openable)
         {
-            var url = !string.IsNullOrWhiteSpace(mod.ApiUrl)
-                ? mod.ApiUrl
-                : mod.ApiModId.HasValue
-                    ? ForgeUrls.ModPage(mod.ApiModId.Value, mod.ApiSlug)
-                    : null;
+            var url =
+                !string.IsNullOrWhiteSpace(mod.ApiUrl) ? mod.ApiUrl
+                : mod.ApiModId.HasValue ? ForgeUrls.ModPage(mod.ApiModId.Value, mod.ApiSlug)
+                : null;
 
             if (!string.IsNullOrWhiteSpace(url) && seen.Add(url))
             {
