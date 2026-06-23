@@ -8,17 +8,18 @@ namespace CheckMods.Services;
 /// <summary>
 /// Default <see cref="IIgnoredUpdateWorkflow"/>. Presents the currently-flagged updates in a checklist (already-ignored
 /// ones pre-checked), rewrites the visible decisions while preserving ignores for mods not evaluated this run, and
-/// offers to report the result as a GitHub issue so others benefit.
+/// offers to contribute any entries the community list doesn't already have as a GitHub issue so others benefit.
 /// </summary>
 [Injectable(InjectionType.Transient)]
 public sealed class IgnoredUpdateWorkflow(
     IIgnoredUpdateStore store,
     IModCheckReporter reporter,
-    IBrowserLauncher browserLauncher
+    IBrowserLauncher browserLauncher,
+    IRemoteIgnoreFileClient remoteIgnoreFileClient
 ) : IIgnoredUpdateWorkflow
 {
     /// <inheritdoc />
-    public Task RunAsync(IReadOnlyList<Mod>? mods, CancellationToken cancellationToken = default)
+    public async Task RunAsync(IReadOnlyList<Mod>? mods, CancellationToken cancellationToken = default)
     {
         // One row per Forge mod id (paired server/client mods share an id and a single table row).
         var candidates = (mods ?? [])
@@ -45,11 +46,11 @@ public sealed class IgnoredUpdateWorkflow(
                     break;
 
                 case EndOfRunChoice.ManageIgnoredUpdates:
-                    ManageIgnoredUpdates(mods!, candidates);
+                    await ManageIgnoredUpdatesAsync(mods!, candidates, cancellationToken);
                     break;
 
                 default:
-                    return Task.CompletedTask;
+                    return;
             }
         }
     }
@@ -103,7 +104,11 @@ public sealed class IgnoredUpdateWorkflow(
     /// contribute the just-confirmed ignores. The new ignores take effect the next time the app is run; we deliberately
     /// don't re-check or re-render the table here.
     /// </summary>
-    private void ManageIgnoredUpdates(IReadOnlyList<Mod> mods, IReadOnlyList<Mod> candidates)
+    private async Task ManageIgnoredUpdatesAsync(
+        IReadOnlyList<Mod> mods,
+        IReadOnlyList<Mod> candidates,
+        CancellationToken cancellationToken
+    )
     {
         var preIgnoredIds = candidates.Where(m => m.UpdateSuppressed).Select(m => m.ApiModId!.Value).ToHashSet();
         var selected = reporter.SelectUpdatesToIgnore(candidates, preIgnoredIds);
@@ -111,7 +116,7 @@ public sealed class IgnoredUpdateWorkflow(
 
         PersistSelection(mods, chosen);
 
-        OfferReport(chosen);
+        await OfferReportAsync(chosen, cancellationToken);
     }
 
     private void PersistSelection(IReadOnlyList<Mod> mods, IReadOnlyList<IgnoredUpdate> chosen)
@@ -122,13 +127,23 @@ public sealed class IgnoredUpdateWorkflow(
     }
 
     /// <summary>
-    /// Offers to report the just-confirmed ignores as a templated GitHub issue, opening the user's browser to a
-    /// pre-filled new-issue form when they accept. Opt-in with a default of "no"; skipped when nothing was selected.
+    /// Offers to contribute the just-confirmed ignores as a templated GitHub issue, opening the user's browser to a
+    /// pre-filled new-issue form when they accept. Only entries the community list doesn't already have are offered.
     /// </summary>
     /// <param name="chosen">The entries the user confirmed as ignored this run.</param>
-    private void OfferReport(IReadOnlyList<IgnoredUpdate> chosen)
+    /// <param name="cancellationToken">Token to cancel the community-list fetch.</param>
+    private async Task OfferReportAsync(IReadOnlyList<IgnoredUpdate> chosen, CancellationToken cancellationToken)
     {
         if (chosen.Count == 0)
+        {
+            return;
+        }
+
+        var community = await FetchCommunityIgnoresAsync(cancellationToken);
+        var reportable = SelectReportableEntries(chosen, community);
+
+        // Nothing to contribute. The community list already has every update the user confirmed this run.
+        if (reportable.Count == 0)
         {
             return;
         }
@@ -138,15 +153,42 @@ public sealed class IgnoredUpdateWorkflow(
             return;
         }
 
-        var url = IgnoreReportUrl.Build(chosen, out var prefilled);
+        var url = IgnoreReportUrl.Build(reportable, out var prefilled);
         var opened = browserLauncher.TryOpenUrl(url);
         reporter.IgnoreReportOpened(url, opened, prefilled);
     }
 
     /// <summary>
-    /// Builds the new ignore set: keep existing entries for mods that weren't evaluated this run, then add this run's
-    /// selected entries. Entries for evaluated-but-unselected mods are intentionally dropped — the user un-ignored them,
-    /// or they resolved on their own (now genuinely up to date).
+    /// Fetches the community (remote) ignore list for comparison only, returning an empty list when it isn't configured
+    /// or can't be fetched. This never modifies the local list — it's used solely to decide what's worth contributing.
+    /// </summary>
+    private async Task<IReadOnlyList<IgnoredUpdate>> FetchCommunityIgnoresAsync(CancellationToken cancellationToken)
+    {
+        if (!remoteIgnoreFileClient.IsConfigured)
+        {
+            return [];
+        }
+
+        return await remoteIgnoreFileClient.FetchAsync(cancellationToken) ?? [];
+    }
+
+    /// <summary>
+    /// Returns the entries worth contributing: those from <paramref name="chosen"/> whose key isn't already present in
+    /// the <paramref name="community"/> list. Matching uses <see cref="IgnoredUpdate.Key"/> compared case-insensitively,
+    /// the same key the remote merge dedupes on. An empty result means the community already covers everything chosen.
+    /// </summary>
+    internal static IReadOnlyList<IgnoredUpdate> SelectReportableEntries(
+        IReadOnlyList<IgnoredUpdate> chosen,
+        IReadOnlyList<IgnoredUpdate> community
+    )
+    {
+        var communityKeys = community.Select(e => e.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return chosen.Where(e => !communityKeys.Contains(e.Key)).ToList();
+    }
+
+    /// <summary>
+    /// Builds the new ignore set. Keep existing entries for mods that weren't evaluated this run, then add this run's
+    /// selected entries.
     /// </summary>
     internal static List<IgnoredUpdate> BuildNewSet(
         IReadOnlyList<IgnoredUpdate> existing,

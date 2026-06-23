@@ -120,7 +120,10 @@ public interface IModCheckReporter
     /// <summary>Reports the outcome of opening update pages in the browser (how many of the total opened).</summary>
     void UpdatePagesOpened(int opened, int total);
 
-    /// <summary>Asks whether to report the just-confirmed ignores as a GitHub issue. Defaults to no.</summary>
+    /// <summary>
+    /// Asks whether to contribute the just-confirmed ignores that the community list doesn't already have as a GitHub
+    /// issue. Only reached when there's at least one such entry to contribute. Defaults to no.
+    /// </summary>
     bool PromptReportIgnores();
 
     /// <summary>

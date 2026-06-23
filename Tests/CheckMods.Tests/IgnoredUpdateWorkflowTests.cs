@@ -131,4 +131,65 @@ public sealed class IgnoredUpdateWorkflowTests
         Assert.Single(result);
         Assert.Equal(1, result[0].ApiModId);
     }
+
+    [Fact]
+    public void SelectReportableEntries_returns_all_chosen_when_community_is_empty()
+    {
+        // No community list (unconfigured / unreachable): everything confirmed is worth contributing.
+        var chosen = new List<IgnoredUpdate> { Entry(1), Entry(2) };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, []);
+
+        Assert.Equal(2, reportable.Count);
+    }
+
+    [Fact]
+    public void SelectReportableEntries_drops_entries_already_in_the_community_list()
+    {
+        var chosen = new List<IgnoredUpdate> { Entry(1), Entry(2) };
+        // The community already has mod 1's exact (id, local, latest) triple.
+        var community = new List<IgnoredUpdate> { Entry(1, source: IgnoreSource.Remote) };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, community);
+
+        Assert.Single(reportable);
+        Assert.Equal(2, reportable[0].ApiModId);
+    }
+
+    [Fact]
+    public void SelectReportableEntries_returns_empty_when_community_already_has_all_chosen()
+    {
+        // This is what makes the workflow skip the share prompt entirely.
+        var chosen = new List<IgnoredUpdate> { Entry(1), Entry(2) };
+        var community = new List<IgnoredUpdate> { Entry(1), Entry(2) };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, community);
+
+        Assert.Empty(reportable);
+    }
+
+    [Fact]
+    public void SelectReportableEntries_matches_on_the_full_triple_not_just_id()
+    {
+        // Same mod id, but a genuinely newer latest version -> a different rule the community doesn't have yet.
+        var chosen = new List<IgnoredUpdate> { Entry(1, latest: "2.0.0") };
+        var community = new List<IgnoredUpdate> { Entry(1, latest: "1.0.1") };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, community);
+
+        Assert.Single(reportable);
+        Assert.Equal("2.0.0", reportable[0].IgnoredLatestVersion);
+    }
+
+    [Fact]
+    public void SelectReportableEntries_compares_keys_case_insensitively()
+    {
+        // Version strings can carry pre-release/build casing; a casing-only difference isn't a new rule.
+        var chosen = new List<IgnoredUpdate> { Entry(1, local: "1.0.0-RC1", latest: "1.0.1-RC2") };
+        var community = new List<IgnoredUpdate> { Entry(1, local: "1.0.0-rc1", latest: "1.0.1-rc2") };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, community);
+
+        Assert.Empty(reportable);
+    }
 }
