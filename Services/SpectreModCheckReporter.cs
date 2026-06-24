@@ -373,6 +373,9 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
                 foreach (var pair in pairsWithNotes)
                 {
+                    // Blank line before each entry so the multi-line warnings don't run together visually.
+                    AnsiConsole.WriteLine();
+
                     var modName = pair.SelectedMod.LocalName;
 
                     var nameDisplay = FormatModLink(modName, pair.SelectedMod.ApiUrl);
@@ -547,7 +550,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine(
-            "  [grey]These weren't matched to a Forge listing. That's expected for a mod that isn't published on Forge, or for a plugin bundled inside another mod you already have installed. No action is needed unless you expected one of these to be its own mod on Forge.[/]"
+            "[grey]These weren't matched to a Forge listing. That's expected for a mod that isn't published on Forge, or for a plugin bundled inside another mod you already have installed. No action is needed unless you expected one of these to be its own mod on Forge.[/]"
         );
         AnsiConsole.WriteLine();
     }
