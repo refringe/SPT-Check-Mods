@@ -17,8 +17,7 @@ public interface IIgnoredUpdateStore
     void Save(IReadOnlyList<IgnoredUpdate> entries);
 
     /// <summary>
-    /// Adds entries from <paramref name="incoming"/> whose key isn't already present, preserving existing entries
-    /// verbatim. Added entries are tagged <see cref="IgnoreSource.Remote"/>. Returns the number added.
+    /// Merges entries from <paramref name="incoming"/> that are not already present, tagging added entries as <see cref="IgnoreSource.Remote"/>; returns the count added.
     /// </summary>
     int MergeWithoutOverwrite(IReadOnlyList<IgnoredUpdate> incoming);
 }

@@ -8,9 +8,8 @@ using Microsoft.Extensions.Options;
 namespace CheckMods.Tests;
 
 /// <summary>
-/// Tests for RateLimitService's retry and backoff behaviour. The token-bucket pacer is configured with a large burst so
-/// it never throttles at the test's request volume, isolating the retry/classification logic. Backoff delays are
-/// configured to a few milliseconds to keep the tests fast.
+/// Tests for RateLimitService's retry and backoff behaviour. The token-bucket pacer is configured with a large burst
+/// that does not throttle at the test's request volume. Backoff delays are configured to a few milliseconds.
 /// </summary>
 public sealed class RateLimitServiceTests
 {

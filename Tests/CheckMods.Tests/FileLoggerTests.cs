@@ -77,13 +77,13 @@ public sealed class FileLoggerTests
         var provider = CreateProvider(logPath);
         try
         {
-            // Hold the log file with an exclusive lock so the logger's first open attempt fails and is swallowed.
+            // Hold the log file with an exclusive lock.
             using (new FileStream(logPath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 provider.CreateLogger("Cat").LogInformation("written while the file is locked");
             }
 
-            // Lock released: a later write must retry and succeed rather than staying permanently dead.
+            // Lock released: a later write retries and succeeds.
             provider.CreateLogger("Cat").LogInformation("written after the lock is released");
             provider.Dispose();
 
@@ -117,7 +117,6 @@ public sealed class FileLoggerTests
             // A rotated file only appears if rotation ran during the session (not just at startup on a fresh file).
             Assert.True(File.Exists(rotatedPath), "expected a rotated log file from mid-session rotation");
 
-            // The active log was rolled, so it stays bounded near the cap instead of growing with every entry.
             Assert.True(new FileInfo(logPath).Length <= 500 + 1024, "active log should be bounded near the size cap");
         }
         finally
@@ -134,9 +133,7 @@ public sealed class FileLoggerTests
         {
             var logPath = Path.Combine(dir, "test.log");
 
-            // Occupy the rotation target with a directory. File.Exists is false for a directory so the shift logic
-            // skips it, but File.Move(active -> test.1.log) fails because the path is taken. This mimics a rotation
-            // that can't move the active file aside (e.g. the file held open by another process).
+            // Occupy the rotation target with a directory.
             Directory.CreateDirectory(Path.Combine(dir, "test.1.log"));
 
             var provider = CreateProvider(logPath, o => o.MaxFileSizeBytes = 200);
@@ -147,11 +144,9 @@ public sealed class FileLoggerTests
                 logger.LogInformation("Log entry {Index} with enough text to accumulate bytes quickly", i);
             }
 
-            // The first over-cap roll failed to rotate, so further per-line rolls are suppressed rather than retried
-            // on every write.
             Assert.True(provider.RotationSuppressed, "a blocked rotation should suppress further roll attempts");
 
-            // Release the active handle before reading the file back.
+            // Release the active handle.
             provider.Dispose();
 
             // Logging keeps working: the latest entry is still written despite rotation being stuck.

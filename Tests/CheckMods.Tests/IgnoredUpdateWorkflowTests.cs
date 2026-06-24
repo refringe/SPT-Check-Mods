@@ -75,7 +75,7 @@ public sealed class IgnoredUpdateWorkflowTests
     [Fact]
     public void BuildUpdatePageUrls_dedups_components_that_share_a_page()
     {
-        // Paired server/client components resolve to the same Forge mod page and should open a single tab.
+        // Paired server/client components resolve to the same Forge mod page.
         var server = MatchedMod(2471, "cool-mod", "https://forge.sp-tarkov.com/mod/2471/cool-mod");
         var client = MatchedMod(2471, "cool-mod", "https://forge.sp-tarkov.com/mod/2471/cool-mod");
 
@@ -92,7 +92,6 @@ public sealed class IgnoredUpdateWorkflowTests
 
         var result = IgnoredUpdateWorkflow.BuildNewSet(existing, evaluated, []);
 
-        // Mod 2 wasn't evaluated, so its entry survives even though it wasn't re-selected.
         Assert.Single(result);
         Assert.Equal(2, result[0].ApiModId);
     }
@@ -103,7 +102,7 @@ public sealed class IgnoredUpdateWorkflowTests
         var existing = new List<IgnoredUpdate> { Entry(1) };
         var evaluated = new HashSet<int> { 1 };
 
-        // Mod 1 was evaluated and shown, but the user un-checked it -> removed (undo / self-resolved).
+        // Mod 1 was evaluated but not re-selected.
         var result = IgnoredUpdateWorkflow.BuildNewSet(existing, evaluated, []);
 
         Assert.Empty(result);
@@ -125,7 +124,7 @@ public sealed class IgnoredUpdateWorkflowTests
         var existing = new List<IgnoredUpdate> { Entry(1) };
         var evaluated = new HashSet<int> { 1 };
 
-        // User kept mod 1 checked: it arrives via "selected" and shouldn't duplicate.
+        // Mod 1 re-selected: arrives in both existing and selected.
         var result = IgnoredUpdateWorkflow.BuildNewSet(existing, evaluated, [Entry(1)]);
 
         Assert.Single(result);
@@ -135,7 +134,7 @@ public sealed class IgnoredUpdateWorkflowTests
     [Fact]
     public void SelectReportableEntries_returns_all_chosen_when_community_is_empty()
     {
-        // No community list (unconfigured / unreachable): everything confirmed is worth contributing.
+        // No community list configured.
         var chosen = new List<IgnoredUpdate> { Entry(1), Entry(2) };
 
         var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, []);
@@ -159,7 +158,6 @@ public sealed class IgnoredUpdateWorkflowTests
     [Fact]
     public void SelectReportableEntries_returns_empty_when_community_already_has_all_chosen()
     {
-        // This is what makes the workflow skip the share prompt entirely.
         var chosen = new List<IgnoredUpdate> { Entry(1), Entry(2) };
         var community = new List<IgnoredUpdate> { Entry(1), Entry(2) };
 
@@ -171,7 +169,7 @@ public sealed class IgnoredUpdateWorkflowTests
     [Fact]
     public void SelectReportableEntries_matches_on_the_full_triple_not_just_id()
     {
-        // Same mod id, but a genuinely newer latest version -> a different rule the community doesn't have yet.
+        // Same mod id but a different latest version.
         var chosen = new List<IgnoredUpdate> { Entry(1, latest: "2.0.0") };
         var community = new List<IgnoredUpdate> { Entry(1, latest: "1.0.1") };
 
@@ -184,7 +182,6 @@ public sealed class IgnoredUpdateWorkflowTests
     [Fact]
     public void SelectReportableEntries_compares_keys_case_insensitively()
     {
-        // Version strings can carry pre-release/build casing; a casing-only difference isn't a new rule.
         var chosen = new List<IgnoredUpdate> { Entry(1, local: "1.0.0-RC1", latest: "1.0.1-RC2") };
         var community = new List<IgnoredUpdate> { Entry(1, local: "1.0.0-rc1", latest: "1.0.1-rc2") };
 

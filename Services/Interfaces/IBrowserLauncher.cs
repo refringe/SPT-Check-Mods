@@ -6,8 +6,7 @@ namespace CheckMods.Services.Interfaces;
 public interface IBrowserLauncher
 {
     /// <summary>
-    /// Attempts to open <paramref name="url"/> in the default browser. Returns false on any failure (or a non-http(s)
-    /// URL), so callers can fall back to printing the link.
+    /// Attempts to open <paramref name="url"/> in the default browser, returning false on any failure or a non-http(s) URL.
     /// </summary>
     bool TryOpenUrl(string url);
 }

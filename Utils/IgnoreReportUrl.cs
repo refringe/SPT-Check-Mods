@@ -6,8 +6,7 @@ namespace CheckMods.Utils;
 
 /// <summary>
 /// Builds the GitHub "new issue" URL for reporting ignored-update suggestions. Pre-fills the ignore-suggestion issue
-/// form's <c>ignored_versions</c> field with the entries as a fenced JSON block, so the maintainer can paste them
-/// straight into the remote list.
+/// form's <c>ignored_versions</c> field with the entries as a fenced JSON block.
 /// </summary>
 internal static class IgnoreReportUrl
 {
@@ -18,10 +17,7 @@ internal static class IgnoreReportUrl
     /// <summary>Issue-form field id that receives the pre-filled JSON (must match the template's field id).</summary>
     private const string FieldId = "ignored_versions";
 
-    /// <summary>
-    /// Maximum total URL length. GitHub rejects very long URLs (~8 KB), so beyond this we drop the pre-fill and return
-    /// the bare form URL, signalling the caller to ask the user to paste their list manually.
-    /// </summary>
+    /// <summary>Maximum URL length before falling back to the bare form URL.</summary>
     private const int MaxUrlLength = 7000;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -36,12 +32,11 @@ internal static class IgnoreReportUrl
     /// </summary>
     /// <param name="entries">The ignored-update entries to report.</param>
     /// <param name="prefilled">True when the returned URL carries the pre-filled entries.</param>
-    /// <returns>The GitHub new-issue URL.</returns>
     public static string Build(IReadOnlyList<IgnoredUpdate> entries, out bool prefilled)
     {
         var json = JsonSerializer.Serialize(entries.Select(ToReportEntry).ToList(), _jsonOptions);
 
-        // Wrap in a fenced code block so the field renders as JSON in the submitted issue.
+        // Wrap in a fenced JSON code block.
         var field = $"```json\n{json}\n```";
         var url = $"{BaseUrl}&{FieldId}={Uri.EscapeDataString(field)}";
 
@@ -55,7 +50,7 @@ internal static class IgnoreReportUrl
         return BaseUrl;
     }
 
-    /// <summary>Projects an entry to the minimal shape the maintainer pastes into the remote list.</summary>
+    /// <summary>Projects an entry to the report format.</summary>
     private static ReportEntry ToReportEntry(IgnoredUpdate entry)
     {
         return new ReportEntry(entry.ApiModId, entry.Name, entry.Guid, entry.LocalVersion, entry.IgnoredLatestVersion);

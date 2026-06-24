@@ -7,7 +7,6 @@ public class ModScannerOptions
 {
     /// <summary>
     /// Maximum DLL file size in bytes to scan (default: 100MB).
-    /// Files larger than this are skipped.
     /// </summary>
     public long MaxDllSizeBytes { get; set; } = 100 * 1024 * 1024;
 }

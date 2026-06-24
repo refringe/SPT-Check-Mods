@@ -8,7 +8,7 @@ namespace CheckMods.Services;
 /// <summary>
 /// Default <see cref="IIgnoredUpdateWorkflow"/>. Presents the currently-flagged updates in a checklist (already-ignored
 /// ones pre-checked), rewrites the visible decisions while preserving ignores for mods not evaluated this run, and
-/// offers to contribute any entries the community list doesn't already have as a GitHub issue so others benefit.
+/// offers to contribute any entries the community list doesn't already have as a GitHub issue.
 /// </summary>
 [Injectable(InjectionType.Transient)]
 public sealed class IgnoredUpdateWorkflow(
@@ -28,13 +28,11 @@ public sealed class IgnoredUpdateWorkflow(
             .Select(g => g.First())
             .ToList();
 
-        // The mods actually shown as "Updates available" — dismissed false positives are treated as up to date and
-        // aren't opened in the browser.
+        // The mods actually shown as "Updates available"; dismissed false positives are excluded.
         var openable = candidates.Where(m => !m.UpdateSuppressed).ToList();
 
-        // The end-of-run menu loops until the user chooses to close: opening pages or managing ignores returns here so
-        // they can do both before exiting. The counts reflect this run's results and don't change as ignores are
-        // edited — those take effect on the next run.
+        // The end-of-run menu loops until the user chooses to close. The counts reflect this run's results and don't
+        // change as ignores are edited.
         while (true)
         {
             var choice = reporter.PromptEndOfRun(openable.Count, canManageIgnoredUpdates: candidates.Count > 0);
@@ -101,8 +99,7 @@ public sealed class IgnoredUpdateWorkflow(
 
     /// <summary>
     /// Runs the ignore-management checklist for the available updates and persists the result, then offers to
-    /// contribute the just-confirmed ignores. The new ignores take effect the next time the app is run; we deliberately
-    /// don't re-check or re-render the table here.
+    /// contribute the just-confirmed ignores.
     /// </summary>
     private async Task ManageIgnoredUpdatesAsync(
         IReadOnlyList<Mod> mods,
@@ -142,7 +139,7 @@ public sealed class IgnoredUpdateWorkflow(
         var community = await FetchCommunityIgnoresAsync(cancellationToken);
         var reportable = SelectReportableEntries(chosen, community);
 
-        // Nothing to contribute. The community list already has every update the user confirmed this run.
+        // Nothing to contribute.
         if (reportable.Count == 0)
         {
             return;
@@ -160,7 +157,7 @@ public sealed class IgnoredUpdateWorkflow(
 
     /// <summary>
     /// Fetches the community (remote) ignore list for comparison only, returning an empty list when it isn't configured
-    /// or can't be fetched. This never modifies the local list — it's used solely to decide what's worth contributing.
+    /// or can't be fetched.
     /// </summary>
     private async Task<IReadOnlyList<IgnoredUpdate>> FetchCommunityIgnoresAsync(CancellationToken cancellationToken)
     {
@@ -174,8 +171,8 @@ public sealed class IgnoredUpdateWorkflow(
 
     /// <summary>
     /// Returns the entries worth contributing: those from <paramref name="chosen"/> whose key isn't already present in
-    /// the <paramref name="community"/> list. Matching uses <see cref="IgnoredUpdate.Key"/> compared case-insensitively,
-    /// the same key the remote merge dedupes on. An empty result means the community already covers everything chosen.
+    /// the <paramref name="community"/> list. Matching uses <see cref="IgnoredUpdate.Key"/> compared case-insensitively.
+    /// An empty result means the community already covers everything chosen.
     /// </summary>
     internal static IReadOnlyList<IgnoredUpdate> SelectReportableEntries(
         IReadOnlyList<IgnoredUpdate> chosen,

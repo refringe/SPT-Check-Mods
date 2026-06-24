@@ -50,7 +50,7 @@ public sealed class IgnoredUpdateStoreTests : IDisposable
     {
         CreateStore().Save([Entry(1, "1.0.0", "1.0.1"), Entry(2, "2.0.0", "2.1.0")]);
 
-        // Fresh instance proves it reads from disk, not just the in-memory cache.
+        // New store instance reads from disk.
         var reloaded = CreateStore().Load();
 
         Assert.Equal(2, reloaded.Count);

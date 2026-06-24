@@ -6,7 +6,7 @@ namespace CheckMods.Tests;
 
 /// <summary>
 /// In-memory <see cref="IForgeApiService"/> test double. Only the handlers a given test needs are configured; the
-/// rest return benign "not found"/empty results, and the unused endpoints throw so accidental reliance is obvious.
+/// rest return benign "not found"/empty results, and the unused endpoints throw.
 /// </summary>
 internal sealed class FakeForgeApiService : IForgeApiService
 {
@@ -27,8 +27,7 @@ internal sealed class FakeForgeApiService : IForgeApiService
 
     /// <summary>
     /// Version-aware handler for the dependencies endpoint, keyed by the first requested (identifier, version) pair.
-    /// Takes precedence over <see cref="OnGetModDependencies"/> when set, so a test can return different dependencies
-    /// for the same mod at its installed versus its proposed update version.
+    /// Takes precedence over <see cref="OnGetModDependencies"/> when set.
     /// </summary>
     public Func<
         (string Identifier, string Version),
@@ -70,7 +69,6 @@ internal sealed class FakeForgeApiService : IForgeApiService
         return SearchModsAsync(modName, sptVersion, cancellationToken);
     }
 
-    // Endpoints not exercised by the matching tests.
     public Task<OneOf<bool, InvalidSptVersion, ApiError>> ValidateSptVersionAsync(
         string sptVersion,
         CancellationToken cancellationToken = default

@@ -16,8 +16,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
     : IModMatchingService
 {
     /// <summary>
-    /// Minimum number of mods that must all fail before an all-failed batch is treated as a systemic fault. Below
-    /// this, "every mod failed" is too easily satisfied by one or two unlucky mods to justify aborting the run.
+    /// Minimum number of mods that must all fail before an all-failed batch is treated as a systemic fault.
     /// </summary>
     private const int MinimumModsForSystemicFailure = 3;
 
@@ -30,12 +29,10 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
     {
         logger.LogDebug("Matching mod: {ModName} (GUID: {Guid})", mod.LocalName, mod.Guid);
 
-        // A GUID match whose mod has no SPT-compatible version. The GUID is authoritative, so hold it as a fallback:
-        // if nothing compatible turns up, the mod is retained as matched (and flagged incompatible by the later
-        // version check) rather than reported as missing from Forge.
+        // A GUID match whose mod has no SPT-compatible version, held as a fallback.
         ModSearchResult? incompatibleMatch = null;
 
-        // Try GUID lookup first (most reliable)
+        // Try GUID lookup first
         if (!string.IsNullOrWhiteSpace(mod.Guid))
         {
             var guidResult = await forgeApiService.GetModByGuidAsync(mod.Guid, sptVersion, cancellationToken);
@@ -53,7 +50,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
             }
         }
 
-        // Try alternate GUIDs (for multi-DLL mods where primary GUID might not be on Forge)
+        // Try alternate GUIDs
         foreach (var alternateGuid in mod.AlternateGuids)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -105,8 +102,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
             return mod;
         }
 
-        // Nothing compatible turned up. If a GUID matched a mod that simply has no SPT-compatible version, keep it as
-        // a match so it surfaces as incompatible rather than as missing from Forge.
+        // Nothing compatible turned up. If a GUID matched a mod that has no SPT-compatible version, keep it as a match.
         if (incompatibleMatch is not null)
         {
             logger.LogDebug(
@@ -222,9 +218,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
             }
             catch (Exception ex)
             {
-                // Isolate per-mod failures: leave this mod cleanly unmatched rather than failing the whole batch.
-                // An exception here is always abnormal - network/API errors are handled inside MatchModAsync and
-                // never throw - so remember it to surface a systemic failure once the batch completes.
+                // Isolate per-mod failures: mark this mod unmatched and record the failure.
                 logger.LogWarning(ex, "Failed to match mod: {ModName}", mod.LocalName);
                 mod.MarkUnmatched();
                 Interlocked.Increment(ref failureCount);
@@ -239,10 +233,7 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
 
         var results = await Task.WhenAll(tasks);
 
-        // When every mod throws, matching is likely broken systemically (a bug or environment fault that hits them
-        // all). Surface it instead of silently reporting every mod as "not found on Forge" - but only once enough
-        // mods are involved that an all-failed batch is meaningful. For one or two mods, "every mod failed" is just
-        // as easily an isolated bad mod, so leave them cleanly unmatched and let the run continue.
+        // When every mod fails and enough mods are involved to be meaningful, throw a systemic failure.
         if (totalCount >= MinimumModsForSystemicFailure && failureCount == totalCount)
         {
             throw new InvalidOperationException(

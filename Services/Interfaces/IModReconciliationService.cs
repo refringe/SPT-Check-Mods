@@ -3,14 +3,12 @@ using CheckMods.Models;
 namespace CheckMods.Services.Interfaces;
 
 /// <summary>
-/// Service responsible for reconciling server and client mod components.
-/// Matches components of the same mod and selects the best version when duplicates exist.
+/// Reconciles server and client mod components into a unified mod list.
 /// </summary>
 public interface IModReconciliationService
 {
     /// <summary>
-    /// Reconciles server and client mods, matching components of the same mod and selecting the best version.
-    /// Updates paired mods with their component paths.
+    /// Reconciles server and client mods, matching components and selecting the best version when duplicates exist.
     /// </summary>
     /// <param name="serverMods">Scanned server mods.</param>
     /// <param name="clientMods">Scanned client mods.</param>

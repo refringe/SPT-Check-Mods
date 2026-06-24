@@ -102,9 +102,8 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
     }
 
     /// <summary>
-    /// True once a mid-session roll left the active file still over the size cap, meaning rotation is blocked (e.g.
-    /// the file is held open by another process). Further automatic rolls are then suppressed to avoid per-line disk
-    /// churn. Exposed for tests.
+    /// True once a mid-session roll left the active file still over the size cap, meaning rotation is blocked.
+    /// Further automatic rolls are then suppressed.
     /// </summary>
     internal bool RotationSuppressed
     {
@@ -125,21 +124,20 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
 
     /// <summary>
     /// Rotates the log if it is over the size cap, then opens a fresh auto-flushing handle for the current log
-    /// file. Shared by first-time setup and mid-session rollover so both go through the same guarded path.
+    /// file. Shared by first-time setup and mid-session rollover.
     /// </summary>
     private void OpenLogFile()
     {
         RotateLogsIfNeeded();
 
-        // Keep a single shared, auto-flushing handle open for the session rather than reopening the file per line.
+        // Opens a single shared, auto-flushing handle for the session.
         // FileShare.ReadWrite lets other processes (e.g. a second instance) read or append concurrently.
         var stream = new FileStream(_logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
         _writer = new StreamWriter(stream) { AutoFlush = true };
 
-        // Latch only after the handle is open. If the open above throws (e.g. a brief exclusive lock), WriteLog's
-        // catch swallows it but _initialized stays false, so the next write retries rather than leaving file logging
-        // permanently dead. Setting it here also precedes the startup banner, whose nested WriteLog re-enters
-        // EnsureInitialized and would otherwise recurse.
+        // Latch only after the handle is open. If the open above throws, WriteLog's catch swallows it but
+        // _initialized stays false, so the next write retries. Setting it here also precedes the startup banner,
+        // whose nested WriteLog re-enters EnsureInitialized and would otherwise recurse.
         _initialized = true;
     }
 
@@ -167,9 +165,8 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
 
                 _writer.Write(message);
 
-                // Enforce the size cap throughout the session, not just at startup: once the active file passes the
-                // limit, roll it over so a single long run can't grow the log unbounded. Skip once rotation is known
-                // to be blocked (see RollActiveLog) so a stuck file doesn't trigger a roll attempt on every line.
+                // Once the active file passes the limit, roll it over. Skip if rotation is known to be blocked
+                // (see RollActiveLog).
                 if (!_rotationSuppressed && _writer.BaseStream.Length >= _options.MaxFileSizeBytes)
                 {
                     RollActiveLog();
@@ -183,8 +180,8 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
     }
 
     /// <summary>
-    /// Closes the active log file once it reaches the size cap and reopens a fresh one, rotating the full file out
-    /// of the way. Only ever called from <see cref="WriteLog"/>, so it runs under <see cref="_writeLock"/>.
+    /// Closes the active log file once it reaches the size cap and reopens a fresh one. Called only from
+    /// <see cref="WriteLog"/> while holding <see cref="_writeLock"/>.
     /// </summary>
     private void RollActiveLog()
     {
@@ -192,16 +189,13 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
         _writer?.Dispose();
         _writer = null;
 
-        // Reopen through the shared path. If the reopen throws it propagates to WriteLog's catch with _initialized
-        // false, so the next write re-initializes instead of writing to a disposed handle.
+        // Reopen through the shared path. If the reopen throws, _initialized stays false so the next write
+        // re-initializes.
         _initialized = false;
         OpenLogFile();
 
-        // A successful roll moves the full file aside and reopens an empty one. If the reopened handle is still at or
-        // over the cap, RotateLogsIfNeeded couldn't move the active file out of the way (e.g. another process holds it
-        // open, or the rotation target is blocked). Suppress further automatic rolls so each subsequent line doesn't
-        // re-enter this flush/dispose/reopen/move cycle and churn the disk; the log may exceed the cap for the rest of
-        // the session, which is the lesser evil over per-line rotation thrashing.
+        // If the reopened handle is still at or over the cap, RotateLogsIfNeeded couldn't move the active file
+        // (e.g. another process holds it open). Suppress further automatic rolls for the session.
         if (_writer is not null && _writer.BaseStream.Length >= _options.MaxFileSizeBytes)
         {
             _rotationSuppressed = true;
@@ -232,19 +226,16 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
                 return;
             }
 
-            // Rotate existing log files
             var directory = Path.GetDirectoryName(_logFilePath) ?? ".";
             var fileNameWithoutExt = Path.GetFileNameWithoutExtension(_logFilePath);
             var extension = Path.GetExtension(_logFilePath);
 
-            // Delete oldest log if at limit
             var oldestLog = Path.Combine(directory, $"{fileNameWithoutExt}.{_options.RetainedFileCount}{extension}");
             if (File.Exists(oldestLog))
             {
                 File.Delete(oldestLog);
             }
 
-            // Shift existing logs (process in reverse order)
             var logsToShift = Enumerable
                 .Range(1, _options.RetainedFileCount - 1)
                 .Reverse()
@@ -261,7 +252,6 @@ public sealed class FileLoggerProvider(IOptions<LoggingOptions> options) : ILogg
                 File.Move(current, newPath);
             }
 
-            // Rename current log to .1
             var firstRotation = Path.Combine(directory, $"{fileNameWithoutExt}.1{extension}");
             File.Move(_logFilePath, firstRotation);
         }

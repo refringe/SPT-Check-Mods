@@ -17,8 +17,7 @@ namespace CheckMods.Services;
 public sealed class RateLimitService : IRateLimitService, IDisposable
 {
     /// <summary>
-    /// Upper bound on requests queued behind the pacer. Large enough to hold every request a single run could fan out
-    /// at once, so callers wait their turn rather than being rejected.
+    /// Upper bound on requests queued behind the pacer.
     /// </summary>
     private const int QueueLimit = 10_000;
 
@@ -27,8 +26,7 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
 
     /// <summary>
     /// Token-bucket pacer that smooths request dispatch to a steady sustained rate (refill) with a bounded initial
-    /// burst (capacity). Sized under both Forge windows, so it serves as a single ceiling for the burst (40/10s) and
-    /// general (200/60s) limits at once while avoiding the front-loaded bursts a sliding window would allow.
+    /// burst (capacity). Sized under both Forge windows.
     /// </summary>
     private readonly TokenBucketRateLimiter _pacer;
     private readonly SemaphoreSlim _concurrencyGate;
@@ -110,7 +108,7 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
                 }
             }
 
-            // Network error or timeout: back off locally and retry without stalling other requests.
+            // Network error or timeout: back off locally and retry.
             if (transientError is not null)
             {
                 if (++retryCount > _options.MaxRetries)
@@ -135,7 +133,7 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
                 continue;
             }
 
-            // Rate limited: honor Retry-After and back off globally so all requests wait together.
+            // Rate limited: honor Retry-After and back off globally.
             if (response!.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 if (++retryCount > _options.MaxRetries)
@@ -218,8 +216,8 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
     }
 
     /// <summary>
-    /// Applies a global backoff after a 429 so all concurrent requests wait. Uses the Retry-After delay when present,
-    /// otherwise an escalating exponential backoff with jitter. Guarded by a semaphore so only one thread updates state.
+    /// Applies a global backoff after a 429. Uses the Retry-After delay when present, otherwise an escalating
+    /// exponential backoff with jitter. Guarded by a semaphore.
     /// </summary>
     /// <param name="retryAfter">Optional delay from the Retry-After header.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

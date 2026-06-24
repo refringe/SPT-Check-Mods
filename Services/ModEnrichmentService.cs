@@ -21,10 +21,9 @@ public sealed class ModEnrichmentService(IForgeApiService forgeApiService, ILogg
     {
         logger.LogDebug("Enriching mods with version data");
 
-        // Filter to only matched mods and deduplicate by API mod ID
         var matchedMods = mods.Where(m => m.IsMatched && m.ApiModId.HasValue).ToList();
 
-        // Group by API mod ID to deduplicate (paired server/client mods share the same API ID)
+        // Group by API mod ID to deduplicate.
         var uniqueModsById = matchedMods.GroupBy(m => m.ApiModId!.Value).ToDictionary(g => g.Key, g => g.ToList());
 
         if (uniqueModsById.Count == 0)
@@ -35,21 +34,17 @@ public sealed class ModEnrichmentService(IForgeApiService forgeApiService, ILogg
 
         logger.LogDebug("Enriching {ModCount} unique mods", uniqueModsById.Count);
 
-        // Create request items for the batch API call
         var modUpdates = uniqueModsById
             .Select(kvp => (ModId: kvp.Key, CurrentVersion: kvp.Value[0].LocalVersion))
             .ToList();
 
-        // Make single batch API call
         var updatesResult = await forgeApiService.GetModUpdatesAsync(modUpdates, sptVersion, cancellationToken);
 
-        // Extract the data or return early on error/not found
         if (!updatesResult.TryPickT0(out var updatesData, out _))
         {
             return;
         }
 
-        // Helper to process update categories
         void ProcessUpdates<T>(IEnumerable<T>? updates, Func<T, int> getModId, Action<Mod, T> updateAction)
         {
             if (updates is null)
@@ -67,7 +62,6 @@ public sealed class ModEnrichmentService(IForgeApiService forgeApiService, ILogg
             }
         }
 
-        // Process all update categories
         ProcessUpdates(updatesData.SafeToUpdate, u => u.ModId, (m, u) => m.UpdateFromSafeToUpdate(u));
         ProcessUpdates(updatesData.Blocked, b => b.ModId, (m, b) => m.UpdateFromBlocked(b));
         ProcessUpdates(updatesData.UpToDate, u => u.ModId, (m, u) => m.UpdateFromUpToDate(u));

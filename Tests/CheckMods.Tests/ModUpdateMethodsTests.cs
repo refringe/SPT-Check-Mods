@@ -113,7 +113,6 @@ public sealed class ModUpdateMethodsTests
         Assert.Null(mod.ApiVersions);
         Assert.Equal(ModStatus.Verified, mod.Status);
 
-        // ApiModId is still set, so the mod counts as matched even with the optional fields absent.
         Assert.True(mod.IsMatched);
     }
 

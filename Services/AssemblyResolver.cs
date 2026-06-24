@@ -16,7 +16,6 @@ public sealed class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
     /// </summary>
     /// <param name="context">The metadata load context.</param>
     /// <param name="assemblyName">The assembly name to resolve.</param>
-    /// <returns>Resolved assembly or null if not found.</returns>
     public override Assembly? Resolve(MetadataLoadContext context, AssemblyName assemblyName)
     {
         try
@@ -25,7 +24,7 @@ public sealed class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
         }
         catch
         {
-            // Return null for missing assemblies to allow inspection to continue. Key to avoiding dependency issues.
+            // Return null for missing assemblies.
             return null;
         }
     }
@@ -35,20 +34,18 @@ public sealed class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
     /// runtime assemblies, and BepInEx core assemblies.
     /// </summary>
     /// <param name="dllPath">Path to the DLL being analyzed.</param>
-    /// <returns>List of assembly paths.</returns>
     private static IEnumerable<string> BuildMinimalAssemblySearchPaths(string dllPath)
     {
         List<string> assemblyPaths = [dllPath];
 
-        // Add .NET runtime assemblies, required for MetadataLoadContext core assembly
+        // Add .NET runtime assemblies.
         var runtimeDir = RuntimeEnvironment.GetRuntimeDirectory();
         if (Directory.Exists(runtimeDir))
         {
             assemblyPaths.AddRange(Directory.GetFiles(runtimeDir, "*.dll"));
         }
 
-        // Add BepInEx core assemblies, required for BepInPlugin attribute resolution
-        // Walk up from the DLL path to find the plugins directory, then locate BepInEx/core
+        // Add BepInEx core assemblies.
         var bepInExCoreDir = FindBepInExCoreDirectory(dllPath);
         if (bepInExCoreDir != null && Directory.Exists(bepInExCoreDir))
         {
@@ -60,9 +57,7 @@ public sealed class AssemblyResolver(string dllPath) : MetadataAssemblyResolver
 
     /// <summary>
     /// Finds the BepInEx core directory by walking up from the DLL path, looking for a sibling BepInEx/core folder at
-    /// each ancestor. This resolves the BepInEx assemblies regardless of where the DLL lives within the SPT install,
-    /// whether correctly placed under BepInEx/plugins or misplaced under SPT/user/mods, since both sit beside the
-    /// BepInEx directory at the SPT root.
+    /// each ancestor.
     /// </summary>
     /// <param name="dllPath">Path to the DLL being analyzed.</param>
     /// <returns>Path to BepInEx/core directory, or null if not found.</returns>

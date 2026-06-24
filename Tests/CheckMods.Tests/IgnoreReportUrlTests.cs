@@ -36,7 +36,6 @@ public sealed class IgnoreReportUrlTests
     [Fact]
     public void Build_drops_prefill_when_too_large()
     {
-        // Many entries with long names blow past the URL length cap.
         var entries = Enumerable.Range(1, 400).Select(i => Entry(i, new string('x', 60), "1.0.0", "1.0.1")).ToList();
 
         var url = IgnoreReportUrl.Build(entries, out var prefilled);

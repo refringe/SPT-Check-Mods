@@ -6,7 +6,7 @@ namespace CheckMods.Configuration;
 public class UpdateCheckOptions
 {
     /// <summary>
-    /// The Forge mod ID for Check Mods itself, used to look up the latest available version.
+    /// The Forge mod ID for Check Mods itself.
     /// </summary>
     public int ForgeModId { get; set; } = 2471;
 }

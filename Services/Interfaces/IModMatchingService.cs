@@ -8,8 +8,7 @@ namespace CheckMods.Services.Interfaces;
 public interface IModMatchingService
 {
     /// <summary>
-    /// Attempts to match a single mod with the Forge API using GUID lookup and fuzzy name fallback.
-    /// Updates the mod's API metadata and status in-place.
+    /// Matches a single mod with the Forge API using GUID lookup and fuzzy name fallback, updating its metadata in-place.
     /// </summary>
     /// <param name="mod">The mod to match.</param>
     /// <param name="sptVersion">The SPT version for compatibility filtering.</param>
@@ -22,8 +21,7 @@ public interface IModMatchingService
     );
 
     /// <summary>
-    /// Matches multiple mods with the Forge API in parallel.
-    /// Updates each mod's API metadata and status in-place.
+    /// Matches multiple mods with the Forge API in parallel, updating each mod's metadata in-place.
     /// </summary>
     /// <param name="mods">The mods to match.</param>
     /// <param name="sptVersion">The SPT version for compatibility filtering.</param>

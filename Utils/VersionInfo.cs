@@ -32,7 +32,7 @@ public static class VersionInfo
             return "0.0.0";
         }
 
-        // The informational version is "<semver>+<gitHash>"; drop the build metadata after '+'.
+        // Informational version format: "<semver>+<gitHash>".
         var plusIndex = informational.IndexOf('+');
         return plusIndex >= 0 ? informational[..plusIndex] : informational;
     }

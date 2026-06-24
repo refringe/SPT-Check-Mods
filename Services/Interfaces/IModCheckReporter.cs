@@ -3,8 +3,7 @@ using CheckMods.Models;
 namespace CheckMods.Services.Interfaces;
 
 /// <summary>
-/// Renders the user-facing output of the mod-check workflow. This is the single boundary between workflow logic and
-/// the console, so the orchestrator and services stay free of direct console dependencies (and remain testable).
+/// Renders the user-facing console output for the mod-check workflow.
 /// </summary>
 public interface IModCheckReporter
 {
@@ -102,9 +101,7 @@ public interface IModCheckReporter
     void RemoteIgnoresUnavailable();
 
     /// <summary>
-    /// Shows the end-of-run menu and returns the chosen action. The "open update pages" entry is offered only when
-    /// <paramref name="openableUpdateCount"/> is greater than zero; the "manage ignored updates" entry only when
-    /// <paramref name="canManageIgnoredUpdates"/> is true. "Close" is always available.
+    /// Shows the end-of-run menu and returns the chosen action.
     /// </summary>
     EndOfRunChoice PromptEndOfRun(int openableUpdateCount, bool canManageIgnoredUpdates);
 
@@ -118,8 +115,7 @@ public interface IModCheckReporter
     void UpdatePagesOpened(int opened, int total);
 
     /// <summary>
-    /// Asks whether to contribute the just-confirmed ignores that the community list doesn't already have as a GitHub
-    /// issue. Only reached when there's at least one such entry to contribute. Defaults to no.
+    /// Prompts whether to submit new ignore entries as a GitHub issue, defaulting to no.
     /// </summary>
     bool PromptReportIgnores();
 

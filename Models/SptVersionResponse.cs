@@ -7,14 +7,11 @@ namespace CheckMods.Models;
 /// </summary>
 public class SptVersionApiResponse
 {
-    /// <summary>
-    /// Whether the API call was successful.
-    /// </summary>
     [JsonPropertyName("success")]
     public bool Success { get; set; }
 
     /// <summary>
-    /// List of available SPT versions returned by the API.
+    /// Available SPT versions returned by the API.
     /// </summary>
     [JsonPropertyName("data")]
     public List<SptVersionResult>? Data { get; set; }
@@ -25,9 +22,6 @@ public class SptVersionApiResponse
 /// </summary>
 public class SptVersionResult
 {
-    /// <summary>
-    /// The unique identifier of the SPT version.
-    /// </summary>
     [JsonPropertyName("id")]
     public int Id { get; set; }
 
@@ -37,21 +31,12 @@ public class SptVersionResult
     [JsonPropertyName("version")]
     public string Version { get; set; } = string.Empty;
 
-    /// <summary>
-    /// The major version number.
-    /// </summary>
     [JsonPropertyName("version_major")]
     public int VersionMajor { get; set; }
 
-    /// <summary>
-    /// The minor version number.
-    /// </summary>
     [JsonPropertyName("version_minor")]
     public int VersionMinor { get; set; }
 
-    /// <summary>
-    /// The patch version number.
-    /// </summary>
     [JsonPropertyName("version_patch")]
     public int VersionPatch { get; set; }
 
@@ -74,7 +59,7 @@ public class SptVersionResult
     public string? Link { get; set; }
 
     /// <summary>
-    /// CSS color class for UI display purposes.
+    /// CSS color class.
     /// </summary>
     [JsonPropertyName("color_class")]
     public string? ColorClass { get; set; }

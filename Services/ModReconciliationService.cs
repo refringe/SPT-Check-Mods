@@ -26,7 +26,7 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
         var matchedServerIndices = new HashSet<int>();
         var matchedClientIndices = new HashSet<int>();
 
-        // Exact GUID pairs first, so a real component claims its counterpart before a weaker name match can steal it.
+        // Exact GUID pairs first.
         MatchComponents(
             serverMods,
             clientMods,
@@ -67,7 +67,7 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
 
     /// <summary>
     /// Mod matching. Each unmatched client claims the first unmatched server where <paramref name="isMatch"/> holds.
-    /// Matched indices are shared so later passes skip them.
+    /// Matched indices are shared across passes.
     /// </summary>
     private static void MatchComponents(
         List<Mod> serverMods,
@@ -182,13 +182,11 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
     {
         List<string> notes = [];
 
-        // Check for GUID mismatch
         if (!string.Equals(serverMod.Guid, clientMod.Guid, StringComparison.OrdinalIgnoreCase))
         {
             notes.Add($"GUID mismatch: server '{serverMod.Guid}' vs client '{clientMod.Guid}'");
         }
 
-        // Compare versions
         var serverVersion = SemVer.TryParse(serverMod.LocalVersion);
         var clientVersion = SemVer.TryParse(clientMod.LocalVersion);
 
@@ -221,7 +219,7 @@ public sealed class ModReconciliationService(ILogger<ModReconciliationService> l
             return (serverMod, notes);
         }
 
-        // Versions are equal or both invalid - prefer server mod (has SPT version info)
+        // Versions are equal or both invalid - prefer server mod
         return (serverMod, notes);
     }
 }

@@ -38,10 +38,9 @@ public sealed class ApplicationService(
 
         try
         {
-            // Remove any legacy API key file from previous versions; the Forge API is now open and keyless.
+            // Remove any legacy API key file from previous versions.
             RemoveLegacyApiKeyFile();
 
-            // SPT path validation
             logger.LogDebug("Validating SPT path");
             var sptPath = GetValidatedSptPath(args);
             if (sptPath is null)
@@ -52,7 +51,6 @@ public sealed class ApplicationService(
 
             logger.LogInformation("Using SPT path: {SptPath}", sptPath);
 
-            // SPT version validation
             logger.LogDebug("Validating SPT installation");
             var sptVersion = await ValidateSptInstallationAsync(sptPath, cancellationToken);
             if (sptVersion is null)
@@ -63,7 +61,7 @@ public sealed class ApplicationService(
 
             logger.LogInformation("SPT version validated: {SptVersion}", sptVersion);
 
-            // Check for Check Mods updates (Must run after the SPT update check)
+            // Must run after the SPT update check.
             logger.LogDebug("Checking for Check Mods updates");
             await CheckForCheckModsUpdateAsync(sptVersion, cancellationToken);
 
@@ -74,7 +72,6 @@ public sealed class ApplicationService(
             reporter.Blank();
             reporter.Heading("Loading mods...");
 
-            // Detect improperly installed mods
             logger.LogDebug("Checking for improperly installed mods");
             reporter.Status("Checking mod installation locations...");
             var misplacedReport = modScannerService.DetectMisplacedMods(sptPath, cancellationToken);
@@ -86,12 +83,10 @@ public sealed class ApplicationService(
                     misplacedReport.CrossInstalled.Count
                 );
 
-                // Surface the problem (still as an error) but keep running; the misplaced mods are filtered out of the
-                // scan below so they're excluded from every check from here on.
+                // Surface the problem but keep running.
                 reporter.MisplacedMods(misplacedReport);
             }
 
-            // Load and reconcile local mods
             logger.LogDebug("Scanning and reconciling mods");
             var mods = await ScanAndReconcileModsAsync(sptPath, sptVersion, misplacedReport, cancellationToken);
             if (mods.Count == 0)
@@ -103,29 +98,23 @@ public sealed class ApplicationService(
 
             logger.LogInformation("Found {ModCount} mods after reconciliation", mods.Count);
 
-            // Match mods with Forge API
             logger.LogDebug("Matching mods with Forge API");
             await MatchModsWithApiAsync(mods, sptVersion, cancellationToken);
 
-            // Enrich matched mods with version data, then apply locally-stored update suppressions. This runs before the
-            // compatibility check on purpose: a mod whose update the user dismissed as a false positive is then also
-            // excluded from the SPT-compatibility warning. Both warnings stem from the same stale local version, and the
-            // user is asserting their installed files are really the (compatible) latest version.
+            // Enrich matched mods with version data, then apply locally-stored update suppressions.
             logger.LogDebug("Enriching mods with version data");
             await EnrichModsWithVersionDataAsync(mods, sptVersion, cancellationToken);
 
             logger.LogDebug("Applying ignored updates");
             ApplyIgnoredUpdates(mods);
 
-            // Check SPT version compatibility for matched mods (suppressed false positives are skipped)
+            // Suppressed false positives are skipped.
             logger.LogDebug("Checking mod version compatibility");
             CheckModVersionCompatibility(mods, sptVersion);
 
-            // Check mod dependencies
             logger.LogDebug("Checking mod dependencies");
             await CheckModDependenciesAsync(mods, cancellationToken);
 
-            // Display results
             logger.LogDebug("Displaying results");
             reporter.VersionTable(mods);
 
@@ -182,7 +171,7 @@ public sealed class ApplicationService(
 
     /// <summary>
     /// Flags any mod whose available update matches a stored suppression so it renders as ignored (treated as up to
-    /// date) rather than as an available update.
+    /// date).
     /// </summary>
     /// <param name="mods">The reconciled, enriched mods to evaluate.</param>
     private void ApplyIgnoredUpdates(List<Mod> mods)
@@ -248,7 +237,6 @@ public sealed class ApplicationService(
 
         reporter.SptVersionValidated(sptVersion.ToString());
 
-        // Check for SPT updates
         await CheckForSptUpdatesAsync(sptVersion, cancellationToken);
 
         reporter.Blank();
@@ -322,7 +310,6 @@ public sealed class ApplicationService(
     /// <param name="sptVersion">SPT version for API lookups.</param>
     /// <param name="misplacedReport">Incorrectly installed mods which should be excluded from further operations.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>List of reconciled mods.</returns>
     private async Task<List<Mod>> ScanAndReconcileModsAsync(
         string sptPath,
         SemanticVersioning.Version sptVersion,
@@ -332,15 +319,13 @@ public sealed class ApplicationService(
     {
         var (serverMods, clientMods) = await modScannerService.ScanAllModsAsync(sptPath, cancellationToken);
 
-        // Drop any mods flagged as misplaced so they're excluded from every check from here on. Detection runs before
-        // the scan, so a cross-installed intruder would otherwise be picked back up here and checked as a normal mod.
+        // Drop any mods flagged as misplaced.
         if (misplacedReport.Any)
         {
             serverMods = ExcludeMisplacedMods(serverMods, misplacedReport);
             clientMods = ExcludeMisplacedMods(clientMods, misplacedReport);
         }
 
-        // Early exit if no mods found at all
         if (serverMods.Count == 0 && clientMods.Count == 0)
         {
             logger.LogInformation("No mods found in SPT installation");
@@ -350,7 +335,7 @@ public sealed class ApplicationService(
 
         reporter.Success($"Loaded {serverMods.Count} server mods and {clientMods.Count} client mods.");
 
-        // Fetch API info for mods with warnings to get source code URLs
+        // Fetch API info for mods with warnings.
         var modsWithWarnings = serverMods.Concat(clientMods).Where(m => m.HasWarnings).ToList();
         if (modsWithWarnings.Count > 0)
         {
@@ -366,7 +351,7 @@ public sealed class ApplicationService(
 
         var result = modReconciliationService.ReconcileMods(serverMods, clientMods);
 
-        // Fetch API info for mods with reconciliation warnings (try both GUIDs for paired mods)
+        // Fetch API info for mods with reconciliation warnings.
         var pairsWithNotes = result.ReconciledPairs.Where(p => p.Notes.Count > 0).ToList();
         if (pairsWithNotes.Count > 0)
         {
@@ -424,8 +409,7 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        // Each mod's lookup is independent, so dispatch them together and let the rate limiter throttle rather than
-        // waiting for each round-trip in turn. Cancellation is honored by the API calls inside each task.
+        // Dispatch the lookups concurrently and let the rate limiter throttle.
         await Task.WhenAll(mods.Select(mod => FetchSourceCodeUrlForModAsync(mod, sptVersion, cancellationToken)));
     }
 
@@ -439,8 +423,7 @@ public sealed class ApplicationService(
         CancellationToken cancellationToken = default
     )
     {
-        // Each pair's lookup is independent, so dispatch them together and let the rate limiter throttle. Cancellation
-        // is honored by the API calls inside each task.
+        // Dispatch the lookups concurrently and let the rate limiter throttle.
         await Task.WhenAll(pairs.Select(pair => FetchSourceCodeUrlForPairAsync(pair, sptVersion, cancellationToken)));
     }
 
@@ -659,9 +642,8 @@ public sealed class ApplicationService(
         reporter.Blank();
         reporter.Heading("Checking mod version compatibility...");
 
-        // Only check mods that are matched with the API and have versions stored. Skip mods whose update was dismissed
-        // as a false positive: the user is asserting their installed files are really the (compatible) latest version,
-        // so the stale-local-version incompatibility is a false positive too.
+        // Only check mods that are matched with the API and have versions stored, skipping those whose update was
+        // dismissed as a false positive.
         var matchedMods = mods.Where(m => m.IsMatched && m.ApiVersions is { Count: > 0 } && !m.UpdateSuppressed)
             .ToList();
 
@@ -673,8 +655,7 @@ public sealed class ApplicationService(
             }
             catch (Exception ex)
             {
-                // Isolate per-mod failures: an exotic version range or unexpected API data shouldn't abort the whole
-                // run and dump a stack trace. Skip this mod and carry on with the rest.
+                // Skip this mod and carry on with the rest.
                 logger.LogWarning(ex, "Failed to check SPT compatibility for mod: {ModName}", mod.DisplayName);
                 reporter.Warning($"Could not verify SPT compatibility for {mod.DisplayName}.");
             }
@@ -691,9 +672,7 @@ public sealed class ApplicationService(
     /// <param name="sptVersion">The installed SPT version.</param>
     private void CheckModSptCompatibility(Mod mod, SemanticVersioning.Version sptVersion)
     {
-        // Find the version that matches the installed local version. ModVersion.Version is declared non-nullable but
-        // is bound from Forge JSON, so a missing "version" field deserializes to null; use the static string.Equals
-        // to compare null-safely rather than dereferencing it.
+        // Find the version that matches the installed local version.
         var installedApiVersion = mod.ApiVersions!.FirstOrDefault(v =>
             string.Equals(v.Version, mod.LocalVersion, StringComparison.OrdinalIgnoreCase)
         );
@@ -712,8 +691,7 @@ public sealed class ApplicationService(
 
         if (!SemanticVersioning.Range.TryParse(installedApiVersion.SptVersionConstraint, out var range))
         {
-            // The constraint from Forge can't be parsed, so compatibility can't be evaluated. Surface it now:
-            // LoadWarnings are already rendered earlier in the run, so adding to them here would be invisible.
+            // The constraint from Forge can't be parsed; surface a warning.
             reporter.Warning(
                 $"Could not verify SPT compatibility for {mod.DisplayName}: Forge reported an invalid version constraint ({installedApiVersion.SptVersionConstraint})."
             );
@@ -762,7 +740,7 @@ public sealed class ApplicationService(
         var matchedCount = mods.Count(m => m.IsMatched && m.ApiModId.HasValue);
 
         // Mods with an available update get a second dependency fetch (at the proposed version), deduped by API mod ID.
-        // Include those in the progress total so the bar accounts for the extra round-trips.
+        // Include those in the progress total.
         var updatableCount = mods.Where(m =>
                 m.IsMatched
                 && m.ApiModId.HasValue
@@ -790,8 +768,7 @@ public sealed class ApplicationService(
     }
 
     /// <summary>
-    /// Removes the legacy API key file written by previous versions. The Forge API is now open and read-only,
-    /// so no API key is stored. Best-effort: any failure is logged and ignored.
+    /// Removes the legacy API key file written by previous versions. Best-effort: any failure is logged and ignored.
     /// </summary>
     private void RemoveLegacyApiKeyFile()
     {

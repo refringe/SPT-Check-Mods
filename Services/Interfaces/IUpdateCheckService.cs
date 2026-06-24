@@ -12,9 +12,7 @@ public interface IUpdateCheckService
     /// </summary>
     /// <param name="sptVersion">The installed SPT version, used for compatibility filtering by the Forge API.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>
-    /// The update status. Best-effort... API errors resolve to <see cref="CheckModsUpdateStatus.Unavailable"/>.
-    /// </returns>
+    /// <returns>The update status; API errors resolve to <see cref="CheckModsUpdateStatus.Unavailable"/>.</returns>
     Task<CheckModsUpdateResult> CheckAsync(
         SemanticVersioning.Version sptVersion,
         CancellationToken cancellationToken = default

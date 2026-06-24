@@ -20,7 +20,6 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
     /// <param name="installedModGuids">Set of GUIDs for mods that are currently installed.</param>
     /// <param name="progressCallback">Optional callback for progress updates (current, total).</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>Dependency analysis result containing tree structure and any issues.</returns>
     public async Task<DependencyAnalysisResult> AnalyzeDependenciesAsync(
         IEnumerable<Mod> mods,
         HashSet<string> installedModGuids,
@@ -60,7 +59,6 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
         List<DependencyConflict> conflicts = [];
 
         // Fetch dependencies for each matched mod individually
-        // This allows us to build a proper tree showing which mod depends on which
         var modDependencyCache = new Dictionary<int, List<ModDependency>>();
 
         // Get unique mod IDs to fetch
@@ -70,9 +68,8 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
             .Distinct()
             .ToList();
 
-        // Mods with an available update get a second dependency fetch at the proposed version so the update's
-        // dependency changes can be diffed against the installed version. Dedupe by API mod ID (paired
-        // server/client components share an ID).
+        // Mods with an available update get a second dependency fetch at the proposed version. Dedupe by API mod ID
+        // (paired server/client components share an ID).
         var updatableGroups = modList
             .Where(m =>
                 m.IsMatched
@@ -114,7 +111,7 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
         }
 
         // Second pass: for each updatable mod, fetch dependencies at the proposed version and diff them against the
-        // installed version's dependencies (already cached above) to surface what the update adds or removes.
+        // installed version's dependencies (already cached above).
         foreach (var group in updatableGroups)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -216,7 +213,6 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
             return null;
         }
 
-        // Check for conflicts
         if (
             dependency.Conflict
             && !conflicts.Any(c => c.ModGuid.Equals(dependency.Guid, StringComparison.OrdinalIgnoreCase))
@@ -249,7 +245,7 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
         // Track missing dependencies
         if (!isInstalled && !missingDeps.ContainsKey(dependency.Guid))
         {
-            // Always construct the Forge download URL for consistency
+            // Construct the Forge download URL
             string? downloadLink = null;
             if (
                 dependency.Id > 0
@@ -355,7 +351,7 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
 
     /// <summary>
     /// Recursively flattens a dependency tree into a GUID-keyed map. Blank GUIDs are skipped and each GUID is visited
-    /// once, which also guards against cycles and duplicate paths.
+    /// once.
     /// </summary>
     private static Dictionary<string, ModDependency> FlattenDependencies(List<ModDependency> deps)
     {
@@ -407,7 +403,7 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
 
         var recommendedVersion = dependency.LatestCompatibleVersion?.Version;
 
-        // Construct the Forge download URL when there's enough information, mirroring the missing-dependency path.
+        // Construct the Forge download URL when there's enough information.
         string? downloadLink = null;
         if (
             dependency.Id > 0

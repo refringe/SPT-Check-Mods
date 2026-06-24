@@ -5,12 +5,12 @@ namespace CheckMods.Models;
 /// </summary>
 public enum DependencyInstallState
 {
-    /// <summary>The dependency is not installed and will need to be downloaded.</summary>
+    /// <summary>The dependency is not installed.</summary>
     NotInstalled = 0,
 
     /// <summary>
     /// The dependency is installed, but its installed version is older than the latest version Forge reports as
-    /// compatible, so it may need updating for the proposed update.
+    /// compatible.
     /// </summary>
     InstalledOutdated = 1,
 
@@ -23,19 +23,16 @@ public enum DependencyInstallState
 /// </summary>
 public sealed record DependencyChange
 {
-    /// <summary>The display name of the dependency.</summary>
     public required string Name { get; init; }
 
-    /// <summary>The GUID of the dependency.</summary>
     public required string Guid { get; init; }
 
     /// <summary>The Forge mod ID of the dependency (0 when unknown).</summary>
     public required int ModId { get; init; }
 
-    /// <summary>The Forge URL slug of the dependency.</summary>
     public required string Slug { get; init; }
 
-    /// <summary>The latest Forge-compatible version of the dependency, used as the recommended version.</summary>
+    /// <summary>The latest Forge-compatible version of the dependency.</summary>
     public required string RecommendedVersion { get; init; }
 
     /// <summary>A direct download link for the recommended version, when one could be constructed.</summary>
@@ -62,7 +59,6 @@ public sealed class UpdateDependencyDelta
     /// <summary>Dependencies the installed version required that the update no longer requires.</summary>
     public List<DependencyChange> Removed { get; init; } = [];
 
-    /// <summary>Whether the update introduces any dependency change worth reporting.</summary>
     public bool HasChanges
     {
         get { return Added.Count > 0 || Removed.Count > 0; }

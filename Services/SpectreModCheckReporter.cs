@@ -8,8 +8,7 @@ using SPTarkov.DI.Annotations;
 namespace CheckMods.Services;
 
 /// <summary>
-/// Spectre.Console implementation of <see cref="IModCheckReporter"/>. This is the only type that talks to the console
-/// directly; all workflow logic renders output through the <see cref="IModCheckReporter"/> abstraction.
+/// Spectre.Console implementation of <see cref="IModCheckReporter"/>.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
 public sealed class SpectreModCheckReporter : IModCheckReporter
@@ -373,7 +372,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
                 foreach (var pair in pairsWithNotes)
                 {
-                    // Blank line before each entry so the multi-line warnings don't run together visually.
+                    // Blank line before each entry.
                     AnsiConsole.WriteLine();
 
                     var modName = pair.SelectedMod.LocalName;
@@ -390,8 +389,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                         ? pair.SelectedMod.ApiSourceCodeUrl
                         : pair.SelectedMod.ApiUrl;
 
-                    // A GUID mismatch only happens on a name match (same name, unrelated IDs). Likely mismatched
-                    // packaging or two mods in one folder, so soften the report prompt.
+                    // A GUID mismatch only happens on a name match (same name, unrelated IDs).
                     var guidMismatch = !string.Equals(
                         pair.ServerMod.Guid,
                         pair.ClientMod.Guid,
@@ -569,16 +567,13 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         AnsiConsole.MarkupLine("[green]Dependency analysis complete.[/]");
         AnsiConsole.WriteLine();
 
-        // Display the dependency tree
         DependencyTree(result);
 
-        // Display conflicts (warnings section)
         if (result.Conflicts.Count > 0)
         {
             DependencyConflicts(result.Conflicts);
         }
 
-        // Display missing dependencies (download list section)
         if (result.MissingDependencies.Count > 0)
         {
             MissingDependencies(result.MissingDependencies);
@@ -629,7 +624,6 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             var label = FormatDependencyNodeLabel(child);
             var childTreeNode = parent.AddNode(label);
 
-            // Recursively add nested dependencies
             if (child.Children.Count > 0)
             {
                 AddDependencyChildrenToTree(childTreeNode, child.Children);
@@ -765,7 +759,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             var annotation = dep.InstallState switch
             {
                 DependencyInstallState.NotInstalled =>
-                    $"[red]new — download v{dep.RecommendedVersion.EscapeMarkup()}[/]",
+                    $"[red]new - download v{dep.RecommendedVersion.EscapeMarkup()}[/]",
                 DependencyInstallState.InstalledOutdated =>
                     $"[yellow]installed v{(dep.InstalledVersion ?? "?").EscapeMarkup()}, update needs v{dep.RecommendedVersion.EscapeMarkup()}[/]",
                 _ => $"[grey]already satisfied (v{(dep.InstalledVersion ?? dep.RecommendedVersion).EscapeMarkup()})[/]",
@@ -796,7 +790,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     /// <inheritdoc />
     public void VersionTable(List<Mod> mods)
     {
-        // Group by API mod ID to avoid duplicates, select the one with the highest version
+        // Group by API mod ID, selecting the one with the highest version
         var verifiedMods = mods.Where(m => m.IsMatched && m.LatestVersion is not null)
             .GroupBy(m => m.ApiModId!.Value)
             .Select(g => g.OrderByDescending(m => SemVer.ParseOrZero(m.LocalVersion)).First())
@@ -1088,7 +1082,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <summary>
-    /// Discards any keystrokes buffered during the run so a following ReadKey actually waits for fresh input.
+    /// Discards any keystrokes buffered during the run.
     /// </summary>
     private static void DrainBufferedKeys()
     {
@@ -1103,11 +1097,10 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     /// </summary>
     internal static string FormatVersionDisplay(Mod mod)
     {
-        // VersionTable only passes mods whose LatestVersion is resolved (it filters on LatestVersion is not null), so
-        // it is non-null here.
+        // LatestVersion is non-null here.
         var latestVersion = mod.LatestVersion!;
 
-        // A dismissed false positive renders as a dim, ignored row rather than as an available update.
+        // A dismissed false positive renders as a dim, ignored row.
         if (mod.UpdateSuppressed)
         {
             return $"[grey]{latestVersion.EscapeMarkup()} (ignored)[/]";
@@ -1155,14 +1148,11 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
     /// <summary>
     /// Renders a mod name as a clickable Forge link when an API URL is available, otherwise as plain text. The name
-    /// is markup-escaped internally, so callers pass the raw name.
+    /// is markup-escaped internally.
     /// </summary>
     /// <param name="name">The raw mod name to display.</param>
     /// <param name="apiUrl">The Forge mod page URL, or null/empty when none is known.</param>
-    /// <param name="colorPlainNameWhite">
-    /// When true (the default), the non-linked fallback is wrapped in white; table cells that rely on the default
-    /// cell color pass false.
-    /// </param>
+    /// <param name="colorPlainNameWhite">When true (the default), the non-linked fallback is wrapped in white.</param>
     private static string FormatModLink(string name, string? apiUrl, bool colorPlainNameWhite = true)
     {
         var escaped = name.EscapeMarkup();
@@ -1177,7 +1167,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
     /// <summary>
     /// Wraps already-formatted display markup in a Spectre [link] tag when the URL can be safely embedded, otherwise
-    /// returns the markup unlinked. Use this for the [link={url}] attribute form where the URL sits inside the tag.
+    /// returns the markup unlinked.
     /// </summary>
     private static string WithLink(string displayMarkup, string? url)
     {
@@ -1186,8 +1176,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
     /// <summary>
     /// Returns true when a URL is safe to embed in a [link=...] tag attribute. A URL containing the markup delimiters
-    /// '[' or ']' would corrupt the tag and throw when Spectre renders it; EscapeMarkup can't help here because it
-    /// escapes content, not attribute values, so such URLs are dropped and the text is rendered without a link.
+    /// '[' or ']' is treated as unsafe.
     /// </summary>
     internal static bool IsLinkUrlSafe(string? url)
     {

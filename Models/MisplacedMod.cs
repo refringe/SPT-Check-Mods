@@ -14,18 +14,16 @@ namespace CheckMods.Models;
 public sealed record MisplacedMod(bool IsServerMod, string Guid, string Name, string Version, string FilePath);
 
 /// <summary>
-/// A single BepInEx/plugins subdirectory that holds two or more unrelated mods. The signature of one mod having been
-/// copied into another mod's folder.
+/// A single BepInEx/plugins subdirectory that holds two or more unrelated mods.
 /// </summary>
 /// <param name="Directory">The full path to the offending plugins subdirectory.</param>
 /// <param name="Misplaced">
 /// The mod(s) identified as not belonging in this folder. Empty when blame could not be attributed (see
 /// <paramref name="Ambiguous"/>).
 /// </param>
-/// <param name="Mods">Every mod found in the directory, used to describe the conflict when it is ambiguous.</param>
+/// <param name="Mods">Every mod found in the directory.</param>
 /// <param name="Ambiguous">
-/// True when it cannot be determined which mod is the intruder (two unrelated mods with no other signal), in which case
-/// the user is pointed at the directory and asked to review all of its mods.
+/// True when it cannot be determined which mod is the intruder (two unrelated mods with no other signal).
 /// </param>
 public sealed record CrossInstalledDirectory(
     string Directory,
@@ -77,7 +75,7 @@ public sealed record MisplacedModReport(
 
     /// <summary>
     /// Cross-installed directories whose intruder could not be identified. Every mod inside such a folder is dropped
-    /// from the remaining checks, since none of them can be trusted to be correctly placed.
+    /// from the remaining checks.
     /// </summary>
     public IReadOnlyList<string> ExcludedDirectories
     {

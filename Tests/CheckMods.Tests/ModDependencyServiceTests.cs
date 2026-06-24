@@ -87,7 +87,7 @@ public sealed class ModDependencyServiceTests
     [Fact]
     public async Task Returns_all_mods_as_roots_when_none_are_matched()
     {
-        // OnGetModDependencies is intentionally unset: the early-exit path must not call the API.
+        // OnGetModDependencies intentionally unset.
         var api = new FakeForgeApiService();
         var mod = UnmatchedMod("com.x.mod", "Mod");
 
@@ -172,7 +172,7 @@ public sealed class ModDependencyServiceTests
     [Fact]
     public async Task Guards_against_circular_dependencies()
     {
-        // main -> A -> B -> A (back-edge). The repeated A must be pruned rather than recursed into forever.
+        // main -> A -> B -> A (circular back-edge).
         var backEdgeToA = Dep("com.a", "A");
         var b = Dep("com.b", "B", nested: [backEdgeToA]);
         var a = Dep("com.a", "A", nested: [b]);
@@ -361,7 +361,7 @@ public sealed class ModDependencyServiceTests
                     {
                         Dep("com.author.dep", "Dependency", id: 500, slug: "dependency", version: "2.0.0"),
                     },
-                    // ...but the proposed-version fetch fails, so no delta can be computed.
+                    // ...but the proposed-version fetch fails.
                     ("100", "2.0.0") => new ApiError("boom"),
                     _ => new List<ModDependency>(),
                 },

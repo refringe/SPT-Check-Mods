@@ -5,14 +5,7 @@ namespace CheckMods.Utils;
 /// </summary>
 public static class ModNameNormalizer
 {
-    /// <summary>
-    /// Characters to remove during normalization.
-    /// </summary>
     private static readonly char[] _charsToRemove = ['-', '_', ' ', '.'];
-
-    /// <summary>
-    /// Suffixes to remove during normalization (case-insensitive).
-    /// </summary>
     private static readonly string[] _suffixesToRemove = ["server", "client"];
 
     /// <summary>
@@ -21,7 +14,6 @@ public static class ModNameNormalizer
     /// </summary>
     /// <param name="name">The name to normalize.</param>
     /// <param name="removeComponentSuffixes">Whether to remove "server" and "client" suffixes.</param>
-    /// <returns>The normalized name.</returns>
     public static string Normalize(string? name, bool removeComponentSuffixes = false)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -29,13 +21,11 @@ public static class ModNameNormalizer
             return string.Empty;
         }
 
-        // Remove special characters using Aggregate
         var result = _charsToRemove.Aggregate(
             name.ToLowerInvariant(),
             (current, c) => current.Replace(c.ToString(), string.Empty)
         );
 
-        // Optionally remove server/client suffixes
         if (removeComponentSuffixes)
         {
             var matchingSuffix = _suffixesToRemove.FirstOrDefault(s => result.EndsWith(s, StringComparison.Ordinal));
@@ -60,7 +50,6 @@ public static class ModNameNormalizer
             return string.Empty;
         }
 
-        // Split by common delimiters and take the last meaningful segment
         var parts = guid.Split(['.', '-', '_'], StringSplitOptions.RemoveEmptyEntries);
 
         if (parts.Length == 0)
@@ -68,7 +57,6 @@ public static class ModNameNormalizer
             return guid;
         }
 
-        // Return the last part, which is typically the mod name
         return parts[^1];
     }
 
@@ -97,7 +85,6 @@ public static class ModNameNormalizer
     /// <param name="name1">The first name.</param>
     /// <param name="name2">The second name.</param>
     /// <param name="removeComponentSuffixes">Whether to remove server/client suffixes.</param>
-    /// <returns>True if the normalized names are identical.</returns>
     public static bool IsExactMatch(string? name1, string? name2, bool removeComponentSuffixes = false)
     {
         var normalized1 = Normalize(name1, removeComponentSuffixes);
