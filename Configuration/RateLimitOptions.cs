@@ -5,33 +5,33 @@ namespace CheckMods.Configuration;
 /// </summary>
 /// <remarks>
 /// The Forge API enforces two server-side limits: a burst limit of 40 requests per 10 seconds and a general limit of
-/// 200 requests per 60 seconds. Exceeding either triggers a temporary block (30s and 60s respectively). The client
-/// paces itself just under both limits so it rarely, if ever, trips them.
+/// 200 requests per 60 seconds. Exceeding either triggers a temporary block (30s and 60s respectively). Rather than
+/// race up to those ceilings and recover from the blocks, the client paces itself with a single token bucket that
+/// smooths dispatch to a steady sustained rate with only a small burst, keeping it comfortably under both limits.
 /// </remarks>
 public class RateLimitOptions
 {
     /// <summary>
-    /// Maximum requests allowed within the burst window. Kept below the server's burst limit (40 / 10s) for margin.
+    /// Maximum number of requests that can be dispatched back-to-back before steady-state pacing applies. Sized so a
+    /// full burst plus the sustained refill stays under the server's burst window (40 / 10s).
     /// </summary>
-    public int BurstLimit { get; set; } = 35;
+    public int MaxBurst { get; set; } = 5;
 
     /// <summary>
-    /// Length of the burst window in seconds. Mirrors the server's 10-second burst window.
+    /// Number of request permits replenished each RefillPeriodMs. Sets the sustained request rate.
     /// </summary>
-    public int BurstWindowSeconds { get; set; } = 10;
+    public int RefillTokensPerPeriod { get; set; } = 1;
 
     /// <summary>
-    /// Maximum requests allowed within the general window. Kept below the server's general limit (200 / 60s) for margin.
+    /// How often, in milliseconds, request permits are replenished. The default of one token per 333ms yields ~3
+    /// requests/second, which sits under both the general limit (200 / 60s = 3.3/s) and the burst limit
+    /// (40 / 10s = 4/s). A small period keeps pacing smooth rather than releasing permits in clumps.
     /// </summary>
-    public int GeneralLimit { get; set; } = 180;
+    public int RefillPeriodMs { get; set; } = 333;
 
     /// <summary>
-    /// Length of the general window in seconds. Mirrors the server's 60-second general window.
-    /// </summary>
-    public int GeneralWindowSeconds { get; set; } = 60;
-
-    /// <summary>
-    /// Maximum number of simultaneous in-flight requests.
+    /// Maximum number of simultaneous in-flight requests. A safety ceiling that bounds concurrency if responses are
+    /// slow; with smooth pacing in place it is rarely the binding constraint.
     /// </summary>
     public int MaxConcurrentRequests { get; set; } = 5;
 

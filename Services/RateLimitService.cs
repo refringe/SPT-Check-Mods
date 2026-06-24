@@ -10,23 +10,27 @@ namespace CheckMods.Services;
 
 /// <summary>
 /// Service that provides rate limiting for API calls. Proactively paces requests beneath the Forge API's two
-/// server-side limits (a burst window and a general window) using sliding-window rate limiters, and reacts to
-/// rate limiting (429) and transient errors with retries and backoff. All limiter state is shared across requests.
+/// server-side limits with a single token-bucket limiter that smooths to a steady sustained rate, and reacts to rate
+/// limiting (429) and transient errors with retries and backoff. All limiter state is shared across requests.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
 public sealed class RateLimitService : IRateLimitService, IDisposable
 {
     /// <summary>
-    /// Upper bound on requests queued behind each window limiter. Large enough to hold every request a single run
-    /// could fan out at once, so callers wait their turn rather than being rejected.
+    /// Upper bound on requests queued behind the pacer. Large enough to hold every request a single run could fan out
+    /// at once, so callers wait their turn rather than being rejected.
     /// </summary>
     private const int QueueLimit = 10_000;
 
     private readonly RateLimitOptions _options;
     private readonly ILogger<RateLimitService> _logger;
 
-    private readonly SlidingWindowRateLimiter _burstLimiter;
-    private readonly SlidingWindowRateLimiter _generalLimiter;
+    /// <summary>
+    /// Token-bucket pacer that smooths request dispatch to a steady sustained rate (refill) with a bounded initial
+    /// burst (capacity). Sized under both Forge windows, so it serves as a single ceiling for the burst (40/10s) and
+    /// general (200/60s) limits at once while avoiding the front-loaded bursts a sliding window would allow.
+    /// </summary>
+    private readonly TokenBucketRateLimiter _pacer;
     private readonly SemaphoreSlim _concurrencyGate;
 
     private readonly SemaphoreSlim _backoffSemaphore = new(1, 1);
@@ -38,24 +42,12 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
         _options = options.Value;
         _logger = logger;
 
-        _burstLimiter = new SlidingWindowRateLimiter(
-            new SlidingWindowRateLimiterOptions
+        _pacer = new TokenBucketRateLimiter(
+            new TokenBucketRateLimiterOptions
             {
-                PermitLimit = _options.BurstLimit,
-                Window = TimeSpan.FromSeconds(_options.BurstWindowSeconds),
-                SegmentsPerWindow = Math.Max(1, _options.BurstWindowSeconds),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = QueueLimit,
-                AutoReplenishment = true,
-            }
-        );
-
-        _generalLimiter = new SlidingWindowRateLimiter(
-            new SlidingWindowRateLimiterOptions
-            {
-                PermitLimit = _options.GeneralLimit,
-                Window = TimeSpan.FromSeconds(_options.GeneralWindowSeconds),
-                SegmentsPerWindow = Math.Max(1, _options.GeneralWindowSeconds),
+                TokenLimit = Math.Max(1, _options.MaxBurst),
+                TokensPerPeriod = Math.Max(1, _options.RefillTokensPerPeriod),
+                ReplenishmentPeriod = TimeSpan.FromMilliseconds(Math.Max(1, _options.RefillPeriodMs)),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = QueueLimit,
                 AutoReplenishment = true,
@@ -91,8 +83,7 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
             Exception? transientError = null;
 
             // Proactively pace beneath both server windows, then cap simultaneous in-flight requests.
-            using (await _burstLimiter.AcquireAsync(1, cancellationToken))
-            using (await _generalLimiter.AcquireAsync(1, cancellationToken))
+            using (await _pacer.AcquireAsync(1, cancellationToken))
             {
                 await _concurrencyGate.WaitAsync(cancellationToken);
                 try
@@ -312,8 +303,7 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        _burstLimiter.Dispose();
-        _generalLimiter.Dispose();
+        _pacer.Dispose();
         _concurrencyGate.Dispose();
         _backoffSemaphore.Dispose();
     }

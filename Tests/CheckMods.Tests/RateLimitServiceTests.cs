@@ -8,8 +8,8 @@ using Microsoft.Extensions.Options;
 namespace CheckMods.Tests;
 
 /// <summary>
-/// Tests for <see cref="RateLimitService"/>'s retry and backoff behavior. The rate-limiting windows are configured
-/// well above the request volume so they never throttle, isolating the retry/classification logic. Backoff delays are
+/// Tests for RateLimitService's retry and backoff behaviour. The token-bucket pacer is configured with a large burst so
+/// it never throttles at the test's request volume, isolating the retry/classification logic. Backoff delays are
 /// configured to a few milliseconds to keep the tests fast.
 /// </summary>
 public sealed class RateLimitServiceTests
@@ -20,10 +20,9 @@ public sealed class RateLimitServiceTests
     {
         var options = new RateLimitOptions
         {
-            BurstLimit = 1000,
-            BurstWindowSeconds = 10,
-            GeneralLimit = 1000,
-            GeneralWindowSeconds = 60,
+            MaxBurst = 1000,
+            RefillTokensPerPeriod = 1000,
+            RefillPeriodMs = 1,
             MaxConcurrentRequests = 8,
             MaxRetries = MaxRetries,
             BaseDelayMs = 1,
