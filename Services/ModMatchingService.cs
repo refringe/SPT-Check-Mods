@@ -30,6 +30,11 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
     {
         logger.LogDebug("Matching mod: {ModName} (GUID: {Guid})", mod.LocalName, mod.Guid);
 
+        // A GUID match whose mod has no SPT-compatible version. The GUID is authoritative, so hold it as a fallback:
+        // if nothing compatible turns up, the mod is retained as matched (and flagged incompatible by the later
+        // version check) rather than reported as missing from Forge.
+        ModSearchResult? incompatibleMatch = null;
+
         // Try GUID lookup first (most reliable)
         if (!string.IsNullOrWhiteSpace(mod.Guid))
         {
@@ -40,6 +45,11 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
                 logger.LogDebug("Mod matched by GUID: {ModName} -> {ApiName}", mod.LocalName, guidMatch.Name);
                 mod.UpdateFromApiMatch(guidMatch);
                 return mod;
+            }
+
+            if (guidResult.TryPickT2(out var guidNoCompat, out _))
+            {
+                incompatibleMatch = guidNoCompat.Mod;
             }
         }
 
@@ -54,6 +64,11 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
             {
                 mod.UpdateFromApiMatch(altGuidMatch);
                 return mod;
+            }
+
+            if (altGuidResult.TryPickT2(out var altNoCompat, out _))
+            {
+                incompatibleMatch ??= altNoCompat.Mod;
             }
         }
 
@@ -87,6 +102,19 @@ public sealed class ModMatchingService(IForgeApiService forgeApiService, ILogger
             }
 
             mod.UpdateFromApiMatch(bestMatch);
+            return mod;
+        }
+
+        // Nothing compatible turned up. If a GUID matched a mod that simply has no SPT-compatible version, keep it as
+        // a match so it surfaces as incompatible rather than as missing from Forge.
+        if (incompatibleMatch is not null)
+        {
+            logger.LogDebug(
+                "Mod matched by GUID but has no SPT-compatible version: {ModName} -> {ApiName}",
+                mod.LocalName,
+                incompatibleMatch.Name
+            );
+            mod.UpdateFromApiMatch(incompatibleMatch);
             return mod;
         }
 

@@ -341,6 +341,9 @@ public sealed partial class ForgeApiService(
 
         try
         {
+            // Look the GUID up exactly as the mod declares it. Forge's filter[guid] lookup is case-sensitive, and
+            // keeping the author's GUID consistent between their DLL and their Forge listing is the author's
+            // responsibility; a mismatch correctly surfaces as an unmatched mod rather than being papered over here.
             var url =
                 $"{_options.BaseUrl}mods?filter[guid]={Uri.EscapeDataString(modGuid)}&include=versions,source_code_links";
 
@@ -370,9 +373,12 @@ public sealed partial class ForgeApiService(
                 SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion)
             );
 
+            // A GUID is an exact identifier, so this is unambiguously the user's mod even when no published version
+            // targets their SPT version. Carry the matched mod so the caller can retain it (and surface it as
+            // incompatible) rather than reporting it as missing from Forge.
             if (!hasCompatibleVersion)
             {
-                return new NoCompatibleVersion();
+                return new NoCompatibleVersion(result);
             }
 
             return result;
