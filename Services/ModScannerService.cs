@@ -919,8 +919,8 @@ public sealed class ModScannerService(
     {
         // ExtractClientModMetadata handles its own per-DLL failures (collecting a warning and returning null), so the
         // only exception that escapes here is cancellation, which is allowed to propagate through Task.WhenAll.
-        // The shared console isn't safe for concurrent writes, so failures are gathered and surfaced on this thread
-        // after the parallel scan rather than written from inside the worker tasks.
+        // Failures are gathered and emitted on this thread after the parallel scan rather than from inside the worker
+        // tasks.
         var warnings = new ConcurrentBag<(string FileName, string Reason)>();
         var tasks = dllFiles.Select(dllPath =>
             Task.Run(() => ExtractClientModMetadata(dllPath, warnings), cancellationToken)
@@ -928,9 +928,12 @@ public sealed class ModScannerService(
 
         var results = await Task.WhenAll(tasks);
 
+        // These are almost always native (unmanaged) DLLs dropped loose in the plugins folder, which aren't .NET
+        // assemblies and were never mods. Log at debug rather than warning on the console, matching how the
+        // subdirectory scan path skips unreadable DLLs quietly.
         foreach (var (fileName, reason) in warnings)
         {
-            reporter.CouldNotExtractClientMod(fileName, reason);
+            logger.LogDebug("Could not extract client mod metadata from {FileName}: {Reason}", fileName, reason);
         }
 
         return results.Where(r => r is not null).Cast<Mod>().ToList();

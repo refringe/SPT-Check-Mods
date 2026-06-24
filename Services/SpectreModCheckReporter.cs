@@ -123,14 +123,6 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <inheritdoc />
-    public void CouldNotExtractClientMod(string fileName, string reason)
-    {
-        AnsiConsole.MarkupLine(
-            $"[orange1]Warning:[/] Could not extract mod metadata from [grey]{fileName.EscapeMarkup()}[/]. Reason: {reason.EscapeMarkup()}"
-        );
-    }
-
-    /// <inheritdoc />
     public async Task RunForgeQueryProgressAsync(int total, Func<Action<int>, Task> work)
     {
         await CreateForgeProgress()
