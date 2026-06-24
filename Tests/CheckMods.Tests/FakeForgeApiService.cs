@@ -25,6 +25,16 @@ internal sealed class FakeForgeApiService : IForgeApiService
     /// <summary>Handler for the dependencies endpoint, keyed by the first requested identifier (the mod ID).</summary>
     public Func<string, OneOf<List<ModDependency>, NotFound, ApiError>>? OnGetModDependencies { get; set; }
 
+    /// <summary>
+    /// Version-aware handler for the dependencies endpoint, keyed by the first requested (identifier, version) pair.
+    /// Takes precedence over <see cref="OnGetModDependencies"/> when set, so a test can return different dependencies
+    /// for the same mod at its installed versus its proposed update version.
+    /// </summary>
+    public Func<
+        (string Identifier, string Version),
+        OneOf<List<ModDependency>, NotFound, ApiError>
+    >? OnGetModDependenciesVersioned { get; set; }
+
     public Task<OneOf<ModSearchResult, NotFound, NoCompatibleVersion, ApiError>> GetModByGuidAsync(
         string modGuid,
         SemanticVersioning.Version sptVersion,
@@ -108,12 +118,20 @@ internal sealed class FakeForgeApiService : IForgeApiService
         CancellationToken cancellationToken = default
     )
     {
+        var first = modVersions.FirstOrDefault();
+        var identifier = first.Identifier ?? string.Empty;
+        var version = first.Version ?? string.Empty;
+
+        if (OnGetModDependenciesVersioned is not null)
+        {
+            return Task.FromResult(OnGetModDependenciesVersioned((identifier, version)));
+        }
+
         if (OnGetModDependencies is null)
         {
             throw new NotSupportedException();
         }
 
-        var identifier = modVersions.Select(m => m.Identifier).FirstOrDefault() ?? string.Empty;
         return Task.FromResult(OnGetModDependencies(identifier));
     }
 }

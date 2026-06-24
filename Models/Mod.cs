@@ -147,6 +147,12 @@ public sealed class Mod
     /// </summary>
     public bool UpdateSuppressed { get; private set; }
 
+    /// <summary>
+    /// How the proposed update changes this mod's dependencies compared to the installed version. Null when there is
+    /// no available update or the comparison couldn't be made.
+    /// </summary>
+    public UpdateDependencyDelta? UpdateDependencyChanges { get; private set; }
+
     #endregion
 
     #region Processing State
@@ -288,6 +294,15 @@ public sealed class Mod
     public void SetUpdateSuppressed(bool suppressed)
     {
         UpdateSuppressed = suppressed;
+    }
+
+    /// <summary>
+    /// Records how the proposed update changes this mod's dependencies compared to the installed version.
+    /// </summary>
+    /// <param name="delta">The added/removed dependency changes introduced by the update.</param>
+    public void SetUpdateDependencyChanges(UpdateDependencyDelta delta)
+    {
+        UpdateDependencyChanges = delta;
     }
 
     #endregion

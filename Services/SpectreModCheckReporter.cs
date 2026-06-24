@@ -750,6 +750,54 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         AnsiConsole.WriteLine();
     }
 
+    /// <summary>
+    /// Renders, beneath an available update, how the proposed version changes the mod's dependencies: newly required
+    /// dependencies (with install state and a download link when missing) and any that are no longer required.
+    /// </summary>
+    private static void UpdateDependencyChangeDetails(UpdateDependencyDelta delta)
+    {
+        AnsiConsole.MarkupLine("    [grey]Dependency changes:[/]");
+
+        foreach (var dep in delta.Added)
+        {
+            // Link the dependency name to its Forge page when a usable URL is available, otherwise show it plain.
+            var url =
+                dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug) ? ForgeUrls.ModPage(dep.ModId, dep.Slug) : null;
+            var nameDisplay = IsLinkUrlSafe(url)
+                ? $"[link={url}]{dep.Name.EscapeMarkup()}[/]"
+                : $"[white]{dep.Name.EscapeMarkup()}[/]";
+
+            var annotation = dep.InstallState switch
+            {
+                DependencyInstallState.NotInstalled =>
+                    $"[red]new — download v{dep.RecommendedVersion.EscapeMarkup()}[/]",
+                DependencyInstallState.InstalledOutdated =>
+                    $"[yellow]installed v{(dep.InstalledVersion ?? "?").EscapeMarkup()}, update needs v{dep.RecommendedVersion.EscapeMarkup()}[/]",
+                _ => $"[grey]already satisfied (v{(dep.InstalledVersion ?? dep.RecommendedVersion).EscapeMarkup()})[/]",
+            };
+
+            AnsiConsole.MarkupLine($"      [green]+[/] {nameDisplay} {annotation}");
+
+            if (dep.Conflict)
+            {
+                AnsiConsole.MarkupLine("        [red]Version constraint conflict reported by Forge.[/]");
+            }
+
+            if (dep.InstallState == DependencyInstallState.NotInstalled && !string.IsNullOrWhiteSpace(dep.DownloadLink))
+            {
+                AnsiConsole.MarkupLine($"        [grey]Download:[/] [link]{dep.DownloadLink.EscapeMarkup()}[/]");
+            }
+        }
+
+        foreach (var dep in delta.Removed)
+        {
+            var wasVersion = dep.InstalledVersion ?? dep.RecommendedVersion;
+            AnsiConsole.MarkupLine(
+                $"      [grey]-[/] [grey]{dep.Name.EscapeMarkup()} no longer required (was v{wasVersion.EscapeMarkup()})[/]"
+            );
+        }
+    }
+
     /// <inheritdoc />
     public void VersionTable(List<Mod> mods)
     {
@@ -819,12 +867,15 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                     $"    [grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [green]{mod.LatestVersion!.EscapeMarkup()}[/]"
                 );
 
-                if (string.IsNullOrWhiteSpace(mod.DownloadLink))
+                if (!string.IsNullOrWhiteSpace(mod.DownloadLink))
                 {
-                    continue;
+                    AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{mod.DownloadLink.EscapeMarkup()}[/]");
                 }
 
-                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{mod.DownloadLink.EscapeMarkup()}[/]");
+                if (mod.UpdateDependencyChanges?.HasChanges == true)
+                {
+                    UpdateDependencyChangeDetails(mod.UpdateDependencyChanges);
+                }
             }
         }
 

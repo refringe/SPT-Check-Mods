@@ -761,10 +761,22 @@ public sealed class ApplicationService(
         // Count matched mods for progress
         var matchedCount = mods.Count(m => m.IsMatched && m.ApiModId.HasValue);
 
+        // Mods with an available update get a second dependency fetch (at the proposed version), deduped by API mod ID.
+        // Include those in the progress total so the bar accounts for the extra round-trips.
+        var updatableCount = mods.Where(m =>
+                m.IsMatched
+                && m.ApiModId.HasValue
+                && m.UpdateStatus == UpdateStatus.UpdateAvailable
+                && !string.IsNullOrWhiteSpace(m.LatestVersion)
+            )
+            .Select(m => m.ApiModId!.Value)
+            .Distinct()
+            .Count();
+
         reporter.Heading($"Checking mod dependencies for {matchedCount} mods...");
 
         var result = await reporter.RunForgeQueryProgressAsync(
-            matchedCount,
+            matchedCount + updatableCount,
             setValue =>
                 modDependencyService.AnalyzeDependenciesAsync(
                     mods,
