@@ -1,8 +1,7 @@
 namespace CheckMods.Utils;
 
 /// <summary>
-/// Helpers for parsing semantic version strings without exception-driven control flow. Mod and SPT version strings
-/// come from untrusted metadata and the Forge API, so they are frequently missing or malformed.
+/// Helpers for parsing semantic version strings.
 /// </summary>
 public static class SemVer
 {
@@ -19,8 +18,7 @@ public static class SemVer
     }
 
     /// <summary>
-    /// Parses a semantic version, falling back to 0.0.0 when the string is missing or invalid. Useful for ordering,
-    /// where an unparseable version should sort lowest rather than throw.
+    /// Parses a semantic version, falling back to 0.0.0 when the string is missing or invalid.
     /// </summary>
     /// <param name="version">The version string to parse.</param>
     /// <returns>The parsed version, or 0.0.0 if it could not be parsed.</returns>

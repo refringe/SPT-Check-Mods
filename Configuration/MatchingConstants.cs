@@ -10,9 +10,6 @@ public static class MatchingConstants
     /// </summary>
     public const int MinimumFuzzyMatchScore = 70;
 
-    /// <summary>
-    /// Minimum fuzzy match score for name search results to be considered.
-    /// </summary>
     public const int NameSearchFuzzyThreshold = 80;
 
     /// <summary>

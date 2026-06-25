@@ -2,14 +2,13 @@ namespace CheckMods.Models;
 
 /// <summary>
 /// Master record representing a mod throughout the entire processing lifecycle.
-/// Progressively enriched as data flows through scanning, reconciliation, API matching, and version checking.
 /// </summary>
 public sealed class Mod
 {
     #region Identity (from scanning)
 
     /// <summary>
-    /// The unique GUID identifier of the mod (e.g., "com.author.modname").
+    /// The mod's GUID (e.g., "com.author.modname").
     /// </summary>
     public required string Guid { get; init; }
 
@@ -30,7 +29,6 @@ public sealed class Mod
 
     /// <summary>
     /// Alternate GUIDs from other DLLs in the same mod package (for multi-DLL client mods).
-    /// Used as fallbacks when the primary GUID doesn't match in the API.
     /// </summary>
     public List<string> AlternateGuids { get; init; } = [];
 
@@ -62,24 +60,12 @@ public sealed class Mod
 
     #region API Metadata (populated when matched via API)
 
-    /// <summary>
-    /// The unique identifier of the mod from the Forge API.
-    /// </summary>
     public int? ApiModId { get; private set; }
 
-    /// <summary>
-    /// The official name from the Forge API.
-    /// </summary>
     public string? ApiName { get; private set; }
 
-    /// <summary>
-    /// The author information from the Forge API.
-    /// </summary>
     public ModAuthor? ApiAuthor { get; private set; }
 
-    /// <summary>
-    /// The URL slug for the mod on Forge.
-    /// </summary>
     public string? ApiSlug { get; private set; }
 
     /// <summary>
@@ -87,14 +73,8 @@ public sealed class Mod
     /// </summary>
     public string? ApiUrl { get; private set; }
 
-    /// <summary>
-    /// URL to the mod's source code repository.
-    /// </summary>
     public string? ApiSourceCodeUrl { get; private set; }
 
-    /// <summary>
-    /// All available versions of this mod from the Forge API.
-    /// </summary>
     public IReadOnlyList<ModVersion>? ApiVersions { get; private set; }
 
     #endregion
@@ -106,9 +86,6 @@ public sealed class Mod
     /// </summary>
     public string? LatestVersion { get; private set; }
 
-    /// <summary>
-    /// The update status compared to the latest available version.
-    /// </summary>
     public UpdateStatus UpdateStatus { get; private set; } = UpdateStatus.Unknown;
 
     /// <summary>
@@ -143,22 +120,22 @@ public sealed class Mod
 
     /// <summary>
     /// Whether this mod's available update has been dismissed as a false positive and should be shown as ignored
-    /// (treated as up to date) rather than as an available update.
+    /// (treated as up to date).
     /// </summary>
     public bool UpdateSuppressed { get; private set; }
+
+    /// <summary>
+    /// How the proposed update changes this mod's dependencies compared to the installed version. Null when there is
+    /// no available update or the comparison couldn't be made.
+    /// </summary>
+    public UpdateDependencyDelta? UpdateDependencyChanges { get; private set; }
 
     #endregion
 
     #region Processing State
 
-    /// <summary>
-    /// The current processing/verification status of the mod.
-    /// </summary>
     public ModStatus Status { get; private set; } = ModStatus.NoMatch;
 
-    /// <summary>
-    /// Warnings encountered during scanning/loading.
-    /// </summary>
     public List<string> LoadWarnings { get; init; } = [];
 
     #endregion
@@ -181,17 +158,11 @@ public sealed class Mod
         get { return ApiAuthor?.Name ?? LocalAuthor; }
     }
 
-    /// <summary>
-    /// Whether the mod has any loading warnings.
-    /// </summary>
     public bool HasWarnings
     {
         get { return LoadWarnings.Count > 0; }
     }
 
-    /// <summary>
-    /// Whether the mod has been successfully matched with the API.
-    /// </summary>
     public bool IsMatched
     {
         get { return Status == ModStatus.Verified && ApiModId.HasValue; }
@@ -288,6 +259,15 @@ public sealed class Mod
     public void SetUpdateSuppressed(bool suppressed)
     {
         UpdateSuppressed = suppressed;
+    }
+
+    /// <summary>
+    /// Records how the proposed update changes this mod's dependencies compared to the installed version.
+    /// </summary>
+    /// <param name="delta">The added/removed dependency changes introduced by the update.</param>
+    public void SetUpdateDependencyChanges(UpdateDependencyDelta delta)
+    {
+        UpdateDependencyChanges = delta;
     }
 
     #endregion

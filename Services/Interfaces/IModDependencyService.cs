@@ -120,7 +120,7 @@ public class MissingDependency
     public required string Guid { get; init; }
 
     /// <summary>
-    /// The mod ID on Forge (for download link).
+    /// The mod ID on Forge.
     /// </summary>
     public required int ModId { get; init; }
 

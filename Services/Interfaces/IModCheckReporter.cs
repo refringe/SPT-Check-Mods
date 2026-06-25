@@ -3,8 +3,7 @@ using CheckMods.Models;
 namespace CheckMods.Services.Interfaces;
 
 /// <summary>
-/// Renders the user-facing output of the mod-check workflow. This is the single boundary between workflow logic and
-/// the console, so the orchestrator and services stay free of direct console dependencies (and remain testable).
+/// Renders the user-facing console output for the mod-check workflow.
 /// </summary>
 public interface IModCheckReporter
 {
@@ -40,9 +39,6 @@ public interface IModCheckReporter
 
     /// <summary>Warns that the BepInEx plugins directory could not be found during scanning.</summary>
     void PluginsDirectoryNotFound(string path);
-
-    /// <summary>Warns that a client mod's metadata could not be extracted during scanning.</summary>
-    void CouldNotExtractClientMod(string fileName, string reason);
 
     /// <summary>Runs work under a Forge-query progress bar, passing a callback to report completed-item counts.</summary>
     Task RunForgeQueryProgressAsync(int total, Func<Action<int>, Task> work);
@@ -104,8 +100,10 @@ public interface IModCheckReporter
     /// <summary>Reports that the remote ignore list couldn't be fetched and the local list is unchanged.</summary>
     void RemoteIgnoresUnavailable();
 
-    /// <summary>Prompts for the manage-ignored-updates gate. Returns true if the user chose to manage.</summary>
-    bool PromptManageIgnoredUpdates();
+    /// <summary>
+    /// Shows the end-of-run menu and returns the chosen action.
+    /// </summary>
+    EndOfRunChoice PromptEndOfRun(int openableUpdateCount, bool canManageIgnoredUpdates);
 
     /// <summary>
     /// Shows a checklist of update candidates (those in <paramref name="preIgnoredApiModIds"/> pre-checked) and returns
@@ -113,10 +111,12 @@ public interface IModCheckReporter
     /// </summary>
     IReadOnlyList<Mod> SelectUpdatesToIgnore(IReadOnlyList<Mod> candidates, ISet<int> preIgnoredApiModIds);
 
-    /// <summary>Drains buffered keystrokes, prints the exit prompt, and waits for a keypress.</summary>
-    void PressAnyKeyToExit();
+    /// <summary>Reports the outcome of opening update pages in the browser (how many of the total opened).</summary>
+    void UpdatePagesOpened(int opened, int total);
 
-    /// <summary>Asks whether to report the just-confirmed ignores as a GitHub issue. Defaults to no.</summary>
+    /// <summary>
+    /// Prompts whether to submit new ignore entries as a GitHub issue, defaulting to no.
+    /// </summary>
     bool PromptReportIgnores();
 
     /// <summary>

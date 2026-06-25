@@ -10,9 +10,8 @@ namespace CheckMods.Tests;
 
 /// <summary>
 /// Tests for <see cref="ForgeApiService.GetModUpdatesAsync"/>, which batches the mods/updates request into chunks and
-/// merges the results. The request is atomic: successful chunks are merged, but any chunk error fails the whole call
-/// rather than silently dropping the failed chunk's mods. Backed by a stub <see cref="HttpMessageHandler"/> and a
-/// pass-through rate limiter.
+/// merges the results. The request is atomic: successful chunks are merged, but any chunk error fails the whole call.
+/// Backed by a stub <see cref="HttpMessageHandler"/> and a pass-through rate limiter.
 /// </summary>
 public sealed class ForgeApiServiceTests
 {
@@ -109,8 +108,6 @@ public sealed class ForgeApiServiceTests
     [Fact]
     public async Task Surfaces_an_error_when_any_chunk_fails()
     {
-        // Chunk 2 errors while chunk 1 succeeds. Returning only chunk 1's data would silently hide updates for the
-        // failed chunk's mods, so the whole call must fail instead.
         var service = CreateService(req => IsSecondChunk(req) ? ServerError() : Ok(UpToDateJson(1001)));
 
         var result = await service.GetModUpdatesAsync(TwoChunkMods(), SptVersion);

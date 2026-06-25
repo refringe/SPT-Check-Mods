@@ -9,8 +9,8 @@ using Microsoft.Extensions.Options;
 namespace CheckMods.Services;
 
 /// <summary>
-/// HTTP client for the author-maintained remote base ignore list. Registered via AddHttpClient (like
-/// <see cref="ForgeApiService"/>) for proper HttpClient lifecycle management, so it carries no [Injectable] attribute.
+/// HTTP client for the author-maintained remote base ignore list. Registered via AddHttpClient; carries no [Injectable]
+/// attribute.
 /// </summary>
 public sealed class RemoteIgnoreFileClient(
     HttpClient httpClient,
@@ -57,7 +57,6 @@ public sealed class RemoteIgnoreFileClient(
                 return null;
             }
 
-            // Refuse to parse a format newer than we understand rather than risk misreading it.
             if (file.SchemaVersion > IgnoredUpdatesFile.CurrentSchemaVersion)
             {
                 logger.LogWarning(

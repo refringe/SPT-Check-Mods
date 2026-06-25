@@ -4,8 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace CheckMods.Tests;
 
 /// <summary>
-/// Tests for <see cref="BrowserLauncher"/>'s URL guard. Only the reject path is exercised — opening a real http(s) URL
-/// would launch a browser, which isn't appropriate in a unit test.
+/// Tests for <see cref="BrowserLauncher"/>'s URL guard. Only the reject path is exercised.
 /// </summary>
 public sealed class BrowserLauncherTests
 {

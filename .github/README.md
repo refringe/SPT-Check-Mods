@@ -9,7 +9,9 @@ A .NET 9 console application that validates Single Player Tarkov (SPT) mod compa
 - **Forge API Integration**: Verifies mods against the official SPT Forge database
 - **Version Compatibility**: Checks installed mod versions against SPT version requirements
 - **Update Detection**: Identifies mods with available updates and provides download links
+- **Bulk Update Pages**: Opens every out-of-date mod's Forge page in your browser from the end-of-run menu
 - **Dependency Analysis**: Builds dependency trees, identifies missing dependencies, and detects conflicts
+- **Dependency Change Notices**: When an update is available, shows the dependencies it adds or removes, flagging ones you'll need to download or update
 - **Installation Checks**: Detects mods installed in the wrong folder and excludes them from the rest of the run
 - **Dismissable Update Prompts**: Lets you ignore false-positive "update available" prompts for mods whose files are already current, with an optional shared community list
 - **SPT Update Checking**: Notifies you when a new SPT version is available

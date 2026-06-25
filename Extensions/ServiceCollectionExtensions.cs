@@ -20,10 +20,8 @@ public static class ServiceCollectionExtensions
     /// Registers all CheckMods services with the dependency injection container.
     /// </summary>
     /// <param name="services">The service collection to configure.</param>
-    /// <returns>The configured service collection.</returns>
     public static IServiceCollection AddCheckModsServices(this IServiceCollection services)
     {
-        // Register configuration options with default values
         services.Configure<ForgeApiOptions>(_ => { });
         services.Configure<RateLimitOptions>(_ => { });
         services.Configure<ModScannerOptions>(_ => { });
@@ -31,27 +29,22 @@ public static class ServiceCollectionExtensions
         services.Configure<UpdateCheckOptions>(_ => { });
         services.Configure<IgnoredUpdateOptions>(_ => { });
 
-        // In-memory cache used by ForgeApiService to dedupe identical API requests within a run.
         services.AddMemoryCache();
 
-        // Register logging infrastructure
         services.AddLogging(builder =>
         {
             builder.SetMinimumLevel(LogLevel.Debug);
             builder.AddFileLogger();
 
-            // Suppress verbose HttpClient logging (we log full URLs ourselves)
+            // Suppress verbose HttpClient logging.
             builder.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
         });
 
-        // Use SPTarkov.DI to auto-register all services with [Injectable] attribute
         var diHandler = new DependencyInjectionHandler(services);
         diHandler.AddInjectableTypesFromAssembly(Assembly.GetExecutingAssembly());
         diHandler.InjectAll();
 
-        // Register ForgeApiService as a typed HttpClient after SPTarkov.DI registration.
-        // AddHttpClient provides proper HttpClient lifecycle management. A descriptive User-Agent identifies this
-        // tool to the Forge API, and a request timeout makes hung requests retryable rather than blocking forever.
+        // Register ForgeApiService as a typed HttpClient.
         services.AddHttpClient<IForgeApiService, ForgeApiService>(
             (serviceProvider, client) =>
             {
@@ -66,7 +59,7 @@ public static class ServiceCollectionExtensions
             }
         );
 
-        // Register the remote ignore-list client as a typed HttpClient for proper lifecycle management.
+        // Register the remote ignore-list client as a typed HttpClient.
         services.AddHttpClient<IRemoteIgnoreFileClient, RemoteIgnoreFileClient>(
             (serviceProvider, client) =>
             {

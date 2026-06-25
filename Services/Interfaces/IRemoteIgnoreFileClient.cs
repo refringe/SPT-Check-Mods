@@ -11,8 +11,7 @@ public interface IRemoteIgnoreFileClient
     bool IsConfigured { get; }
 
     /// <summary>
-    /// Fetches and parses the remote list. Returns null on any failure (not configured, network error, bad status,
-    /// unparseable body, or an unsupported newer schema) so callers can leave the local list untouched.
+    /// Fetches and parses the remote list, returning null on any failure.
     /// </summary>
     Task<IReadOnlyList<IgnoredUpdate>?> FetchAsync(CancellationToken cancellationToken = default);
 }

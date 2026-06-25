@@ -9,7 +9,7 @@ namespace CheckMods.Tests;
 /// <summary>
 /// Tests for <see cref="UpdateCheckService"/>: the static <see cref="UpdateCheckService.InterpretUpdates"/> mapper, and
 /// the <see cref="UpdateCheckService.CheckAsync"/> flow - in particular the unrecognized-build fallback that selects
-/// the latest stable version. The mod-id used mirrors the real Forge listing (2471).
+/// the latest stable version.
 /// </summary>
 public sealed class UpdateCheckServiceTests
 {
@@ -241,7 +241,6 @@ public sealed class UpdateCheckServiceTests
 
         var result = await CreateService(api).CheckAsync(SptVersion);
 
-        // A string sort would wrongly pick "1.9.0"; semver ordering selects "1.10.0".
         Assert.Equal("1.10.0", result.LatestVersion);
     }
 

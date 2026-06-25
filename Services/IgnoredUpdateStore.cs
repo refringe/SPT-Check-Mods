@@ -54,7 +54,7 @@ public sealed class IgnoredUpdateStore(IOptions<IgnoredUpdateOptions> options, I
         return IsIgnored(mod.ApiModId.Value, mod.LocalVersion, mod.LatestVersion);
     }
 
-    /// <summary>Value-based overload of <see cref="IsIgnored(Mod)"/>, kept internal for direct unit testing.</summary>
+    /// <summary>Value-based overload of <see cref="IsIgnored(Mod)"/>.</summary>
     internal bool IsIgnored(int apiModId, string localVersion, string latestVersion)
     {
         Load();
@@ -79,7 +79,7 @@ public sealed class IgnoredUpdateStore(IOptions<IgnoredUpdateOptions> options, I
         var added = 0;
         foreach (var entry in incoming)
         {
-            // Skip anything already present by key: existing (possibly user-authored) entries are never overwritten.
+            // Skip entries already present by key.
             if (!keys.Add(entry.Key))
             {
                 continue;
@@ -119,7 +119,7 @@ public sealed class IgnoredUpdateStore(IOptions<IgnoredUpdateOptions> options, I
                 return [];
             }
 
-            // Defend against partially-written or hand-edited files: keep only well-formed entries.
+            // Keep only well-formed entries.
             return file.Ignored.Where(e => e.IsWellFormed).ToList();
         }
         catch (Exception ex)
@@ -146,7 +146,7 @@ public sealed class IgnoredUpdateStore(IOptions<IgnoredUpdateOptions> options, I
             var file = new IgnoredUpdatesFile(IgnoredUpdatesFile.CurrentSchemaVersion, entries);
             var json = JsonSerializer.Serialize(file, _jsonOptions);
 
-            // Atomic write: stage to a temp file then move into place so a crash mid-write can't corrupt the list.
+            // Atomic write: stage to a temp file then move into place.
             var tempPath = _options.FilePath + ".tmp";
             File.WriteAllText(tempPath, json);
             File.Move(tempPath, _options.FilePath, overwrite: true);

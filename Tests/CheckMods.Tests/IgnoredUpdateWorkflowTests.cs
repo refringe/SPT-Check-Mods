@@ -1,11 +1,12 @@
 using CheckMods.Models;
 using CheckMods.Services;
+using CheckMods.Utils;
 
 namespace CheckMods.Tests;
 
 /// <summary>
-/// Tests for <see cref="IgnoredUpdateWorkflow.BuildNewSet"/>: the rewrite logic that preserves ignores for mods not
-/// evaluated this run while overwriting the decisions the user could actually see.
+/// Tests for <see cref="IgnoredUpdateWorkflow"/>: the ignore-set rewrite logic (<see cref="IgnoredUpdateWorkflow.BuildNewSet"/>)
+/// and the update-page URL building used by the "open update pages" menu action.
 /// </summary>
 public sealed class IgnoredUpdateWorkflowTests
 {
@@ -19,6 +20,70 @@ public sealed class IgnoredUpdateWorkflowTests
         return new IgnoredUpdate(id, local, latest, Name: $"Mod {id}", Source: source);
     }
 
+    private static Mod MatchedMod(int id, string slug, string? detailUrl)
+    {
+        var mod = new Mod
+        {
+            Guid = $"com.author.mod{id}",
+            FilePath = $"mods/Mod{id}.dll",
+            IsServerMod = true,
+            LocalName = $"Mod {id}",
+            LocalAuthor = "Author",
+            LocalVersion = "1.0.0",
+        };
+
+        mod.UpdateFromApiMatch(
+            new ModSearchResult(
+                Id: id,
+                HubId: null,
+                Name: $"Mod {id}",
+                Slug: slug,
+                Teaser: null,
+                Thumbnail: null,
+                Downloads: 0,
+                SourceCodeLinks: null,
+                DetailUrl: detailUrl,
+                Owner: null,
+                Versions: null
+            )
+        );
+
+        return mod;
+    }
+
+    [Fact]
+    public void BuildUpdatePageUrls_prefers_the_api_detail_url()
+    {
+        var mod = MatchedMod(2471, "cool-mod", "https://forge.sp-tarkov.com/mod/2471/cool-mod");
+
+        var urls = IgnoredUpdateWorkflow.BuildUpdatePageUrls([mod]);
+
+        Assert.Equal(new[] { "https://forge.sp-tarkov.com/mod/2471/cool-mod" }, urls);
+    }
+
+    [Fact]
+    public void BuildUpdatePageUrls_falls_back_to_a_mod_page_built_from_id_and_slug()
+    {
+        // No detail URL from the API, but the Forge id and slug are enough to build the page link.
+        var mod = MatchedMod(2471, "cool-mod", detailUrl: null);
+
+        var urls = IgnoredUpdateWorkflow.BuildUpdatePageUrls([mod]);
+
+        Assert.Equal(new[] { ForgeUrls.ModPage(2471, "cool-mod") }, urls);
+    }
+
+    [Fact]
+    public void BuildUpdatePageUrls_dedups_components_that_share_a_page()
+    {
+        // Paired server/client components resolve to the same Forge mod page.
+        var server = MatchedMod(2471, "cool-mod", "https://forge.sp-tarkov.com/mod/2471/cool-mod");
+        var client = MatchedMod(2471, "cool-mod", "https://forge.sp-tarkov.com/mod/2471/cool-mod");
+
+        var urls = IgnoredUpdateWorkflow.BuildUpdatePageUrls([server, client]);
+
+        Assert.Single(urls);
+    }
+
     [Fact]
     public void BuildNewSet_preserves_entries_for_mods_not_evaluated_this_run()
     {
@@ -27,7 +92,6 @@ public sealed class IgnoredUpdateWorkflowTests
 
         var result = IgnoredUpdateWorkflow.BuildNewSet(existing, evaluated, []);
 
-        // Mod 2 wasn't evaluated, so its entry survives even though it wasn't re-selected.
         Assert.Single(result);
         Assert.Equal(2, result[0].ApiModId);
     }
@@ -38,7 +102,7 @@ public sealed class IgnoredUpdateWorkflowTests
         var existing = new List<IgnoredUpdate> { Entry(1) };
         var evaluated = new HashSet<int> { 1 };
 
-        // Mod 1 was evaluated and shown, but the user un-checked it -> removed (undo / self-resolved).
+        // Mod 1 was evaluated but not re-selected.
         var result = IgnoredUpdateWorkflow.BuildNewSet(existing, evaluated, []);
 
         Assert.Empty(result);
@@ -60,10 +124,69 @@ public sealed class IgnoredUpdateWorkflowTests
         var existing = new List<IgnoredUpdate> { Entry(1) };
         var evaluated = new HashSet<int> { 1 };
 
-        // User kept mod 1 checked: it arrives via "selected" and shouldn't duplicate.
+        // Mod 1 re-selected: arrives in both existing and selected.
         var result = IgnoredUpdateWorkflow.BuildNewSet(existing, evaluated, [Entry(1)]);
 
         Assert.Single(result);
         Assert.Equal(1, result[0].ApiModId);
+    }
+
+    [Fact]
+    public void SelectReportableEntries_returns_all_chosen_when_community_is_empty()
+    {
+        // No community list configured.
+        var chosen = new List<IgnoredUpdate> { Entry(1), Entry(2) };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, []);
+
+        Assert.Equal(2, reportable.Count);
+    }
+
+    [Fact]
+    public void SelectReportableEntries_drops_entries_already_in_the_community_list()
+    {
+        var chosen = new List<IgnoredUpdate> { Entry(1), Entry(2) };
+        // The community already has mod 1's exact (id, local, latest) triple.
+        var community = new List<IgnoredUpdate> { Entry(1, source: IgnoreSource.Remote) };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, community);
+
+        Assert.Single(reportable);
+        Assert.Equal(2, reportable[0].ApiModId);
+    }
+
+    [Fact]
+    public void SelectReportableEntries_returns_empty_when_community_already_has_all_chosen()
+    {
+        var chosen = new List<IgnoredUpdate> { Entry(1), Entry(2) };
+        var community = new List<IgnoredUpdate> { Entry(1), Entry(2) };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, community);
+
+        Assert.Empty(reportable);
+    }
+
+    [Fact]
+    public void SelectReportableEntries_matches_on_the_full_triple_not_just_id()
+    {
+        // Same mod id but a different latest version.
+        var chosen = new List<IgnoredUpdate> { Entry(1, latest: "2.0.0") };
+        var community = new List<IgnoredUpdate> { Entry(1, latest: "1.0.1") };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, community);
+
+        Assert.Single(reportable);
+        Assert.Equal("2.0.0", reportable[0].IgnoredLatestVersion);
+    }
+
+    [Fact]
+    public void SelectReportableEntries_compares_keys_case_insensitively()
+    {
+        var chosen = new List<IgnoredUpdate> { Entry(1, local: "1.0.0-RC1", latest: "1.0.1-RC2") };
+        var community = new List<IgnoredUpdate> { Entry(1, local: "1.0.0-rc1", latest: "1.0.1-rc2") };
+
+        var reportable = IgnoredUpdateWorkflow.SelectReportableEntries(chosen, community);
+
+        Assert.Empty(reportable);
     }
 }

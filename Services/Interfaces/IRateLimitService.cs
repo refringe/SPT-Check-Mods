@@ -1,14 +1,12 @@
 namespace CheckMods.Services.Interfaces;
 
 /// <summary>
-/// Interface for rate-limiting API calls. Proactively paces requests beneath the API's rate limits and retries on
-/// rate limiting (429) and transient failures, applying global backoff that honors the Retry-After header.
+/// Rate-limits and retries API calls, applying backoff that honors the Retry-After header.
 /// </summary>
 public interface IRateLimitService
 {
     /// <summary>
-    /// Executes an HTTP request, pacing it beneath the rate limits and retrying on rate limiting (429) and transient
-    /// failures (timeouts, network errors, and 5xx/408 responses).
+    /// Executes an HTTP request with rate limiting and retry on transient failures.
     /// </summary>
     /// <param name="requestFunc">Function that executes the HTTP request.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>

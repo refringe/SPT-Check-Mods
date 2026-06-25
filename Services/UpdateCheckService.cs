@@ -42,7 +42,6 @@ public sealed class UpdateCheckService(
             cancellationToken
         );
 
-        // Successful response with categorized data.
         if (updatesResult.TryPickT0(out var data, out var remainder))
         {
             var interpreted = InterpretUpdates(data, modId, currentVersion);
@@ -100,8 +99,8 @@ public sealed class UpdateCheckService(
     }
 
     /// <summary>
-    /// Handles the case where the running version wasn't recognized .If the mod exists on the Forge, suggest the latest
-    /// stable version, otherwise report the check as unavailable.
+    /// Handles the case where the running version wasn't recognized. If the mod exists on the Forge, suggests the
+    /// latest stable version; otherwise reports the check as unavailable.
     /// </summary>
     private async Task<CheckModsUpdateResult> ResolveUnrecognizedAsync(
         int modId,

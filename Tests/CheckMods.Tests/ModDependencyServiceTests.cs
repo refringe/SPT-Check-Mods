@@ -39,6 +39,37 @@ public sealed class ModDependencyServiceTests
         return mod;
     }
 
+    private static Mod MatchedModWithVersion(string guid, string name, int apiModId, string localVersion)
+    {
+        var mod = new Mod
+        {
+            Guid = guid,
+            FilePath = $"{name}.dll",
+            IsServerMod = true,
+            LocalName = name,
+            LocalAuthor = "Author",
+            LocalVersion = localVersion,
+        };
+        mod.UpdateFromApiMatch(
+            new ModSearchResult(apiModId, null, name, "slug", null, null, 0, null, null, null, null)
+        );
+        return mod;
+    }
+
+    /// <summary>A matched mod (installed at 1.0.0) with an available update to <paramref name="latestVersion"/>.</summary>
+    private static Mod UpdatableMod(string guid, string name, int apiModId, string latestVersion)
+    {
+        var mod = MatchedMod(guid, name, apiModId);
+        mod.UpdateFromSafeToUpdate(
+            new SafeToUpdateMod(
+                null,
+                new ModUpdateVersion(null, apiModId, guid, name, "slug", latestVersion, null, null),
+                null
+            )
+        );
+        return mod;
+    }
+
     private static ModDependency Dep(
         string guid,
         string name = "Dep",
@@ -56,7 +87,7 @@ public sealed class ModDependencyServiceTests
     [Fact]
     public async Task Returns_all_mods_as_roots_when_none_are_matched()
     {
-        // OnGetModDependencies is intentionally unset: the early-exit path must not call the API.
+        // OnGetModDependencies intentionally unset.
         var api = new FakeForgeApiService();
         var mod = UnmatchedMod("com.x.mod", "Mod");
 
@@ -141,7 +172,7 @@ public sealed class ModDependencyServiceTests
     [Fact]
     public async Task Guards_against_circular_dependencies()
     {
-        // main -> A -> B -> A (back-edge). The repeated A must be pruned rather than recursed into forever.
+        // main -> A -> B -> A (circular back-edge).
         var backEdgeToA = Dep("com.a", "A");
         var b = Dep("com.b", "B", nested: [backEdgeToA]);
         var a = Dep("com.a", "A", nested: [b]);
@@ -182,5 +213,186 @@ public sealed class ModDependencyServiceTests
         var root = Assert.Single(result.RootMods);
         Assert.Empty(root.Children);
         Assert.Empty(result.MissingDependencies);
+    }
+
+    [Fact]
+    public async Task Update_reports_a_newly_required_missing_dependency_with_a_download_link()
+    {
+        var main = UpdatableMod("com.author.main", "Main", 100, "2.0.0");
+        var api = new FakeForgeApiService
+        {
+            OnGetModDependenciesVersioned = key =>
+                key switch
+                {
+                    ("100", "2.0.0") => new List<ModDependency>
+                    {
+                        Dep("com.author.dep", "Dependency", id: 500, slug: "dependency", version: "3.0.0"),
+                    },
+                    _ => new List<ModDependency>(),
+                },
+        };
+
+        await CreateService(api).AnalyzeDependenciesAsync([main], []);
+
+        var delta = main.UpdateDependencyChanges;
+        Assert.NotNull(delta);
+        var added = Assert.Single(delta.Added);
+        Assert.Equal("com.author.dep", added.Guid);
+        Assert.Equal(DependencyInstallState.NotInstalled, added.InstallState);
+        Assert.Equal("3.0.0", added.RecommendedVersion);
+        Assert.Equal(ForgeUrls.Download(500, "dependency", "3.0.0"), added.DownloadLink);
+        Assert.Empty(delta.Removed);
+    }
+
+    [Fact]
+    public async Task Update_marks_an_installed_adequate_dependency_as_satisfied()
+    {
+        var main = UpdatableMod("com.author.main", "Main", 100, "2.0.0");
+        var dep = MatchedModWithVersion("com.author.dep", "Dep", 500, "3.0.0");
+        var api = new FakeForgeApiService
+        {
+            OnGetModDependenciesVersioned = key =>
+                key switch
+                {
+                    ("100", "2.0.0") => new List<ModDependency> { Dep("com.author.dep", id: 500, version: "3.0.0") },
+                    _ => new List<ModDependency>(),
+                },
+        };
+
+        await CreateService(api).AnalyzeDependenciesAsync([main, dep], []);
+
+        var added = Assert.Single(main.UpdateDependencyChanges!.Added);
+        Assert.Equal(DependencyInstallState.InstalledOk, added.InstallState);
+        Assert.Equal("3.0.0", added.InstalledVersion);
+    }
+
+    [Fact]
+    public async Task Update_flags_an_installed_dependency_that_is_out_of_date()
+    {
+        var main = UpdatableMod("com.author.main", "Main", 100, "2.0.0");
+        var dep = MatchedModWithVersion("com.author.dep", "Dep", 500, "2.0.0");
+        var api = new FakeForgeApiService
+        {
+            OnGetModDependenciesVersioned = key =>
+                key switch
+                {
+                    ("100", "2.0.0") => new List<ModDependency> { Dep("com.author.dep", id: 500, version: "3.0.0") },
+                    _ => new List<ModDependency>(),
+                },
+        };
+
+        await CreateService(api).AnalyzeDependenciesAsync([main, dep], []);
+
+        var added = Assert.Single(main.UpdateDependencyChanges!.Added);
+        Assert.Equal(DependencyInstallState.InstalledOutdated, added.InstallState);
+        Assert.Equal("2.0.0", added.InstalledVersion);
+        Assert.Equal("3.0.0", added.RecommendedVersion);
+    }
+
+    [Fact]
+    public async Task Update_detects_a_transitively_added_dependency()
+    {
+        var main = UpdatableMod("com.author.main", "Main", 100, "2.0.0");
+        var nested = Dep("com.b", "B", id: 601, version: "1.0.0");
+        var api = new FakeForgeApiService
+        {
+            OnGetModDependenciesVersioned = key =>
+                key switch
+                {
+                    ("100", "2.0.0") => new List<ModDependency>
+                    {
+                        Dep("com.a", "A", id: 600, version: "1.0.0", nested: [nested]),
+                    },
+                    _ => new List<ModDependency>(),
+                },
+        };
+
+        await CreateService(api).AnalyzeDependenciesAsync([main], []);
+
+        var added = main.UpdateDependencyChanges!.Added;
+        Assert.Equal(2, added.Count);
+        Assert.Contains(added, c => c.Guid == "com.a");
+        Assert.Contains(added, c => c.Guid == "com.b");
+    }
+
+    [Fact]
+    public async Task Update_reports_a_no_longer_required_dependency()
+    {
+        var main = UpdatableMod("com.author.main", "Main", 100, "2.0.0");
+        var api = new FakeForgeApiService
+        {
+            OnGetModDependenciesVersioned = key =>
+                key switch
+                {
+                    ("100", "1.0.0") => new List<ModDependency> { Dep("com.old", "Old", id: 700, version: "1.0.0") },
+                    _ => new List<ModDependency>(),
+                },
+        };
+
+        await CreateService(api).AnalyzeDependenciesAsync([main], []);
+
+        var removed = Assert.Single(main.UpdateDependencyChanges!.Removed);
+        Assert.Equal("com.old", removed.Guid);
+        Assert.Empty(main.UpdateDependencyChanges.Added);
+    }
+
+    [Fact]
+    public async Task Does_not_attach_dependency_changes_when_no_update_is_available()
+    {
+        var main = MatchedMod("com.author.main", "Main", 100);
+        var api = new FakeForgeApiService { OnGetModDependencies = _ => new List<ModDependency>() };
+
+        await CreateService(api).AnalyzeDependenciesAsync([main], []);
+
+        Assert.Null(main.UpdateDependencyChanges);
+    }
+
+    [Fact]
+    public async Task A_target_version_fetch_error_leaves_changes_unset_but_keeps_the_current_analysis()
+    {
+        var main = UpdatableMod("com.author.main", "Main", 100, "2.0.0");
+        var api = new FakeForgeApiService
+        {
+            OnGetModDependenciesVersioned = key =>
+                key switch
+                {
+                    // Installed version still surfaces its missing dependency...
+                    ("100", "1.0.0") => new List<ModDependency>
+                    {
+                        Dep("com.author.dep", "Dependency", id: 500, slug: "dependency", version: "2.0.0"),
+                    },
+                    // ...but the proposed-version fetch fails.
+                    ("100", "2.0.0") => new ApiError("boom"),
+                    _ => new List<ModDependency>(),
+                },
+        };
+
+        var result = await CreateService(api).AnalyzeDependenciesAsync([main], []);
+
+        Assert.Null(main.UpdateDependencyChanges);
+        Assert.Single(result.MissingDependencies);
+    }
+
+    [Fact]
+    public async Task Update_surfaces_a_conflicting_new_dependency()
+    {
+        var main = UpdatableMod("com.author.main", "Main", 100, "2.0.0");
+        var api = new FakeForgeApiService
+        {
+            OnGetModDependenciesVersioned = key =>
+                key switch
+                {
+                    ("100", "2.0.0") => new List<ModDependency>
+                    {
+                        Dep("com.conf", "Conflicting", id: 800, version: "1.0.0", conflict: true),
+                    },
+                    _ => new List<ModDependency>(),
+                },
+        };
+
+        await CreateService(api).AnalyzeDependenciesAsync([main], []);
+
+        var added = Assert.Single(main.UpdateDependencyChanges!.Added);
+        Assert.True(added.Conflict);
     }
 }

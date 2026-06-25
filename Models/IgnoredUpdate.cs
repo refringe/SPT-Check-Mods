@@ -16,9 +16,9 @@ public enum IgnoreSource
 
 /// <summary>
 /// A single dismissed ("ignored") mod update. Identifies a known false-positive update where the Forge version is
-/// higher than the installed DLL version but the distributed files are actually the same, so the update prompt should
-/// be suppressed. Matching uses the triple (<see cref="ApiModId"/>, <see cref="LocalVersion"/>,
-/// <see cref="IgnoredLatestVersion"/>); the remaining fields are metadata for readability.
+/// higher than the installed DLL version but the distributed files are actually the same. Matching uses the triple
+/// (<see cref="ApiModId"/>, <see cref="LocalVersion"/>, <see cref="IgnoredLatestVersion"/>); the remaining fields are
+/// metadata.
 /// </summary>
 public sealed record IgnoredUpdate(
     [property: JsonPropertyName("apiModId")] int ApiModId,
@@ -32,7 +32,7 @@ public sealed record IgnoredUpdate(
 {
     /// <summary>
     /// The match key: API mod id plus both version strings. Compared with <see cref="StringComparer.OrdinalIgnoreCase"/>
-    /// (by callers) so version casing differences don't create duplicates.
+    /// by callers.
     /// </summary>
     [JsonIgnore]
     public string Key
@@ -41,8 +41,7 @@ public sealed record IgnoredUpdate(
     }
 
     /// <summary>
-    /// Whether this entry carries the minimum data needed to match a mod. Guards against partially-written or
-    /// hand-edited files (local and remote).
+    /// Whether this entry carries the minimum data needed to match a mod.
     /// </summary>
     [JsonIgnore]
     public bool IsWellFormed

@@ -53,14 +53,13 @@ public sealed class SptInstallationService(
         var isValid = validationResult.Match(
             valid => valid,
             _ => false, // InvalidSptVersion
-            _ => false // ApiError - treat as invalid for safety
+            _ => false // ApiError
         );
 
         if (!isValid)
         {
-            // Provide more specific error messages based on the result type
             validationResult.Switch(
-                _ => { }, // Success - handled above
+                _ => { },
                 _ => reporter.Error("Failed. SPT version not recognized by Forge API."),
                 apiError => reporter.Error($"Failed. API error: {apiError.Message}")
             );
@@ -68,8 +67,6 @@ public sealed class SptInstallationService(
             return null;
         }
 
-        // Forge accepted the version string, but parse it without throwing in case its format differs from what the
-        // SemanticVersioning library's strict constructor accepts.
         var localSptVersion = SemVer.TryParse(localSptVersionStr);
         if (localSptVersion is null)
         {
@@ -95,8 +92,7 @@ public sealed class SptInstallationService(
         return versionsResult.Match(
             versions =>
             {
-                // Filter to versions newer than the current version, skipping any that can't be parsed. Parse each
-                // version string once and carry the result through the filter and sort.
+                // Filter to versions newer than the current version, skipping any that can't be parsed.
                 var newerVersions = versions
                     .Select(v => (Raw: v, Parsed: SemVer.TryParse(v.Version)))
                     .Where(x => x.Parsed is not null && x.Parsed! > currentVersion)

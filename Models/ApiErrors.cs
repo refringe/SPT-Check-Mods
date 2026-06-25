@@ -8,7 +8,8 @@ public readonly record struct NotFound;
 /// <summary>
 /// Represents a mod that exists but has no version compatible with the requested SPT version.
 /// </summary>
-public readonly record struct NoCompatibleVersion;
+/// <param name="Mod">The mod that was matched by GUID despite having no SPT-compatible version.</param>
+public readonly record struct NoCompatibleVersion(ModSearchResult Mod);
 
 /// <summary>
 /// Represents an invalid input parameter.

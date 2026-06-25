@@ -14,11 +14,10 @@ namespace CheckMods.Services;
 
 /// <summary>
 /// Service for interacting with the Forge API with rate limiting. Handles mod searching, version validation, and data
-/// retrieval. The Forge API is open and read-only, so no authentication is required.
+/// retrieval.
 /// </summary>
 /// <remarks>
-/// This service is NOT decorated with [Injectable] because it requires special registration via AddHttpClient
-/// for proper HttpClient lifecycle management. It is registered manually in ServiceCollectionExtensions.
+/// Registered manually in ServiceCollectionExtensions via AddHttpClient, not via [Injectable].
 /// </remarks>
 public sealed partial class ForgeApiService(
     HttpClient httpClient,
@@ -31,16 +30,14 @@ public sealed partial class ForgeApiService(
     private readonly ForgeApiOptions _options = options.Value;
 
     /// <summary>
-    /// Maximum number of mods sent in a single batch updates request. Mods are chunked so the request URL stays
-    /// comfortably within server and proxy length limits, even for installs with many mods.
+    /// Maximum number of mods sent in a single batch updates request.
     /// </summary>
     private const int MaxModsPerUpdateRequest = 50;
 
     private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>
-    /// Cache lifetime for API responses. Comfortably longer than a single run so identical requests within a run are
-    /// served from cache, while still bounding memory if the process is unusually long-lived.
+    /// Cache lifetime for API responses.
     /// </summary>
     private static readonly MemoryCacheEntryOptions _cacheEntryOptions = new()
     {
@@ -60,8 +57,7 @@ public sealed partial class ForgeApiService(
 
     /// <summary>
     /// Issues a rate-limited GET request and returns its status code and body. Successful (2xx) and NotFound (404)
-    /// responses are cached by URL so identical requests within a run are served from cache rather than repeated.
-    /// Server errors are not cached, so a later call can retry them.
+    /// responses are cached by URL; server errors are not cached.
     /// </summary>
     /// <param name="url">The request URL, which doubles as the cache key.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
@@ -99,11 +95,10 @@ public sealed partial class ForgeApiService(
     private static partial Regex ConvertCamelCaseRegex();
 
     /// <summary>
-    /// Converts camelCase strings to space-separated words for better API search results. Handles special cases like
+    /// Converts camelCase strings to space-separated words. Handles special cases like
     /// all-uppercase strings (MOAR, SPT, API).
     /// </summary>
     /// <param name="input">The camelCase string to convert.</param>
-    /// <returns>Space-separated string.</returns>
     private static string ConvertCamelCaseToSpaces(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
@@ -341,6 +336,7 @@ public sealed partial class ForgeApiService(
 
         try
         {
+            // filter[guid] is case-insensitive, so the GUID is sent verbatim.
             var url =
                 $"{_options.BaseUrl}mods?filter[guid]={Uri.EscapeDataString(modGuid)}&include=versions,source_code_links";
 
@@ -370,9 +366,10 @@ public sealed partial class ForgeApiService(
                 SemVer.SatisfiesRange(v.SptVersionConstraint, sptVersion)
             );
 
+            // No published version targets the requested SPT version; return the matched mod as incompatible.
             if (!hasCompatibleVersion)
             {
-                return new NoCompatibleVersion();
+                return new NoCompatibleVersion(result);
             }
 
             return result;
@@ -445,15 +442,13 @@ public sealed partial class ForgeApiService(
             return new NotFound();
         }
 
-        // Common case: the whole batch fits in one request, so call it directly and return its result unchanged,
-        // skipping the cross-chunk merge (which would otherwise allocate four lists and copy every entry across).
+        // When the whole batch fits in one request, call it directly and return its result.
         if (modList.Count <= MaxModsPerUpdateRequest)
         {
             return await GetModUpdatesChunkAsync(modList, sptVersion, cancellationToken);
         }
 
-        // Larger batches are split so the request URL stays within length limits. Dispatch the chunks concurrently
-        // and let the shared rate limiter throttle them, rather than waiting for each round-trip before the next.
+        // Split larger batches into chunks and dispatch them concurrently.
         var chunkResults = await Task.WhenAll(
             modList
                 .Chunk(MaxModsPerUpdateRequest)
@@ -469,8 +464,7 @@ public sealed partial class ForgeApiService(
 
         foreach (var chunkResult in chunkResults)
         {
-            // The request is atomic: surfacing only the merged successes would silently hide updates for every mod in
-            // a failed chunk, so a single chunk error fails the whole call.
+            // A single chunk error fails the whole call.
             if (chunkResult.TryPickT2(out var error, out _))
             {
                 logger.LogDebug(

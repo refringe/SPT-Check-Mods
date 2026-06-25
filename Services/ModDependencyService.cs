@@ -20,7 +20,6 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
     /// <param name="installedModGuids">Set of GUIDs for mods that are currently installed.</param>
     /// <param name="progressCallback">Optional callback for progress updates (current, total).</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>Dependency analysis result containing tree structure and any issues.</returns>
     public async Task<DependencyAnalysisResult> AnalyzeDependenciesAsync(
         IEnumerable<Mod> mods,
         HashSet<string> installedModGuids,
@@ -60,7 +59,6 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
         List<DependencyConflict> conflicts = [];
 
         // Fetch dependencies for each matched mod individually
-        // This allows us to build a proper tree showing which mod depends on which
         var modDependencyCache = new Dictionary<int, List<ModDependency>>();
 
         // Get unique mod IDs to fetch
@@ -70,7 +68,19 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
             .Distinct()
             .ToList();
 
-        var totalToFetch = uniqueModIds.Count;
+        // Mods with an available update get a second dependency fetch at the proposed version. Dedupe by API mod ID
+        // (paired server/client components share an ID).
+        var updatableGroups = modList
+            .Where(m =>
+                m.IsMatched
+                && m.ApiModId.HasValue
+                && m.UpdateStatus == UpdateStatus.UpdateAvailable
+                && !string.IsNullOrWhiteSpace(m.LatestVersion)
+            )
+            .GroupBy(m => m.ApiModId!.Value)
+            .ToList();
+
+        var totalToFetch = uniqueModIds.Count + updatableGroups.Count;
         var fetchedCount = 0;
 
         foreach (var mod in matchedMods)
@@ -98,6 +108,47 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
             modDependencyCache[modId] = deps;
             fetchedCount++;
             progressCallback?.Invoke(fetchedCount, totalToFetch);
+        }
+
+        // Second pass: for each updatable mod, fetch dependencies at the proposed version and diff them against the
+        // installed version's dependencies (already cached above).
+        foreach (var group in updatableGroups)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var modId = group.Key;
+            var targetVersion = group.First().LatestVersion!;
+
+            var targetResult = await forgeApiService.GetModDependenciesAsync(
+                [(modId.ToString(), targetVersion)],
+                cancellationToken
+            );
+
+            fetchedCount++;
+            progressCallback?.Invoke(fetchedCount, totalToFetch);
+
+            // Skip the diff on a not-found/error response; an empty success list is a valid "no dependencies".
+            var targetDeps = targetResult.Match(
+                dependencies => (List<ModDependency>?)dependencies,
+                _ => null,
+                _ => null
+            );
+            if (targetDeps is null)
+            {
+                continue;
+            }
+
+            var installedDeps = modDependencyCache.GetValueOrDefault(modId, []);
+            var delta = BuildUpdateDependencyDelta(installedDeps, targetDeps, modByGuid, modById, installedModGuids);
+            if (!delta.HasChanges)
+            {
+                continue;
+            }
+
+            foreach (var mod in group)
+            {
+                mod.SetUpdateDependencyChanges(delta);
+            }
         }
 
         // Build the tree for each mod
@@ -162,7 +213,6 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
             return null;
         }
 
-        // Check for conflicts
         if (
             dependency.Conflict
             && !conflicts.Any(c => c.ModGuid.Equals(dependency.Guid, StringComparison.OrdinalIgnoreCase))
@@ -195,7 +245,7 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
         // Track missing dependencies
         if (!isInstalled && !missingDeps.ContainsKey(dependency.Guid))
         {
-            // Always construct the Forge download URL for consistency
+            // Construct the Forge download URL
             string? downloadLink = null;
             if (
                 dependency.Id > 0
@@ -266,6 +316,133 @@ public sealed class ModDependencyService(IForgeApiService forgeApiService, ILogg
             DependencyInfo = dependency,
             IsInstalled = isInstalled,
             Children = children,
+        };
+    }
+
+    /// <summary>
+    /// Diffs the installed and proposed dependency trees (recursively flattened by GUID) and builds the resulting set
+    /// of added and removed dependencies, each annotated with its install state relative to what's installed.
+    /// </summary>
+    private static UpdateDependencyDelta BuildUpdateDependencyDelta(
+        List<ModDependency> installedDeps,
+        List<ModDependency> targetDeps,
+        Dictionary<string, Mod> modByGuid,
+        Dictionary<int, Mod> modById,
+        HashSet<string> installedGuids
+    )
+    {
+        var installedFlat = FlattenDependencies(installedDeps);
+        var targetFlat = FlattenDependencies(targetDeps);
+
+        var added = targetFlat
+            .Where(kvp => !installedFlat.ContainsKey(kvp.Key))
+            .Select(kvp => BuildDependencyChange(kvp.Value, modByGuid, modById, installedGuids))
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var removed = installedFlat
+            .Where(kvp => !targetFlat.ContainsKey(kvp.Key))
+            .Select(kvp => BuildDependencyChange(kvp.Value, modByGuid, modById, installedGuids))
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return new UpdateDependencyDelta { Added = added, Removed = removed };
+    }
+
+    /// <summary>
+    /// Recursively flattens a dependency tree into a GUID-keyed map. Blank GUIDs are skipped and each GUID is visited
+    /// once.
+    /// </summary>
+    private static Dictionary<string, ModDependency> FlattenDependencies(List<ModDependency> deps)
+    {
+        var map = new Dictionary<string, ModDependency>(StringComparer.OrdinalIgnoreCase);
+        CollectDependencies(deps, map);
+        return map;
+    }
+
+    private static void CollectDependencies(List<ModDependency> deps, Dictionary<string, ModDependency> map)
+    {
+        foreach (var dep in deps)
+        {
+            if (string.IsNullOrWhiteSpace(dep.Guid) || !map.TryAdd(dep.Guid, dep))
+            {
+                continue;
+            }
+
+            if (dep.Dependencies is { Count: > 0 })
+            {
+                CollectDependencies(dep.Dependencies, map);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Builds a <see cref="DependencyChange"/> for a dependency, resolving whether it is installed and, if so, whether
+    /// its installed version looks older than the latest Forge-compatible version.
+    /// </summary>
+    private static DependencyChange BuildDependencyChange(
+        ModDependency dependency,
+        Dictionary<string, Mod> modByGuid,
+        Dictionary<int, Mod> modById,
+        HashSet<string> installedGuids
+    )
+    {
+        Mod? installedMod = null;
+        if (!string.IsNullOrWhiteSpace(dependency.Guid) && modByGuid.TryGetValue(dependency.Guid, out var foundByGuid))
+        {
+            installedMod = foundByGuid;
+        }
+        else if (modById.TryGetValue(dependency.Id, out var foundById))
+        {
+            installedMod = foundById;
+        }
+
+        var isInstalled =
+            installedMod != null
+            || (!string.IsNullOrWhiteSpace(dependency.Guid) && installedGuids.Contains(dependency.Guid));
+
+        var recommendedVersion = dependency.LatestCompatibleVersion?.Version;
+
+        // Construct the Forge download URL when there's enough information.
+        string? downloadLink = null;
+        if (
+            dependency.Id > 0
+            && !string.IsNullOrWhiteSpace(dependency.Slug)
+            && !string.IsNullOrWhiteSpace(recommendedVersion)
+        )
+        {
+            downloadLink = ForgeUrls.Download(dependency.Id, dependency.Slug, recommendedVersion);
+        }
+
+        DependencyInstallState state;
+        if (!isInstalled)
+        {
+            state = DependencyInstallState.NotInstalled;
+        }
+        else if (
+            installedMod != null
+            && !string.IsNullOrWhiteSpace(recommendedVersion)
+            && SemVer.ParseOrZero(installedMod.LocalVersion) < SemVer.ParseOrZero(recommendedVersion)
+        )
+        {
+            state = DependencyInstallState.InstalledOutdated;
+        }
+        else
+        {
+            state = DependencyInstallState.InstalledOk;
+        }
+
+        return new DependencyChange
+        {
+            Name = dependency.Name,
+            Guid = dependency.Guid,
+            ModId = dependency.Id,
+            Slug = dependency.Slug,
+            RecommendedVersion = recommendedVersion ?? "unknown",
+            DownloadLink = downloadLink,
+            InstallState = state,
+            InstalledVersion = installedMod?.LocalVersion,
+            Conflict = dependency.Conflict,
         };
     }
 }

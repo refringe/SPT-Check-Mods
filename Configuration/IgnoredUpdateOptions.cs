@@ -6,12 +6,11 @@ namespace CheckMods.Configuration;
 /// </summary>
 public class IgnoredUpdateOptions
 {
-    /// <summary>The full path to the local ignored-updates file. Overridable (e.g. by tests).</summary>
+    /// <summary>The full path to the local ignored-updates file.</summary>
     public string FilePath { get; set; } = DefaultFilePath;
 
     /// <summary>
     /// URL of the author-maintained remote base list, or null/empty to disable the remote-fetch prompt entirely.
-    /// Hosted on the Forge's static domain to keep it within the same trust boundary as the rest of the data.
     /// </summary>
     public string? RemoteUrl { get; set; } = "https://forge-static.sp-tarkov.com/check-mods/ignored-updates.json";
 

@@ -1,7 +1,7 @@
 namespace CheckMods.Utils;
 
 /// <summary>
-/// Utility class providing security-related helper methods for path validation. Prevents directory traversal attacks.
+/// Path validation utilities that prevent directory traversal.
 /// </summary>
 public static class SecurityHelper
 {
@@ -21,10 +21,8 @@ public static class SecurityHelper
 
         try
         {
-            // Get the full path, resolving any relative segments
             var fullPath = Path.GetFullPath(inputPath);
 
-            // If a base path is provided, ensure the resolved path is within it
             if (string.IsNullOrWhiteSpace(basePath))
             {
                 return fullPath;

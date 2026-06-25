@@ -123,7 +123,7 @@ public record SafeToUpdateMod(
 )
 {
     /// <summary>
-    /// Helper property to get the mod ID from current version.
+    /// The mod ID, from the current version.
     /// </summary>
     public int ModId
     {
@@ -142,7 +142,7 @@ public record BlockedUpdateMod(
 )
 {
     /// <summary>
-    /// Helper property to get the mod ID from current version.
+    /// The mod ID, from the current version.
     /// </summary>
     public int ModId
     {

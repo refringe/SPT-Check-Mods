@@ -116,15 +116,12 @@ public sealed class ModMatchingServiceTests
             CreateService(api).MatchModsAsync(mods, SptVersion)
         );
 
-        // The systemic failure wraps the underlying exception rather than swallowing it.
         Assert.Same(boom, ex.InnerException);
     }
 
     [Fact]
     public async Task Does_not_throw_when_a_lone_mod_fails()
     {
-        // A single-mod install where matching that one mod throws must not be treated as a systemic failure: the
-        // per-mod isolation should leave it unmatched and the run should continue.
         var api = new FakeForgeApiService { OnGetModByGuid = _ => throw new InvalidOperationException("boom") };
         var mod = ClientMod("com.a.lonely");
 
@@ -232,7 +229,7 @@ public sealed class ModMatchingServiceTests
     [Fact]
     public async Task FindBestMatch_matches_by_exact_normalized_name()
     {
-        // Name normalizes to the local name; slug deliberately does not, so only strategy 1 can match.
+        // Name normalizes to the local name; slug deliberately does not.
         var api = new FakeForgeApiService
         {
             OnGetModByGuid = _ => new NotFound(),
@@ -281,8 +278,7 @@ public sealed class ModMatchingServiceTests
     [Fact]
     public async Task FindBestMatch_matches_by_author_and_name()
     {
-        // Name matches only after suffix removal and the slug is blank, so strategies 1-3 miss; the owner+name
-        // strategy is what links them.
+        // Name matches only after suffix removal and the slug is blank.
         var api = new FakeForgeApiService
         {
             OnGetModByGuid = _ => new NotFound(),

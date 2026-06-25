@@ -10,23 +10,25 @@ namespace CheckMods.Services;
 
 /// <summary>
 /// Service that provides rate limiting for API calls. Proactively paces requests beneath the Forge API's two
-/// server-side limits (a burst window and a general window) using sliding-window rate limiters, and reacts to
-/// rate limiting (429) and transient errors with retries and backoff. All limiter state is shared across requests.
+/// server-side limits with a single token-bucket limiter that smooths to a steady sustained rate, and reacts to rate
+/// limiting (429) and transient errors with retries and backoff. All limiter state is shared across requests.
 /// </summary>
 [Injectable(InjectionType.Singleton)]
 public sealed class RateLimitService : IRateLimitService, IDisposable
 {
     /// <summary>
-    /// Upper bound on requests queued behind each window limiter. Large enough to hold every request a single run
-    /// could fan out at once, so callers wait their turn rather than being rejected.
+    /// Upper bound on requests queued behind the pacer.
     /// </summary>
     private const int QueueLimit = 10_000;
 
     private readonly RateLimitOptions _options;
     private readonly ILogger<RateLimitService> _logger;
 
-    private readonly SlidingWindowRateLimiter _burstLimiter;
-    private readonly SlidingWindowRateLimiter _generalLimiter;
+    /// <summary>
+    /// Token-bucket pacer that smooths request dispatch to a steady sustained rate (refill) with a bounded initial
+    /// burst (capacity). Sized under both Forge windows.
+    /// </summary>
+    private readonly TokenBucketRateLimiter _pacer;
     private readonly SemaphoreSlim _concurrencyGate;
 
     private readonly SemaphoreSlim _backoffSemaphore = new(1, 1);
@@ -38,24 +40,12 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
         _options = options.Value;
         _logger = logger;
 
-        _burstLimiter = new SlidingWindowRateLimiter(
-            new SlidingWindowRateLimiterOptions
+        _pacer = new TokenBucketRateLimiter(
+            new TokenBucketRateLimiterOptions
             {
-                PermitLimit = _options.BurstLimit,
-                Window = TimeSpan.FromSeconds(_options.BurstWindowSeconds),
-                SegmentsPerWindow = Math.Max(1, _options.BurstWindowSeconds),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = QueueLimit,
-                AutoReplenishment = true,
-            }
-        );
-
-        _generalLimiter = new SlidingWindowRateLimiter(
-            new SlidingWindowRateLimiterOptions
-            {
-                PermitLimit = _options.GeneralLimit,
-                Window = TimeSpan.FromSeconds(_options.GeneralWindowSeconds),
-                SegmentsPerWindow = Math.Max(1, _options.GeneralWindowSeconds),
+                TokenLimit = Math.Max(1, _options.MaxBurst),
+                TokensPerPeriod = Math.Max(1, _options.RefillTokensPerPeriod),
+                ReplenishmentPeriod = TimeSpan.FromMilliseconds(Math.Max(1, _options.RefillPeriodMs)),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = QueueLimit,
                 AutoReplenishment = true,
@@ -91,8 +81,7 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
             Exception? transientError = null;
 
             // Proactively pace beneath both server windows, then cap simultaneous in-flight requests.
-            using (await _burstLimiter.AcquireAsync(1, cancellationToken))
-            using (await _generalLimiter.AcquireAsync(1, cancellationToken))
+            using (await _pacer.AcquireAsync(1, cancellationToken))
             {
                 await _concurrencyGate.WaitAsync(cancellationToken);
                 try
@@ -119,7 +108,7 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
                 }
             }
 
-            // Network error or timeout: back off locally and retry without stalling other requests.
+            // Network error or timeout: back off locally and retry.
             if (transientError is not null)
             {
                 if (++retryCount > _options.MaxRetries)
@@ -144,7 +133,7 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
                 continue;
             }
 
-            // Rate limited: honor Retry-After and back off globally so all requests wait together.
+            // Rate limited: honor Retry-After and back off globally.
             if (response!.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 if (++retryCount > _options.MaxRetries)
@@ -227,8 +216,8 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
     }
 
     /// <summary>
-    /// Applies a global backoff after a 429 so all concurrent requests wait. Uses the Retry-After delay when present,
-    /// otherwise an escalating exponential backoff with jitter. Guarded by a semaphore so only one thread updates state.
+    /// Applies a global backoff after a 429. Uses the Retry-After delay when present, otherwise an escalating
+    /// exponential backoff with jitter. Guarded by a semaphore.
     /// </summary>
     /// <param name="retryAfter">Optional delay from the Retry-After header.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -312,8 +301,7 @@ public sealed class RateLimitService : IRateLimitService, IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        _burstLimiter.Dispose();
-        _generalLimiter.Dispose();
+        _pacer.Dispose();
         _concurrencyGate.Dispose();
         _backoffSemaphore.Dispose();
     }

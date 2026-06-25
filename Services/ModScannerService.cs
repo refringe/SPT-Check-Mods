@@ -98,7 +98,6 @@ public sealed class ModScannerService(
 
         reporter.Status($"Scanning {dllFiles.Count} DLL files for BepInEx plugins...");
 
-        // Group DLLs by their parent directory
         var dllsByDirectory = GroupDllsByDirectory(dllFiles, pluginsDir);
 
         // Process loose DLLs (directly in plugins folder) as individual mods
@@ -222,7 +221,6 @@ public sealed class ModScannerService(
 
         var (primaryDll, primaryPlugin) = SelectPrimaryPlugin(plugins, directoryName);
 
-        // Create the mod from the primary plugin
         var mod = CreateModFromBepInPlugin(primaryPlugin, primaryDll);
 
         // Record the other plugins' GUIDs as alternates
@@ -295,8 +293,7 @@ public sealed class ModScannerService(
     }
 
     /// <summary>
-    /// Generic leading GUID segments (reverse-DNS TLDs and hosts) that, on their own, carry no author identity. A
-    /// shared prefix made up only of these does not imply two mods are related.
+    /// Generic leading GUID segments (reverse-DNS TLDs and hosts) that, on their own, carry no author identity.
     /// </summary>
     private static readonly HashSet<string> _genericGuidSegments = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -385,7 +382,7 @@ public sealed class ModScannerService(
         string directoryName
     )
     {
-        // Normalize directory name for comparison (remove common prefixes like author names)
+        // Normalize directory name for comparison
         var normalizedDirName = NormalizeModName(directoryName);
 
         // Try to find a plugin whose filename matches the directory name
@@ -518,9 +515,8 @@ public sealed class ModScannerService(
     {
         List<MisplacedMod> wrongFolder = [];
 
-        // Client mods incorrectly placed in the server folder (SPT/user/mods). Scans recursively (including DLLs loose
-        // in the mods root and nested in subfolders) so a client mod copied anywhere under the server folder is caught,
-        // not just top-level DLLs in mod directories.
+        // Client mods incorrectly placed in the server folder (SPT/user/mods). Scans recursively, including DLLs
+        // loose in the mods root and nested in subfolders.
         var serverModsDir = Path.Combine(sptPath, "SPT", "user", "mods");
         if (Directory.Exists(serverModsDir))
         {
@@ -538,8 +534,8 @@ public sealed class ModScannerService(
             }
         }
 
-        // Server mods incorrectly placed in the client folder (BepInEx/plugins). Mirrors ScanClientModsAsync; all valid
-        // client DLLs (recursive, excluding the SPT framework folder).
+        // Server mods incorrectly placed in the client folder (BepInEx/plugins). All valid client DLLs (recursive,
+        // excluding the SPT framework folder).
         var pluginsDir = Path.Combine(sptPath, "BepInEx", "plugins");
         if (Directory.Exists(pluginsDir))
         {
@@ -569,8 +565,8 @@ public sealed class ModScannerService(
     }
 
     /// <summary>
-    /// Finds BepInEx/plugins subdirectories that contain two or more unrelated mods. The signature that one mod has
-    /// been copied into another mod's folder. Loose DLLs directly in the plugins root are not considered.
+    /// Finds BepInEx/plugins subdirectories that contain two or more unrelated mods. Loose DLLs directly in the
+    /// plugins root are not considered.
     /// </summary>
     private List<CrossInstalledDirectory> DetectCrossInstalledDirectories(
         string pluginsDir,
@@ -612,8 +608,7 @@ public sealed class ModScannerService(
     /// <summary>
     /// Decides which mods in a cross-installed directory are the intruder. Attribution prefers a component whose DLL
     /// filename matches the folder name (the folder's intended occupant). Failing that, a single largest component (by
-    /// DLL count). When neither yields a single winner, the result is marked ambiguous so the user is pointed at the
-    /// whole directory.
+    /// DLL count). When neither yields a single winner, the result is marked ambiguous.
     /// </summary>
     private CrossInstalledDirectory AttributeCrossInstall(string directory, List<List<PluginDll>> components)
     {
@@ -697,8 +692,7 @@ public sealed class ModScannerService(
     }
 
     /// <summary>
-    /// Lower-cases an identifier and strips separators (dots, dashes, underscores, spaces) so names can be compared
-    /// regardless of punctuation style.
+    /// Lower-cases an identifier and strips separators (dots, dashes, underscores, spaces).
     /// </summary>
     private static string NormalizeIdentifier(string value)
     {
@@ -707,7 +701,7 @@ public sealed class ModScannerService(
 
     /// <summary>
     /// Attempts to read the DLL as a client (BepInEx) mod. Returns the mod if a BepInPlugin attribute is found,
-    /// otherwise null. All load failures are swallowed... a DLL that cannot be read is simply not a client mod.
+    /// otherwise null. All load failures are swallowed.
     /// </summary>
     private Mod? TryDetectClientMod(string dllPath)
     {
@@ -743,7 +737,7 @@ public sealed class ModScannerService(
 
     /// <summary>
     /// Attempts to read the DLL as a server (SPT) mod. Returns the mod if SPT mod metadata is found, otherwise null.
-    /// All load failures are swallowed... a DLL that cannot be read is simply not a server mod.
+    /// All load failures are swallowed.
     /// </summary>
     private Mod? TryDetectServerMod(string dllPath, string sptPath)
     {
@@ -778,7 +772,7 @@ public sealed class ModScannerService(
                 return null;
             }
 
-            // Use reflection to access properties since the type is from a different load context
+            // Use reflection to access properties
             var metadataType = metadata.GetType();
             var modGuid = metadataType.GetProperty("ModGuid")?.GetValue(metadata)?.ToString();
             var name = metadataType.GetProperty("Name")?.GetValue(metadata)?.ToString();
@@ -917,10 +911,7 @@ public sealed class ModScannerService(
         CancellationToken cancellationToken = default
     )
     {
-        // ExtractClientModMetadata handles its own per-DLL failures (collecting a warning and returning null), so the
-        // only exception that escapes here is cancellation, which is allowed to propagate through Task.WhenAll.
-        // The shared console isn't safe for concurrent writes, so failures are gathered and surfaced on this thread
-        // after the parallel scan rather than written from inside the worker tasks.
+        // Per-DLL failures are collected into warnings and surfaced after the parallel scan.
         var warnings = new ConcurrentBag<(string FileName, string Reason)>();
         var tasks = dllFiles.Select(dllPath =>
             Task.Run(() => ExtractClientModMetadata(dllPath, warnings), cancellationToken)
@@ -928,9 +919,10 @@ public sealed class ModScannerService(
 
         var results = await Task.WhenAll(tasks);
 
+        // Log each extraction failure at debug level.
         foreach (var (fileName, reason) in warnings)
         {
-            reporter.CouldNotExtractClientMod(fileName, reason);
+            logger.LogDebug("Could not extract client mod metadata from {FileName}: {Reason}", fileName, reason);
         }
 
         return results.Where(r => r is not null).Cast<Mod>().ToList();
@@ -952,8 +944,7 @@ public sealed class ModScannerService(
         }
         catch (Exception ex)
         {
-            // Runs on a worker thread; collect rather than write so the caller can surface it without racing the
-            // shared console.
+            // Collect the failure for the caller to surface.
             warnings.Add((Path.GetFileName(dllPath), ex.Message));
             return null;
         }

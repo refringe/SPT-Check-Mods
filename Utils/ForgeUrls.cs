@@ -1,8 +1,7 @@
 namespace CheckMods.Utils;
 
 /// <summary>
-/// Builds links to the Forge website (mod detail pages and downloads). These are website URLs, distinct from the Forge
-/// API base URL configured in <see cref="Configuration.ForgeApiOptions"/>.
+/// Builds Forge website URLs for mod detail pages and downloads.
 /// </summary>
 public static class ForgeUrls
 {

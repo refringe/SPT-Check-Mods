@@ -4,8 +4,7 @@ using OneOf;
 namespace CheckMods.Services.Interfaces;
 
 /// <summary>
-/// Interface for interacting with the Forge API, providing rate limiting. Handles mod searching, version validation,
-/// and data retrieval. The Forge API is open and read-only, so no authentication is required.
+/// Interacts with the Forge API to search mods, validate versions, and retrieve mod data.
 /// </summary>
 public interface IForgeApiService
 {
