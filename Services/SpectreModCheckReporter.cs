@@ -276,33 +276,34 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
         AnsiConsole.MarkupLine($"[yellow]Found {incompatibleMods.Count} incompatible mod(s).[/]");
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Incompatible mods:[/]");
+        var tree = new Tree("[yellow]Incompatible mods[/]");
 
         foreach (var mod in incompatibleMods)
         {
             var nameDisplay = FormatModLink(mod.DisplayName, mod.ApiUrl);
 
-            AnsiConsole.MarkupLine($"  {nameDisplay}");
-            AnsiConsole.MarkupLine($"    [yellow]- {mod.IncompatibilityReason?.EscapeMarkup()}[/]");
+            var modNode = tree.AddNode(nameDisplay);
+            modNode.AddNode($"[yellow]{mod.IncompatibilityReason?.EscapeMarkup()}[/]");
 
             if (string.IsNullOrWhiteSpace(mod.CompatibleVersionString))
             {
-                AnsiConsole.MarkupLine($"      [red]No compatible version available for SPT {sptVersion}[/]");
+                modNode.AddNode($"[red]No compatible version available for SPT {sptVersion}[/]");
                 continue;
             }
 
-            AnsiConsole.MarkupLine(
-                $"      [grey]Latest compatible version:[/] [green]{mod.CompatibleVersionString.EscapeMarkup()}[/]"
+            modNode.AddNode(
+                $"[grey]Latest compatible version:[/] [green]{mod.CompatibleVersionString.EscapeMarkup()}[/]"
             );
 
             // Use Forge download link format
             if (mod.ApiModId.HasValue && !string.IsNullOrWhiteSpace(mod.ApiSlug))
             {
                 var forgeDownloadUrl = ForgeUrls.Download(mod.ApiModId.Value, mod.ApiSlug, mod.CompatibleVersionString);
-                AnsiConsole.MarkupLine($"      [grey]Download:[/] [link]{forgeDownloadUrl.EscapeMarkup()}[/]");
+                modNode.AddNode($"[grey]Download:[/] [link]{forgeDownloadUrl.EscapeMarkup()}[/]");
             }
         }
 
+        AnsiConsole.Write(tree);
         AnsiConsole.WriteLine();
         Rule();
     }
@@ -322,7 +323,8 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         }
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Mod loading warnings:[/]");
+
+        var tree = new Tree("[yellow]Mod loading warnings[/]");
 
         foreach (var mod in modsWithWarnings)
         {
@@ -331,22 +333,24 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
             var nameDisplay = FormatModLink(modName, mod.ApiUrl);
 
-            AnsiConsole.MarkupLine($"  [grey]{modType}:[/] {nameDisplay}");
+            var modNode = tree.AddNode($"[grey]{modType}:[/] {nameDisplay}");
             foreach (var warning in mod.LoadWarnings)
             {
-                AnsiConsole.MarkupLine($"    [yellow]- {warning.EscapeMarkup()}[/]");
+                modNode.AddNode($"[yellow]{warning.EscapeMarkup()}[/]");
             }
 
             // Show source code URL if available, otherwise show Forge mod page
             if (!string.IsNullOrWhiteSpace(mod.ApiSourceCodeUrl))
             {
-                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiSourceCodeUrl.EscapeMarkup()}[/]");
+                modNode.AddNode($"[grey]Please report:[/] [link]{mod.ApiSourceCodeUrl.EscapeMarkup()}[/]");
             }
             else if (!string.IsNullOrWhiteSpace(mod.ApiUrl))
             {
-                AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{mod.ApiUrl.EscapeMarkup()}[/]");
+                modNode.AddNode($"[grey]Please report:[/] [link]{mod.ApiUrl.EscapeMarkup()}[/]");
             }
         }
+
+        AnsiConsole.Write(tree);
     }
 
     /// <inheritdoc />
@@ -368,21 +372,19 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             if (pairsWithNotes.Count > 0)
             {
                 AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[yellow]Reconciliation warnings:[/]");
+
+                var tree = new Tree("[yellow]Reconciliation warnings[/]");
 
                 foreach (var pair in pairsWithNotes)
                 {
-                    // Blank line before each entry.
-                    AnsiConsole.WriteLine();
-
                     var modName = pair.SelectedMod.LocalName;
 
                     var nameDisplay = FormatModLink(modName, pair.SelectedMod.ApiUrl);
 
-                    AnsiConsole.MarkupLine($"  {nameDisplay}");
+                    var modNode = tree.AddNode(nameDisplay);
                     foreach (var note in pair.Notes)
                     {
-                        AnsiConsole.MarkupLine($"    [yellow]- {note.EscapeMarkup()}[/]");
+                        modNode.AddNode($"[yellow]{note.EscapeMarkup()}[/]");
                     }
 
                     var reportUrl = !string.IsNullOrWhiteSpace(pair.SelectedMod.ApiSourceCodeUrl)
@@ -398,23 +400,24 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
                     if (guidMismatch)
                     {
-                        AnsiConsole.MarkupLine(
-                            "      [grey]Matched by name, but the IDs differ. This is either a mod packaged with mismatched GUIDs or, more likely, two different mods with one copied into the other's folder. Check that each mod sits in its own folder under BepInEx/plugins.[/]"
+                        modNode.AddNode(
+                            "[grey]Matched by name, but the GUIDs differ. This is likely a mod packaged with mismatched GUIDs.[/]"
                         );
 
                         if (!string.IsNullOrWhiteSpace(reportUrl))
                         {
-                            AnsiConsole.MarkupLine(
-                                $"      [grey]If this is wrong, report it here:[/] [link]{reportUrl.EscapeMarkup()}[/]"
+                            modNode.AddNode(
+                                $"[grey]Report the issue here:[/] [link]{reportUrl.EscapeMarkup()}[/]"
                             );
                         }
                     }
                     else if (!string.IsNullOrWhiteSpace(reportUrl))
                     {
-                        AnsiConsole.MarkupLine($"      [grey]Please report:[/] [link]{reportUrl.EscapeMarkup()}[/]");
+                        modNode.AddNode($"[grey]Please report:[/] [link]{reportUrl.EscapeMarkup()}[/]");
                     }
                 }
 
+                AnsiConsole.Write(tree);
                 AnsiConsole.WriteLine();
             }
         }
@@ -443,25 +446,27 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
         if (serverInClient.Count > 0)
         {
-            AnsiConsole.MarkupLine(
-                "[yellow]Server mods found in the client folder[/] [grey](BepInEx/plugins)[/][yellow]. Move them into[/] [grey]SPT/user/mods[/][yellow]:[/]"
+            var tree = new Tree(
+                "[yellow]Server mods found in the client folder[/] [grey](BepInEx/plugins)[/][yellow]. Move them into[/] [grey]SPT/user/mods[/]"
             );
             foreach (var mod in serverInClient)
             {
-                PrintMisplacedMod(mod);
+                AddMisplacedModNode(tree, mod);
             }
+            AnsiConsole.Write(tree);
             AnsiConsole.WriteLine();
         }
 
         if (clientInServer.Count > 0)
         {
-            AnsiConsole.MarkupLine(
-                "[yellow]Client mods found in the server folder[/] [grey](SPT/user/mods)[/][yellow]. Move them into[/] [grey]BepInEx/plugins[/][yellow]:[/]"
+            var tree = new Tree(
+                "[yellow]Client mods found in the server folder[/] [grey](SPT/user/mods)[/][yellow]. Move them into[/] [grey]BepInEx/plugins[/]"
             );
             foreach (var mod in clientInServer)
             {
-                PrintMisplacedMod(mod);
+                AddMisplacedModNode(tree, mod);
             }
+            AnsiConsole.Write(tree);
             AnsiConsole.WriteLine();
         }
 
@@ -484,42 +489,46 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     /// </summary>
     private void PrintCrossInstalledDirectory(CrossInstalledDirectory directory)
     {
+        Tree tree;
+        TreeNode directoryNode;
+
         if (directory.Ambiguous)
         {
-            AnsiConsole.MarkupLine(
-                "[yellow]Unrelated mods share one folder under[/] [grey](BepInEx/plugins)[/][yellow]. One is likely in the wrong place. Review the install instructions for each:[/]"
+            tree = new Tree(
+                "[yellow]Unrelated mods share one folder under[/] [grey](BepInEx/plugins)[/][yellow]. One is likely in the wrong place. Review the install instructions for each[/]"
             );
-            AnsiConsole.MarkupLine($"  [grey]{directory.Directory.EscapeMarkup()}[/]");
+            directoryNode = tree.AddNode($"[grey]{directory.Directory.EscapeMarkup()}[/]");
             foreach (var mod in directory.Mods)
             {
-                PrintMisplacedMod(mod);
+                AddMisplacedModNode(directoryNode, mod);
             }
         }
         else
         {
-            AnsiConsole.MarkupLine(
-                "[yellow]Mods found inside another mod's folder under[/] [grey](BepInEx/plugins)[/][yellow]. Review the mod's installation instructions:[/]"
+            tree = new Tree(
+                "[yellow]Mods found inside another mod's folder under[/] [grey](BepInEx/plugins)[/][yellow]. Review the mod's installation instructions[/]"
             );
-            AnsiConsole.MarkupLine($"  [grey]{directory.Directory.EscapeMarkup()}[/]");
+            directoryNode = tree.AddNode($"[grey]{directory.Directory.EscapeMarkup()}[/]");
             foreach (var mod in directory.Misplaced)
             {
-                PrintMisplacedMod(mod);
+                AddMisplacedModNode(directoryNode, mod);
             }
         }
 
+        AnsiConsole.Write(tree);
         AnsiConsole.WriteLine();
     }
 
     /// <summary>
-    /// Prints a single misplaced mod entry.
+    /// Adds a single misplaced mod, with its file path as a child, beneath the given tree node.
     /// </summary>
-    private static void PrintMisplacedMod(MisplacedMod mod)
+    private static void AddMisplacedModNode(IHasTreeNodes parent, MisplacedMod mod)
     {
         var name = !string.IsNullOrWhiteSpace(mod.Name) ? mod.Name : Path.GetFileName(mod.FilePath);
         var guidSuffix = !string.IsNullOrWhiteSpace(mod.Guid) ? $" [grey]({mod.Guid.EscapeMarkup()})[/]" : string.Empty;
 
-        AnsiConsole.MarkupLine($"  [white]{name.EscapeMarkup()}[/]{guidSuffix}");
-        AnsiConsole.MarkupLine($"    [grey]{mod.FilePath.EscapeMarkup()}[/]");
+        var modNode = parent.AddNode($"[white]{name.EscapeMarkup()}[/]{guidSuffix}");
+        modNode.AddNode($"[grey]{mod.FilePath.EscapeMarkup()}[/]");
     }
 
     /// <inheritdoc />
@@ -533,7 +542,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         }
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[yellow]Mods not found on Forge:[/]");
+        var tree = new Tree("[yellow]Mods not found on Forge[/]");
 
         foreach (var mod in unverifiedMods)
         {
@@ -543,12 +552,24 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                 modDisplayName += $" by {mod.DisplayAuthor.EscapeMarkup()}";
             }
 
-            AnsiConsole.MarkupLine($"  [white]{modDisplayName}[/]");
+            var modNode = tree.AddNode($"[white]{modDisplayName}[/]");
+
+            if (!string.IsNullOrWhiteSpace(mod.Guid))
+            {
+                modNode.AddNode($"[grey]GUID: {mod.Guid.EscapeMarkup()}[/]");
+            }
+
+            if (!string.IsNullOrWhiteSpace(mod.FilePath))
+            {
+                modNode.AddNode($"[grey]Path: {mod.FilePath.EscapeMarkup()}[/]");
+            }
         }
+
+        AnsiConsole.Write(tree);
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine(
-            "[grey]These weren't matched to a Forge listing. That's expected for a mod that isn't published on Forge, or for a plugin bundled inside another mod you already have installed. No action is needed unless you expected one of these to be its own mod on Forge.[/]"
+            "[grey]These were not matched to a Forge listing. That's expected for a mod that isn't published on the Forge, or for a mod which includes multiple plugins where only one uses the GUID linked to the Forge. No action is needed unless you expected one of these to be its own mod on Forge.[/]"
         );
         AnsiConsole.WriteLine();
     }
@@ -686,35 +707,34 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <summary>
-    /// Displays dependency conflicts in the warning style.
+    /// Renders dependency conflicts as a tree.
     /// </summary>
     private static void DependencyConflicts(List<DependencyConflict> conflicts)
     {
-        AnsiConsole.MarkupLine("[yellow]Dependency conflicts:[/]");
+        var tree = new Tree("[yellow]Dependency conflicts[/]");
 
         foreach (var conflict in conflicts)
         {
-            var nameDisplay = $"[white]{conflict.ModName.EscapeMarkup()}[/]";
-
-            AnsiConsole.MarkupLine($"  {nameDisplay}");
-            AnsiConsole.MarkupLine($"    [yellow]- {conflict.Description.EscapeMarkup()}[/]");
+            var modNode = tree.AddNode($"[white]{conflict.ModName.EscapeMarkup()}[/]");
+            modNode.AddNode($"[yellow]{conflict.Description.EscapeMarkup()}[/]");
 
             if (conflict.DependencyInfo.Id > 0 && !string.IsNullOrWhiteSpace(conflict.DependencyInfo.Slug))
             {
                 var url = ForgeUrls.ModPage(conflict.DependencyInfo.Id, conflict.DependencyInfo.Slug);
-                AnsiConsole.MarkupLine($"      [grey]View on Forge:[/] [link]{url.EscapeMarkup()}[/]");
+                modNode.AddNode($"[grey]View on Forge:[/] [link]{url.EscapeMarkup()}[/]");
             }
         }
 
+        AnsiConsole.Write(tree);
         AnsiConsole.WriteLine();
     }
 
     /// <summary>
-    /// Displays missing dependencies in the download list style.
+    /// Renders missing dependencies as a tree of recommended versions and download links.
     /// </summary>
     private static void MissingDependencies(List<MissingDependency> missingDeps)
     {
-        AnsiConsole.MarkupLine("[red]Missing dependencies:[/]");
+        var tree = new Tree("[red]Missing dependencies[/]");
 
         foreach (var dep in missingDeps)
         {
@@ -722,30 +742,29 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             var url =
                 dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug) ? ForgeUrls.ModPage(dep.ModId, dep.Slug) : null;
             var nameDisplay = IsLinkUrlSafe(url)
-                ? $"[link={url}]{dep.Name.EscapeMarkup()}[/]"
+                ? $"[white link={url}]{dep.Name.EscapeMarkup()}[/]"
                 : $"[white]{dep.Name.EscapeMarkup()}[/]";
 
-            AnsiConsole.MarkupLine($"  {nameDisplay}");
-            AnsiConsole.MarkupLine(
-                $"    [grey]Recommended version:[/] [green]{dep.RecommendedVersion.EscapeMarkup()}[/]"
-            );
+            var depNode = tree.AddNode(nameDisplay);
+            depNode.AddNode($"[grey]Recommended version:[/] [green]{dep.RecommendedVersion.EscapeMarkup()}[/]");
 
             if (!string.IsNullOrWhiteSpace(dep.DownloadLink))
             {
-                AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{dep.DownloadLink.EscapeMarkup()}[/]");
+                depNode.AddNode($"[grey]Download:[/] [link]{dep.DownloadLink.EscapeMarkup()}[/]");
             }
         }
 
+        AnsiConsole.Write(tree);
         AnsiConsole.WriteLine();
     }
 
     /// <summary>
-    /// Renders, beneath an available update, how the proposed version changes the mod's dependencies: newly required
-    /// dependencies (with install state and a download link when missing) and any that are no longer required.
+    /// Adds, beneath an available update's tree node, how the proposed version changes the mod's dependencies: newly
+    /// required dependencies (with install state and a download link when missing) and any that are no longer required.
     /// </summary>
-    private static void UpdateDependencyChangeDetails(UpdateDependencyDelta delta)
+    private static void AddUpdateDependencyChangeNodes(TreeNode modNode, UpdateDependencyDelta delta)
     {
-        AnsiConsole.MarkupLine("    [grey]Dependency changes:[/]");
+        var changesNode = modNode.AddNode("[grey]Dependency changes:[/]");
 
         foreach (var dep in delta.Added)
         {
@@ -753,7 +772,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
             var url =
                 dep.ModId > 0 && !string.IsNullOrWhiteSpace(dep.Slug) ? ForgeUrls.ModPage(dep.ModId, dep.Slug) : null;
             var nameDisplay = IsLinkUrlSafe(url)
-                ? $"[link={url}]{dep.Name.EscapeMarkup()}[/]"
+                ? $"[white link={url}]{dep.Name.EscapeMarkup()}[/]"
                 : $"[white]{dep.Name.EscapeMarkup()}[/]";
 
             var annotation = dep.InstallState switch
@@ -765,24 +784,24 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
                 _ => $"[grey]already satisfied (v{(dep.InstalledVersion ?? dep.RecommendedVersion).EscapeMarkup()})[/]",
             };
 
-            AnsiConsole.MarkupLine($"      [green]+[/] {nameDisplay} {annotation}");
+            var depNode = changesNode.AddNode($"[green]+[/] {nameDisplay} {annotation}");
 
             if (dep.Conflict)
             {
-                AnsiConsole.MarkupLine("        [red]Version constraint conflict reported by Forge.[/]");
+                depNode.AddNode("[red]Version constraint conflict reported by Forge.[/]");
             }
 
             if (dep.InstallState == DependencyInstallState.NotInstalled && !string.IsNullOrWhiteSpace(dep.DownloadLink))
             {
-                AnsiConsole.MarkupLine($"        [grey]Download:[/] [link]{dep.DownloadLink.EscapeMarkup()}[/]");
+                depNode.AddNode($"[grey]Download:[/] [link]{dep.DownloadLink.EscapeMarkup()}[/]");
             }
         }
 
         foreach (var dep in delta.Removed)
         {
             var wasVersion = dep.InstalledVersion ?? dep.RecommendedVersion;
-            AnsiConsole.MarkupLine(
-                $"      [grey]-[/] [grey]{dep.Name.EscapeMarkup()} no longer required (was v{wasVersion.EscapeMarkup()})[/]"
+            changesNode.AddNode(
+                $"[grey]-[/] [grey]{dep.Name.EscapeMarkup()} no longer required (was v{wasVersion.EscapeMarkup()})[/]"
             );
         }
     }
@@ -804,7 +823,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold blue]Checking for mod updates...[/]");
         AnsiConsole.MarkupLine(
-            "[white]This tool depends on mod authors to use and update valid version numbers. If you notice a version number in the Current Version column that is incorrect, please contact the author of the mod to have it updated.[/]"
+            "[white]This tool depends on mod authors to use and update valid version numbers. If you notice a version number in the Current Version column that is incorrect, please contact the author of the mod to have it updated. Additionally, these updates can be ignored by selecting the \"Manage ignored updates\" option at the end of the check.[/]"
         );
         AnsiConsole.WriteLine();
 
@@ -822,7 +841,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
             var latestVersionDisplay = FormatVersionDisplay(mod);
 
-            var nameDisplay = FormatModLink(displayName, mod.ApiUrl, colorPlainNameWhite: false);
+            var nameDisplay = FormatModLink(displayName, mod.ApiUrl);
 
             table.AddRow(
                 nameDisplay,
@@ -845,27 +864,30 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         if (modsWithUpdates.Count > 0)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[red]Updates available:[/]");
+
+            var updatesTree = new Tree("[red]Updates available[/]");
 
             foreach (var mod in modsWithUpdates)
             {
                 var nameDisplay = FormatModLink(mod.DisplayName, mod.ApiUrl);
 
-                AnsiConsole.MarkupLine($"  {nameDisplay}");
-                AnsiConsole.MarkupLine(
-                    $"    [grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [green]{mod.LatestVersion!.EscapeMarkup()}[/]"
+                var modNode = updatesTree.AddNode(nameDisplay);
+                modNode.AddNode(
+                    $"[grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [green]{mod.LatestVersion!.EscapeMarkup()}[/]"
                 );
 
                 if (!string.IsNullOrWhiteSpace(mod.DownloadLink))
                 {
-                    AnsiConsole.MarkupLine($"    [grey]Download:[/] [link]{mod.DownloadLink.EscapeMarkup()}[/]");
+                    modNode.AddNode($"[grey]Download:[/] [link]{mod.DownloadLink.EscapeMarkup()}[/]");
                 }
 
                 if (mod.UpdateDependencyChanges?.HasChanges == true)
                 {
-                    UpdateDependencyChangeDetails(mod.UpdateDependencyChanges);
+                    AddUpdateDependencyChangeNodes(modNode, mod.UpdateDependencyChanges);
                 }
             }
+
+            AnsiConsole.Write(updatesTree);
         }
 
         // Display mods with blocked updates
@@ -873,32 +895,35 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
         if (modsWithBlockedUpdates.Count > 0)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[darkorange]Updates blocked:[/]");
+
+            var blockedTree = new Tree("[darkorange]Updates blocked[/]");
 
             foreach (var mod in modsWithBlockedUpdates)
             {
                 var nameDisplay = FormatModLink(mod.DisplayName, mod.ApiUrl);
 
-                AnsiConsole.MarkupLine($"  {nameDisplay}");
-                AnsiConsole.MarkupLine(
-                    $"    [grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [darkorange]{mod.LatestVersion!.EscapeMarkup()}[/]"
+                var modNode = blockedTree.AddNode(nameDisplay);
+                modNode.AddNode(
+                    $"[grey]{mod.LocalVersion.EscapeMarkup()}[/] [yellow]->[/] [darkorange]{mod.LatestVersion!.EscapeMarkup()}[/]"
                 );
 
                 if (!string.IsNullOrWhiteSpace(mod.BlockReason))
                 {
-                    AnsiConsole.MarkupLine($"    [grey]Reason:[/] {FormatBlockReason(mod.BlockReason).EscapeMarkup()}");
+                    modNode.AddNode($"[grey]Reason:[/] {FormatBlockReason(mod.BlockReason).EscapeMarkup()}");
                 }
 
                 if (mod.BlockingMods is { Count: > 0 })
                 {
                     foreach (var blocker in mod.BlockingMods)
                     {
-                        AnsiConsole.MarkupLine(
-                            $"    [grey]Blocked by:[/] {blocker.Name.EscapeMarkup()} [grey]({blocker.Constraint.EscapeMarkup()})[/]"
+                        modNode.AddNode(
+                            $"[grey]Blocked by:[/] {blocker.Name.EscapeMarkup()} [grey]({blocker.Constraint.EscapeMarkup()})[/]"
                         );
                     }
                 }
             }
+
+            AnsiConsole.Write(blockedTree);
         }
 
         AnsiConsole.WriteLine();
@@ -1147,22 +1172,21 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     }
 
     /// <summary>
-    /// Renders a mod name as a clickable Forge link when an API URL is available, otherwise as plain text. The name
-    /// is markup-escaped internally.
+    /// Renders a mod name in white, as a clickable Forge link when an API URL is available. The name is markup-escaped
+    /// internally.
     /// </summary>
     /// <param name="name">The raw mod name to display.</param>
     /// <param name="apiUrl">The Forge mod page URL, or null/empty when none is known.</param>
-    /// <param name="colorPlainNameWhite">When true (the default), the non-linked fallback is wrapped in white.</param>
-    private static string FormatModLink(string name, string? apiUrl, bool colorPlainNameWhite = true)
+    private static string FormatModLink(string name, string? apiUrl)
     {
         var escaped = name.EscapeMarkup();
 
         if (IsLinkUrlSafe(apiUrl))
         {
-            return $"[link={apiUrl}]{escaped}[/]";
+            return $"[white link={apiUrl}]{escaped}[/]";
         }
 
-        return colorPlainNameWhite ? $"[white]{escaped}[/]" : escaped;
+        return $"[white]{escaped}[/]";
     }
 
     /// <summary>
