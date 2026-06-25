@@ -406,9 +406,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
 
                         if (!string.IsNullOrWhiteSpace(reportUrl))
                         {
-                            modNode.AddNode(
-                                $"[grey]Report the issue here:[/] [link]{reportUrl.EscapeMarkup()}[/]"
-                            );
+                            modNode.AddNode($"[grey]Report the issue here:[/] [link]{reportUrl.EscapeMarkup()}[/]");
                         }
                     }
                     else if (!string.IsNullOrWhiteSpace(reportUrl))
