@@ -32,6 +32,24 @@ public sealed class SecurityHelperTests
     }
 
     [Fact]
+    public void IsWithinDirectory_rejects_linux_sibling_that_only_extends_directory_name()
+    {
+        var directory = Path.GetFullPath(Path.Combine(Path.DirectorySeparatorChar.ToString(), "root", "SPT"));
+        var sibling = Path.GetFullPath(Path.Combine(Path.DirectorySeparatorChar.ToString(), "root", "SPT2", "BepInEx", "plugins", "mod.dll"));
+
+        Assert.False(SecurityHelper.IsWithinDirectory(sibling, directory));
+    }
+
+    [Fact]
+    public void GetSafePath_rejects_linux_sibling_that_only_extends_base_directory_name()
+    {
+        var directory = Path.GetFullPath(Path.Combine(Path.DirectorySeparatorChar.ToString(), "root", "SPT"));
+        var sibling = Path.GetFullPath(Path.Combine(Path.DirectorySeparatorChar.ToString(), "root", "SPT2", "BepInEx", "plugins", "mod.dll"));
+
+        Assert.Null(SecurityHelper.GetSafePath(sibling, directory));
+    }
+
+    [Fact]
     public void GetSafePath_rejects_traversal_outside_base_directory()
     {
         var root = Path.GetTempPath();
