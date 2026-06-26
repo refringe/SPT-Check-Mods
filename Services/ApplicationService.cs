@@ -369,35 +369,14 @@ public sealed class ApplicationService(
     /// </summary>
     private static List<Mod> ExcludeMisplacedMods(List<Mod> mods, MisplacedModReport report)
     {
-        var excludedFiles = new HashSet<string>(report.ExcludedFilePaths, StringComparer.OrdinalIgnoreCase);
+        var excludedFiles = new HashSet<string>(report.ExcludedFilePaths, SecurityHelper.PathStringComparer);
         var excludedDirectories = report.ExcludedDirectories;
 
         return mods.Where(mod =>
                 !excludedFiles.Contains(mod.FilePath)
-                && !excludedDirectories.Any(directory => IsWithinDirectory(mod.FilePath, directory))
+                && !excludedDirectories.Any(directory => SecurityHelper.IsWithinDirectory(mod.FilePath, directory))
             )
             .ToList();
-    }
-
-    /// <summary>
-    /// Determines whether <paramref name="filePath"/> lives inside <paramref name="directory"/> (or is that directory
-    /// itself), comparing fully-resolved paths case-insensitively.
-    /// </summary>
-    private static bool IsWithinDirectory(string filePath, string directory)
-    {
-        var fullFile = Path.GetFullPath(filePath);
-        var fullDirectory = Path.GetFullPath(directory);
-
-        if (string.Equals(fullFile, fullDirectory, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var prefix = fullDirectory.EndsWith(Path.DirectorySeparatorChar)
-            ? fullDirectory
-            : fullDirectory + Path.DirectorySeparatorChar;
-
-        return fullFile.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -778,7 +757,7 @@ public sealed class ApplicationService(
             var configDirectory = Path.GetFullPath(Path.Combine(appDataFolder, "SptCheckMods"));
             var configFilePath = Path.GetFullPath(Path.Combine(configDirectory, "apikey.txt"));
 
-            if (!configFilePath.StartsWith(configDirectory + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            if (!SecurityHelper.IsWithinDirectory(configFilePath, configDirectory))
             {
                 return;
             }

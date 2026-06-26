@@ -901,7 +901,7 @@ public sealed class ModScannerService(
 
         return Directory
             .GetFiles(pluginsPath, "*.dll", SearchOption.AllDirectories)
-            .Where(file => !file.StartsWith(sptDir, StringComparison.OrdinalIgnoreCase))
+            .Where(file => !SecurityHelper.IsWithinDirectory(file, sptDir))
             .Where(file => new FileInfo(file).Length <= _options.MaxDllSizeBytes)
             .ToList();
     }

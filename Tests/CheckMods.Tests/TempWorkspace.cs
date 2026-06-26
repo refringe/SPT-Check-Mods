@@ -1,3 +1,5 @@
+using CheckMods.Utils;
+
 namespace CheckMods.Tests;
 
 /// <summary>
@@ -15,7 +17,7 @@ internal static class TempWorkspace
         var candidate = Path.GetFullPath(Path.Combine(root, $"{prefix}-{Guid.NewGuid():N}"));
 
         // Reject anything that escaped the temp root before it is used for any file operation.
-        if (!candidate.StartsWith(root, StringComparison.Ordinal))
+        if (!SecurityHelper.IsWithinDirectory(candidate, root))
         {
             throw new InvalidOperationException($"Resolved temp path '{candidate}' escaped the temp root '{root}'.");
         }

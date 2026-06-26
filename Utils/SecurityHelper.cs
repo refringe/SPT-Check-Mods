@@ -6,6 +6,20 @@ namespace CheckMods.Utils;
 public static class SecurityHelper
 {
     /// <summary>
+    /// Gets the string comparison to use for local filesystem paths on the current platform.
+    /// </summary>
+    public static StringComparison PathStringComparison => OperatingSystem.IsWindows()
+        ? StringComparison.OrdinalIgnoreCase
+        : StringComparison.Ordinal;
+
+    /// <summary>
+    /// Gets the string comparer to use for local filesystem paths on the current platform.
+    /// </summary>
+    public static StringComparer PathStringComparer => OperatingSystem.IsWindows()
+        ? StringComparer.OrdinalIgnoreCase
+        : StringComparer.Ordinal;
+
+    /// <summary>
     /// Validates and returns a safe absolute path, preventing directory traversal attacks. Resolves relative path
     /// segments and ensures the result stays within the base path if provided.
     /// </summary>
@@ -28,10 +42,7 @@ public static class SecurityHelper
                 return fullPath;
             }
 
-            var baseFullPath = Path.GetFullPath(basePath);
-
-            // Return null if a path traversal attempt is detected
-            return !fullPath.StartsWith(baseFullPath, StringComparison.OrdinalIgnoreCase) ? null : fullPath;
+            return IsWithinDirectory(fullPath, basePath) ? fullPath : null;
         }
         catch (ArgumentException)
         {
@@ -45,5 +56,26 @@ public static class SecurityHelper
         {
             return null; // Path contains a colon in the middle of the string
         }
+    }
+
+    /// <summary>
+    /// Determines whether <paramref name="path"/> lives inside <paramref name="directory"/> or is that directory,
+    /// using platform-appropriate filesystem path comparison semantics.
+    /// </summary>
+    public static bool IsWithinDirectory(string path, string directory)
+    {
+        var fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        var fullDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
+
+        if (string.Equals(fullPath, fullDirectory, PathStringComparison))
+        {
+            return true;
+        }
+
+        var prefix = fullDirectory.EndsWith(Path.DirectorySeparatorChar)
+            ? fullDirectory
+            : fullDirectory + Path.DirectorySeparatorChar;
+
+        return fullPath.StartsWith(prefix, PathStringComparison);
     }
 }
