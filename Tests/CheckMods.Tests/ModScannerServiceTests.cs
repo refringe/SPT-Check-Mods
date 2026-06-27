@@ -21,9 +21,7 @@ public sealed class ModScannerServiceTests
 
         try
         {
-            var serverModDirectory = Path.Combine(sptPath, "SPT", "user", "mods", "ServerOnlyMod");
-            Directory.CreateDirectory(serverModDirectory);
-            File.Copy(typeof(ServerOnlyMetadata).Assembly.Location, Path.Combine(serverModDirectory, "ServerOnlyMod.dll"));
+            CreateServerOnlyMod(sptPath);
 
             var logger = new RecordingLogger<ModScannerService>();
             var service = new ModScannerService(Options.Create(new ModScannerOptions()), reporter, logger);
@@ -51,6 +49,43 @@ public sealed class ModScannerServiceTests
         {
             Directory.Delete(sptPath, recursive: true);
         }
+    }
+
+    [Fact]
+    public void DetectMisplacedMods_returns_empty_report_when_plugins_directory_is_missing()
+    {
+        var sptPath = TempWorkspace.CreateDirectory("checkmods-server-only-misplaced-spt");
+
+        try
+        {
+            CreateServerOnlyMod(sptPath);
+            var pluginsDirectory = Path.Combine(sptPath, "BepInEx", "plugins");
+            var service = new ModScannerService(
+                Options.Create(new ModScannerOptions()),
+                new RecordingModCheckReporter(),
+                new RecordingLogger<ModScannerService>()
+            );
+
+            var report = service.DetectMisplacedMods(sptPath);
+
+            Assert.False(Directory.Exists(pluginsDirectory));
+            Assert.False(report.Any);
+            Assert.Empty(report.WrongFolder);
+            Assert.Empty(report.CrossInstalled);
+            Assert.Empty(report.ExcludedFilePaths);
+            Assert.Empty(report.ExcludedDirectories);
+        }
+        finally
+        {
+            Directory.Delete(sptPath, recursive: true);
+        }
+    }
+
+    private static void CreateServerOnlyMod(string sptPath)
+    {
+        var serverModDirectory = Path.Combine(sptPath, "SPT", "user", "mods", "ServerOnlyMod");
+        Directory.CreateDirectory(serverModDirectory);
+        File.Copy(typeof(ServerOnlyMetadata).Assembly.Location, Path.Combine(serverModDirectory, "ServerOnlyMod.dll"));
     }
 
     private sealed class RecordingLogger<T> : ILogger<T>
