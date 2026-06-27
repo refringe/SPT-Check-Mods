@@ -117,7 +117,7 @@ public sealed class SpectreModCheckReporter : IModCheckReporter
     public void PluginsDirectoryNotFound(string path)
     {
         AnsiConsole.MarkupLine(
-            $"[orange1]Warning:[/] BepInEx plugins directory not found: [grey]{path.EscapeMarkup()}[/]"
+            $"[grey]No BepInEx plugins directory found at {path.EscapeMarkup()}; continuing with server mods only.[/]"
         );
     }
 
