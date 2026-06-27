@@ -52,6 +52,37 @@ public sealed class ModScannerServiceTests
     }
 
     [Fact]
+    public void ScanServerMods_includes_package_only_server_mods()
+    {
+        var sptPath = TempWorkspace.CreateDirectory("checkmods-package-only-spt");
+
+        try
+        {
+            CreatePackageOnlyServerMod(sptPath);
+            var service = new ModScannerService(
+                Options.Create(new ModScannerOptions()),
+                new RecordingModCheckReporter(),
+                new RecordingLogger<ModScannerService>()
+            );
+
+            var serverMods = service.ScanServerMods(sptPath);
+
+            var serverMod = Assert.Single(serverMods);
+            Assert.True(serverMod.IsServerMod);
+            Assert.Equal("PackageOnlyMod", serverMod.Guid);
+            Assert.Equal("PackageOnlyMod", serverMod.LocalName);
+            Assert.Equal("CheckMods", serverMod.LocalAuthor);
+            Assert.Equal("2.3.4", serverMod.LocalVersion);
+            Assert.Equal("~4.0", serverMod.LocalSptVersion);
+            Assert.Equal(Path.Combine(sptPath, "SPT", "user", "mods", "PackageOnlyMod", "package.json"), serverMod.FilePath);
+        }
+        finally
+        {
+            Directory.Delete(sptPath, recursive: true);
+        }
+    }
+
+    [Fact]
     public void DetectMisplacedMods_returns_empty_report_when_plugins_directory_is_missing()
     {
         var sptPath = TempWorkspace.CreateDirectory("checkmods-server-only-misplaced-spt");
@@ -86,6 +117,24 @@ public sealed class ModScannerServiceTests
         var serverModDirectory = Path.Combine(sptPath, "SPT", "user", "mods", "ServerOnlyMod");
         Directory.CreateDirectory(serverModDirectory);
         File.Copy(typeof(ServerOnlyMetadata).Assembly.Location, Path.Combine(serverModDirectory, "ServerOnlyMod.dll"));
+    }
+
+    private static void CreatePackageOnlyServerMod(string sptPath)
+    {
+        var serverModDirectory = Path.Combine(sptPath, "SPT", "user", "mods", "PackageOnlyMod");
+        Directory.CreateDirectory(serverModDirectory);
+        File.WriteAllText(
+            Path.Combine(serverModDirectory, "package.json"),
+            """
+            {
+              "name": "PackageOnlyMod",
+              "author": "CheckMods",
+              "version": "2.3.4",
+              "sptVersion": "~4.0",
+              "main": "src/mod.js"
+            }
+            """
+        );
     }
 
     private sealed class RecordingLogger<T> : ILogger<T>

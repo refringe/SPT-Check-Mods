@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.Json;
 using CheckMods.Configuration;
 using CheckMods.Models;
 using CheckMods.Services.Interfaces;
@@ -48,24 +49,30 @@ public sealed class ModScannerService(
             cancellationToken.ThrowIfCancellationRequested();
 
             var dllFiles = Directory.GetFiles(modDir, "*.dll", SearchOption.TopDirectoryOnly);
+            Mod? mod = null;
 
             foreach (var dllPath in dllFiles)
             {
                 try
                 {
-                    var mod = ExtractServerModMetadata(dllPath, sptPath);
+                    mod = ExtractServerModMetadata(dllPath, sptPath);
                     if (mod is null)
                     {
                         continue;
                     }
 
-                    mods.Add(mod);
                     break; // Only one mod per directory
                 }
                 catch (Exception ex)
                 {
                     reporter.CouldNotReadModDll(Path.GetFileName(dllPath), ex.Message);
                 }
+            }
+
+            mod ??= ExtractServerModPackageMetadata(modDir);
+            if (mod is not null)
+            {
+                mods.Add(mod);
             }
         }
 
@@ -805,6 +812,52 @@ public sealed class ModScannerService(
         {
             loadContext.Unload();
         }
+    }
+
+    private static Mod? ExtractServerModPackageMetadata(string modDirectory)
+    {
+        var packagePath = Path.Combine(modDirectory, "package.json");
+        if (!File.Exists(packagePath))
+        {
+            return null;
+        }
+
+        using var packageStream = File.OpenRead(packagePath);
+        using var packageDocument = JsonDocument.Parse(packageStream);
+        var root = packageDocument.RootElement;
+        var directoryName = Path.GetFileName(modDirectory);
+        var name = GetStringProperty(root, "name") ?? directoryName;
+        var author = GetStringProperty(root, "author") ?? "Unknown";
+        var version = GetStringProperty(root, "version") ?? string.Empty;
+        var sptVersion = GetStringProperty(root, "sptVersion") ?? GetStringProperty(root, "akiVersion");
+        var warnings = ValidateModMetadata(name, author, version, name);
+
+        return new Mod
+        {
+            Guid = name,
+            FilePath = packagePath,
+            IsServerMod = true,
+            LocalName = name,
+            LocalAuthor = author,
+            LocalVersion = version,
+            LocalSptVersion = sptVersion,
+            LoadWarnings = warnings,
+        };
+    }
+
+    private static string? GetStringProperty(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var value))
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Number => value.GetRawText(),
+            _ => null,
+        };
     }
 
     private static object? LoadSptMetadataFromAssembly(Assembly assembly)
