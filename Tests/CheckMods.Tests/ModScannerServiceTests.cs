@@ -2,7 +2,7 @@ using CheckMods.Configuration;
 using CheckMods.Models;
 using CheckMods.Services;
 using CheckMods.Services.Interfaces;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SemanticVersioning;
 
@@ -25,11 +25,8 @@ public sealed class ModScannerServiceTests
             Directory.CreateDirectory(serverModDirectory);
             File.Copy(typeof(ServerOnlyMetadata).Assembly.Location, Path.Combine(serverModDirectory, "ServerOnlyMod.dll"));
 
-            var service = new ModScannerService(
-                Options.Create(new ModScannerOptions()),
-                reporter,
-                NullLogger<ModScannerService>.Instance
-            );
+            var logger = new RecordingLogger<ModScannerService>();
+            var service = new ModScannerService(Options.Create(new ModScannerOptions()), reporter, logger);
 
             var (serverMods, clientMods) = await service.ScanAllModsAsync(sptPath);
 
@@ -41,11 +38,37 @@ public sealed class ModScannerServiceTests
             Assert.Equal("1.2.3", serverMod.LocalVersion);
             Assert.Empty(clientMods);
             Assert.Contains(Path.Combine(sptPath, "BepInEx", "plugins"), reporter.MissingPluginDirectories);
+            Assert.Contains(logger.Entries, entry =>
+                entry.Level == LogLevel.Information
+                && entry.Message.Contains("skipping client-mod scan", StringComparison.Ordinal)
+            );
+            Assert.DoesNotContain(logger.Entries, entry =>
+                entry.Level >= LogLevel.Warning
+                && entry.Message.Contains("BepInEx plugins directory not found", StringComparison.Ordinal)
+            );
         }
         finally
         {
             Directory.Delete(sptPath, recursive: true);
         }
+    }
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        ) => Entries.Add((logLevel, formatter(state, exception)));
     }
 
     private sealed class RecordingModCheckReporter : IModCheckReporter

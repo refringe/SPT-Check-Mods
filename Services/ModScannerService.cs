@@ -84,7 +84,7 @@ public sealed class ModScannerService(
 
         if (!Directory.Exists(pluginsDir))
         {
-            logger.LogWarning("BepInEx plugins directory not found: {PluginsDir}", pluginsDir);
+            logger.LogInformation("BepInEx plugins directory not found; skipping client-mod scan: {PluginsDir}", pluginsDir);
             reporter.PluginsDirectoryNotFound(pluginsDir);
             return mods;
         }
